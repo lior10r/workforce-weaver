@@ -1,5 +1,7 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, LucideIcon } from 'lucide-react';
-import { GROUPS, DEPARTMENTS, Hierarchy } from '@/lib/workforce-data';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus } from 'lucide-react';
+import { DEPARTMENTS, DEPARTMENT_NAMES, Hierarchy } from '@/lib/workforce-data';
+import { useState } from 'react';
+import { LucideIcon } from 'lucide-react';
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -23,9 +25,43 @@ interface SidebarProps {
   setView: (view: string) => void;
   hierarchy: Hierarchy;
   setHierarchy: (hierarchy: Hierarchy) => void;
+  departments: Record<string, string[]>;
+  onAddDepartment: (name: string) => void;
+  onAddTeam: (dept: string, teamName: string) => void;
 }
 
-export const Sidebar = ({ view, setView, hierarchy, setHierarchy }: SidebarProps) => {
+export const Sidebar = ({ 
+  view, 
+  setView, 
+  hierarchy, 
+  setHierarchy,
+  departments,
+  onAddDepartment,
+  onAddTeam
+}: SidebarProps) => {
+  const [showAddDept, setShowAddDept] = useState(false);
+  const [showAddTeam, setShowAddTeam] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [newTeamName, setNewTeamName] = useState('');
+
+  const handleAddDept = () => {
+    if (newDeptName.trim()) {
+      onAddDepartment(newDeptName.trim());
+      setNewDeptName('');
+      setShowAddDept(false);
+    }
+  };
+
+  const handleAddTeam = () => {
+    if (newTeamName.trim() && hierarchy.dept !== 'All') {
+      onAddTeam(hierarchy.dept, newTeamName.trim());
+      setNewTeamName('');
+      setShowAddTeam(false);
+    }
+  };
+
+  const deptList = Object.keys(departments);
+
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col p-6">
       {/* Logo */}
@@ -65,27 +101,91 @@ export const Sidebar = ({ view, setView, hierarchy, setHierarchy }: SidebarProps
           active={view === 'planner'} 
           onClick={() => setView('planner')} 
         />
+        <SidebarItem 
+          icon={BarChart3} 
+          label="Team Analytics" 
+          active={view === 'analytics'} 
+          onClick={() => setView('analytics')} 
+        />
       </nav>
 
       {/* Scope Filter */}
       <div className="mt-auto p-4 bg-accent/50 rounded-2xl border border-border">
         <p className="text-[10px] text-muted-foreground font-bold uppercase mb-3 tracking-widest">Scope Filter</p>
         <div className="space-y-2">
-          <select 
-            className="select-field w-full text-xs"
-            value={hierarchy.group}
-            onChange={(e) => setHierarchy({ group: e.target.value, dept: 'All', team: 'All' })}
-          >
-            {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
-          <select 
-            className="select-field w-full text-xs"
-            value={hierarchy.dept}
-            onChange={(e) => setHierarchy({ ...hierarchy, dept: e.target.value, team: 'All' })}
-          >
-            <option value="All">All Departments</option>
-            {DEPARTMENTS[hierarchy.group]?.map(d => <option key={d} value={d}>{d}</option>)}
-          </select>
+          {/* Department Select */}
+          <div className="flex gap-1">
+            <select 
+              className="select-field flex-1 text-xs"
+              value={hierarchy.dept}
+              onChange={(e) => setHierarchy({ dept: e.target.value, team: 'All' })}
+            >
+              <option value="All">All Departments</option>
+              {deptList.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
+            <button 
+              onClick={() => setShowAddDept(!showAddDept)}
+              className="p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors"
+              title="Add Department"
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+          
+          {showAddDept && (
+            <div className="flex gap-1 animate-fade-in">
+              <input 
+                type="text"
+                value={newDeptName}
+                onChange={(e) => setNewDeptName(e.target.value)}
+                placeholder="Department name"
+                className="input-field flex-1 text-xs py-1.5"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddDept()}
+              />
+              <button onClick={handleAddDept} className="btn-primary py-1.5 px-2 text-xs">
+                Add
+              </button>
+            </div>
+          )}
+
+          {/* Team Select */}
+          <div className="flex gap-1">
+            <select 
+              className="select-field flex-1 text-xs"
+              value={hierarchy.team}
+              onChange={(e) => setHierarchy({ ...hierarchy, team: e.target.value })}
+              disabled={hierarchy.dept === 'All'}
+            >
+              <option value="All">All Teams</option>
+              {hierarchy.dept !== 'All' && departments[hierarchy.dept]?.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <button 
+              onClick={() => setShowAddTeam(!showAddTeam)}
+              className="p-2 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Add Team"
+              disabled={hierarchy.dept === 'All'}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {showAddTeam && hierarchy.dept !== 'All' && (
+            <div className="flex gap-1 animate-fade-in">
+              <input 
+                type="text"
+                value={newTeamName}
+                onChange={(e) => setNewTeamName(e.target.value)}
+                placeholder="Team name"
+                className="input-field flex-1 text-xs py-1.5"
+                onKeyDown={(e) => e.key === 'Enter' && handleAddTeam()}
+              />
+              <button onClick={handleAddTeam} className="btn-primary py-1.5 px-2 text-xs">
+                Add
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </aside>

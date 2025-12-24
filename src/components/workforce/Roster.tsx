@@ -1,5 +1,5 @@
 import { Flag, Edit2 } from 'lucide-react';
-import { Employee, getRoleColor, getStatusColor } from '@/lib/workforce-data';
+import { Employee, getRoleColor, formatDate } from '@/lib/workforce-data';
 
 interface RosterProps {
   employees: Employee[];
@@ -44,7 +44,7 @@ export const Roster = ({ employees, openPlannerForUser, onEditEmployee }: Roster
           
           {/* Employee info */}
           <h4 className="font-bold text-lg text-foreground">{emp.name}</h4>
-          <p className="text-xs text-muted-foreground mb-4">{emp.role} • {emp.dept}</p>
+          <p className="text-xs text-muted-foreground mb-4">{emp.role} • {emp.team}</p>
           
           {/* Footer with status and date */}
           <div className="flex justify-between items-center">
@@ -61,7 +61,7 @@ export const Roster = ({ employees, openPlannerForUser, onEditEmployee }: Roster
               {emp.status}
             </span>
             <span className="text-muted-foreground font-mono text-[10px]">
-              Since {emp.joined}
+              Since {formatDate(emp.joined)}
             </span>
           </div>
         </div>

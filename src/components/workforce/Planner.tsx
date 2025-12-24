@@ -1,5 +1,5 @@
 import { Plus, Flag } from 'lucide-react';
-import { Employee, WorkforceEvent } from '@/lib/workforce-data';
+import { Employee, WorkforceEvent, formatDate } from '@/lib/workforce-data';
 
 interface PlannerProps {
   employees: Employee[];
@@ -72,7 +72,7 @@ export const Planner = ({ employees, events, onAddMovement }: PlannerProps) => {
                     </span>
                   </td>
                   <td className="px-8 py-5">
-                    <span className="text-foreground font-mono text-sm">{ev.date}</span>
+                    <span className="text-foreground font-mono text-sm">{formatDate(ev.date)}</span>
                   </td>
                   <td className="px-8 py-5">
                     <span className="text-sm text-muted-foreground">{ev.details}</span>
