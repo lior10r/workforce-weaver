@@ -2,95 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+@import "@fontsource/geist-sans/700.css";
+@import "@fontsource/geist-mono/400.css";
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* Dark command center theme */
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 222 47% 5%;
+    --popover-foreground: 210 40% 98%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 4%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217 33% 12%;
+    --secondary-foreground: 210 40% 98%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 55%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 217 33% 15%;
+    --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 217 33% 15%;
+    --input: 217 33% 15%;
+    --ring: 217 91% 60%;
 
-    --radius: 0.5rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Custom role colors */
+    --role-junior: 160 84% 39%;
+    --role-senior: 217 91% 60%;
+    --role-lead: 270 91% 65%;
+    --role-architect: 25 95% 53%;
+    --role-pm: 330 81% 60%;
+    --role-qa: 187 92% 51%;
+    --role-manager: 0 84% 60%;
+    --role-default: 215 14% 45%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    /* Status colors */
+    --status-active: 142 76% 45%;
+    --status-course: 270 91% 65%;
+    --status-leave: 45 93% 47%;
+    --status-notice: 0 84% 60%;
 
-    --sidebar-primary: 240 5.9% 10%;
+    /* Accent colors for UI */
+    --flag-color: 25 95% 53%;
+    --success-color: 160 84% 39%;
+    --info-color: 217 91% 60%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar */
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 15%;
+    --sidebar-ring: 217 91% 60%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    --background: 222 47% 4%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222 47% 6%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222 47% 5%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 4%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 217 33% 12%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 55%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 217 33% 15%;
     --accent-foreground: 210 40% 98%;
 
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 217 33% 15%;
+    --input: 217 33% 15%;
+    --ring: 217 91% 60%;
+    
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 215 20% 65%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217 33% 12%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217 33% 15%;
+    --sidebar-ring: 217 91% 60%;
   }
 }
 
@@ -100,6 +119,137 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: "Geist Sans", system-ui, sans-serif;
+  }
+
+  .font-mono {
+    font-family: "Geist Mono", monospace;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/40 border border-border backdrop-blur-sm rounded-2xl;
+  }
+
+  .stat-card {
+    @apply glass-card p-6 transition-all duration-300 hover:border-primary/30;
+  }
+
+  .sidebar-item {
+    @apply w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200;
+  }
+
+  .sidebar-item-active {
+    @apply bg-primary text-primary-foreground shadow-lg shadow-primary/20 translate-x-1;
+  }
+
+  .sidebar-item-inactive {
+    @apply text-muted-foreground hover:bg-accent hover:text-foreground;
+  }
+
+  .input-field {
+    @apply w-full bg-background border border-border rounded-xl px-4 py-3 text-sm 
+           focus:border-primary focus:ring-1 focus:ring-primary outline-none 
+           transition-all duration-200 placeholder:text-muted-foreground;
+  }
+
+  .select-field {
+    @apply bg-background border border-border rounded-xl px-4 py-3 text-sm outline-none 
+           transition-all duration-200 focus:border-primary;
+  }
+
+  .btn-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2.5 
+           rounded-xl flex items-center gap-2 transition-all font-semibold text-sm 
+           shadow-lg shadow-primary/20;
+  }
+
+  .btn-secondary {
+    @apply border border-border hover:bg-accent text-foreground px-5 py-2.5 
+           rounded-xl flex items-center gap-2 transition-all font-semibold text-sm;
+  }
+
+  .btn-flag {
+    @apply bg-flag hover:bg-flag/90 text-foreground px-5 py-2.5 
+           rounded-xl flex items-center gap-2 transition-all font-semibold text-sm;
+  }
+
+  .badge {
+    @apply px-2 py-1 text-[10px] font-bold rounded uppercase tracking-wider;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary/10 text-primary border border-primary/20;
+  }
+
+  .badge-flag {
+    @apply badge bg-flag/10 text-flag border border-flag/20;
+  }
+
+  /* Role color utilities */
+  .role-junior { background-color: hsl(var(--role-junior)); }
+  .role-senior { background-color: hsl(var(--role-senior)); }
+  .role-lead { background-color: hsl(var(--role-lead)); }
+  .role-architect { background-color: hsl(var(--role-architect)); }
+  .role-pm { background-color: hsl(var(--role-pm)); }
+  .role-qa { background-color: hsl(var(--role-qa)); }
+  .role-manager { background-color: hsl(var(--role-manager)); }
+  .role-default { background-color: hsl(var(--role-default)); }
+
+  /* Text colors for roles */
+  .text-role-junior { color: hsl(var(--role-junior)); }
+  .text-role-senior { color: hsl(var(--role-senior)); }
+  .text-role-lead { color: hsl(var(--role-lead)); }
+  .text-role-architect { color: hsl(var(--role-architect)); }
+  .text-role-pm { color: hsl(var(--role-pm)); }
+  .text-role-qa { color: hsl(var(--role-qa)); }
+  .text-role-manager { color: hsl(var(--role-manager)); }
+
+  /* Status colors */
+  .status-active { background-color: hsl(var(--status-active)); }
+  .status-course { background-color: hsl(var(--status-course)); }
+  .status-leave { background-color: hsl(var(--status-leave)); }
+  .status-notice { background-color: hsl(var(--status-notice)); }
+
+  .text-flag { color: hsl(var(--flag-color)); }
+  .bg-flag { background-color: hsl(var(--flag-color)); }
+  .bg-flag\/10 { background-color: hsl(var(--flag-color) / 0.1); }
+  .border-flag\/20 { border-color: hsl(var(--flag-color) / 0.2); }
+}
+
+@layer utilities {
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 3px;
   }
 }
