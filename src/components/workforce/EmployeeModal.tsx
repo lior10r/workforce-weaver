@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { Employee, GROUPS, DEPARTMENTS, ROLES, STATUSES, Hierarchy } from '@/lib/workforce-data';
+import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, Hierarchy } from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect } from 'react';
 
 interface EmployeeModalProps {
@@ -8,18 +8,19 @@ interface EmployeeModalProps {
   onSubmit: (employee: Omit<Employee, 'id'>, id?: number) => void;
   editingEmployee: Employee | null;
   hierarchy: Hierarchy;
+  departments: Record<string, string[]>;
 }
 
-export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy }: EmployeeModalProps) => {
-  const [selectedGroup, setSelectedGroup] = useState(hierarchy.group);
+export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy, departments }: EmployeeModalProps) => {
+  const [selectedDept, setSelectedDept] = useState(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
 
   useEffect(() => {
     if (editingEmployee) {
-      setSelectedGroup(editingEmployee.group);
+      setSelectedDept(editingEmployee.dept);
     } else {
-      setSelectedGroup(hierarchy.group);
+      setSelectedDept(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
     }
-  }, [editingEmployee, hierarchy.group, isOpen]);
+  }, [editingEmployee, hierarchy.dept, isOpen]);
 
   if (!isOpen) return null;
 
@@ -29,8 +30,8 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
     
     const employeeData = {
       name: formData.get('name') as string,
-      group: formData.get('group') as string,
       dept: formData.get('dept') as string,
+      team: formData.get('team') as string,
       role: formData.get('role') as string,
       status: formData.get('status') as string,
       joined: formData.get('joined') as string,
@@ -38,6 +39,9 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
 
     onSubmit(employeeData, editingEmployee?.id);
   };
+
+  const deptList = Object.keys(departments);
+  const teamList = departments[selectedDept] || [];
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -71,27 +75,27 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-                Group
-              </label>
-              <select 
-                name="group" 
-                value={selectedGroup}
-                onChange={(e) => setSelectedGroup(e.target.value)}
-                className="select-field w-full"
-              >
-                {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
                 Department
               </label>
               <select 
                 name="dept" 
-                defaultValue={editingEmployee?.dept} 
+                value={selectedDept}
+                onChange={(e) => setSelectedDept(e.target.value)}
                 className="select-field w-full"
               >
-                {DEPARTMENTS[selectedGroup]?.map(d => <option key={d} value={d}>{d}</option>)}
+                {deptList.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                Team
+              </label>
+              <select 
+                name="team" 
+                defaultValue={editingEmployee?.team} 
+                className="select-field w-full"
+              >
+                {teamList.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
           </div>

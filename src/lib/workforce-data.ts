@@ -1,14 +1,17 @@
-// Configuration & Constants
-export const GROUPS = ['Engineering', 'Product & Design', 'Operations'] as const;
+// Configuration & Constants - Hierarchy: Department → Teams
 
+// Departments with their teams (4-8 teams per department, 6-7 people per team)
 export const DEPARTMENTS: Record<string, string[]> = {
-  'Engineering': ['Frontend', 'Backend', 'Infrastructure', 'Mobile', 'Security', 'DevOps'],
-  'Product & Design': ['Product Management', 'UX Design', 'Data Science'],
-  'Operations': ['HR', 'Finance', 'Legal']
+  'Engineering': ['Frontend Alpha', 'Frontend Beta', 'Backend Core', 'Backend API', 'Infrastructure', 'Mobile iOS', 'Mobile Android', 'Security'],
+  'Product & Design': ['Product Core', 'Product Growth', 'UX Research', 'UX Design', 'Data Analytics'],
+  'Operations': ['HR & People', 'Finance', 'Legal', 'Office Management']
 };
+
+export const DEPARTMENT_NAMES = Object.keys(DEPARTMENTS);
 
 export const ROLE_COLORS: Record<string, string> = {
   'Junior Dev': 'role-junior',
+  'Mid-Level Dev': 'role-mid',
   'Senior Dev': 'role-senior',
   'Team Lead': 'role-lead',
   'Architect': 'role-architect',
@@ -20,6 +23,7 @@ export const ROLE_COLORS: Record<string, string> = {
 
 export const ROLE_TEXT_COLORS: Record<string, string> = {
   'Junior Dev': 'text-role-junior',
+  'Mid-Level Dev': 'text-role-mid',
   'Senior Dev': 'text-role-senior',
   'Team Lead': 'text-role-lead',
   'Architect': 'text-role-architect',
@@ -33,16 +37,16 @@ export const ROLES = Object.keys(ROLE_COLORS).filter(r => r !== 'Default');
 export const STATUSES = ['Active', 'On Course', 'Parental Leave', 'Notice Period'] as const;
 export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Course Start', 'Course End', 'Departure', 'New Joiner', 'Decision Flag'] as const;
 
-// Timeline Range (Jan 2025 - Dec 2030)
-export const TIMELINE_START = new Date('2025-01-01');
+// Timeline Range (Jan 2020 - Dec 2030) - Extended to show historical data
+export const TIMELINE_START = new Date('2020-01-01');
 export const TIMELINE_END = new Date('2030-12-31');
 
 // Types
 export interface Employee {
   id: number;
   name: string;
-  group: string;
   dept: string;
+  team: string;
   role: string;
   status: string;
   joined: string;
@@ -58,7 +62,6 @@ export interface WorkforceEvent {
 }
 
 export interface Hierarchy {
-  group: string;
   dept: string;
   team: string;
 }
@@ -84,20 +87,64 @@ export const getStatusColor = (status: string): string => {
   }
 };
 
-// Initial data
+// Format date as dd/mm/yyyy
+export const formatDate = (dateStr: string): string => {
+  const date = new Date(dateStr);
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+};
+
+// Calculate capacity weight based on tenure and role
+export const getCapacityWeight = (role: string, joined: string, asOfDate: Date = new Date()): number => {
+  if (role === 'Team Lead') return 0; // Team leads don't count
+  
+  const joinDate = new Date(joined);
+  const yearsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  
+  // Junior: 0.7x, Mid-level (after 1 year): 1x, Senior (after 3 years total): 1.5x
+  if (yearsOfExperience >= 3) return 1.5; // Senior
+  if (yearsOfExperience >= 1) return 1.0; // Mid-level
+  return 0.7; // Junior
+};
+
+// Get effective role based on tenure
+export const getEffectiveRole = (originalRole: string, joined: string, asOfDate: Date = new Date()): string => {
+  if (originalRole === 'Team Lead' || originalRole === 'Architect' || originalRole === 'Engineering Manager' || originalRole === 'Product Manager') {
+    return originalRole;
+  }
+  
+  const joinDate = new Date(joined);
+  const yearsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  
+  if (yearsOfExperience >= 3) return 'Senior Dev';
+  if (yearsOfExperience >= 1) return 'Mid-Level Dev';
+  return 'Junior Dev';
+};
+
+// Initial data - with new hierarchy structure
 export const initialEmployees: Employee[] = [
-  { id: 1, name: 'Alice Chen', group: 'Engineering', dept: 'Frontend', role: 'Senior Dev', status: 'Active', joined: '2023-01-15' },
-  { id: 2, name: 'Bob Smith', group: 'Engineering', dept: 'Backend', role: 'Team Lead', status: 'Active', joined: '2022-05-10' },
-  { id: 3, name: 'Charlie Day', group: 'Engineering', dept: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01' },
-  { id: 4, name: 'Diana Ross', group: 'Product & Design', dept: 'Product Management', role: 'Product Manager', status: 'Active', joined: '2023-06-20' },
-  { id: 5, name: 'Edward Kim', group: 'Engineering', dept: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01' },
-  { id: 6, name: 'Fiona Walsh', group: 'Engineering', dept: 'DevOps', role: 'Senior Dev', status: 'Active', joined: '2023-03-15' },
-  { id: 7, name: 'George Liu', group: 'Operations', dept: 'HR', role: 'Team Lead', status: 'Active', joined: '2022-11-01' },
-  { id: 8, name: 'Hannah Moore', group: 'Engineering', dept: 'Mobile', role: 'Junior Dev', status: 'Active', joined: '2024-06-01' },
-  { id: 9, name: 'Ivan Petrov', group: 'Product & Design', dept: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15' },
-  { id: 10, name: 'Julia Santos', group: 'Engineering', dept: 'Backend', role: 'QA Engineer', status: 'Active', joined: '2023-09-01' },
-  { id: 11, name: 'Kevin O\'Brien', group: 'Operations', dept: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20' },
-  { id: 12, name: 'Laura Martinez', group: 'Engineering', dept: 'Frontend', role: 'Engineering Manager', status: 'Active', joined: '2020-01-15' },
+  { id: 1, name: 'Alice Chen', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15' },
+  { id: 2, name: 'Bob Smith', dept: 'Engineering', team: 'Backend Core', role: 'Team Lead', status: 'Active', joined: '2022-05-10' },
+  { id: 3, name: 'Charlie Day', dept: 'Engineering', team: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01' },
+  { id: 4, name: 'Diana Ross', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2023-06-20' },
+  { id: 5, name: 'Edward Kim', dept: 'Engineering', team: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01' },
+  { id: 6, name: 'Fiona Walsh', dept: 'Engineering', team: 'Backend API', role: 'Senior Dev', status: 'Active', joined: '2023-03-15' },
+  { id: 7, name: 'George Liu', dept: 'Operations', team: 'HR & People', role: 'Team Lead', status: 'Active', joined: '2022-11-01' },
+  { id: 8, name: 'Hannah Moore', dept: 'Engineering', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01' },
+  { id: 9, name: 'Ivan Petrov', dept: 'Product & Design', team: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15' },
+  { id: 10, name: 'Julia Santos', dept: 'Engineering', team: 'Backend Core', role: 'QA Engineer', status: 'Active', joined: '2023-09-01' },
+  { id: 11, name: 'Kevin O\'Brien', dept: 'Operations', team: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20' },
+  { id: 12, name: 'Laura Martinez', dept: 'Engineering', team: 'Frontend Alpha', role: 'Engineering Manager', status: 'Active', joined: '2020-01-15' },
+  { id: 13, name: 'Mike Johnson', dept: 'Engineering', team: 'Frontend Alpha', role: 'Mid-Level Dev', status: 'Active', joined: '2023-04-01' },
+  { id: 14, name: 'Nina Patel', dept: 'Engineering', team: 'Frontend Alpha', role: 'Junior Dev', status: 'Active', joined: '2024-01-15' },
+  { id: 15, name: 'Oscar Lee', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2021-06-01' },
+  { id: 16, name: 'Paula Brown', dept: 'Engineering', team: 'Frontend Beta', role: 'Team Lead', status: 'Active', joined: '2021-03-01' },
+  { id: 17, name: 'Quinn Davis', dept: 'Engineering', team: 'Frontend Beta', role: 'Mid-Level Dev', status: 'Active', joined: '2023-07-15' },
+  { id: 18, name: 'Rachel Green', dept: 'Engineering', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01' },
+  { id: 19, name: 'Steve Wilson', dept: 'Engineering', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01' },
+  { id: 20, name: 'Tina Turner', dept: 'Engineering', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10' },
 ];
 
 export const initialEvents: WorkforceEvent[] = [

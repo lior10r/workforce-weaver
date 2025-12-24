@@ -6,6 +6,7 @@ import { Dashboard } from '@/components/workforce/Dashboard';
 import { Timeline } from '@/components/workforce/Timeline';
 import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
+import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
 import { 
@@ -13,16 +14,18 @@ import {
   WorkforceEvent, 
   Hierarchy, 
   initialEmployees, 
-  initialEvents 
+  initialEvents,
+  DEPARTMENTS
 } from '@/lib/workforce-data';
 
 const Index = () => {
   // State
-  const [hierarchy, setHierarchy] = useState<Hierarchy>({ group: 'Engineering', dept: 'All', team: 'All' });
+  const [hierarchy, setHierarchy] = useState<Hierarchy>({ dept: 'Engineering', team: 'All' });
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [events, setEvents] = useState<WorkforceEvent[]>(initialEvents);
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
+  const [departments, setDepartments] = useState<Record<string, string[]>>(DEPARTMENTS);
   
   // Modal states
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -34,9 +37,9 @@ const Index = () => {
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchGroup = hierarchy.group === 'All' || e.group === hierarchy.group;
       const matchDept = hierarchy.dept === 'All' || e.dept === hierarchy.dept;
-      return matchSearch && matchGroup && matchDept;
+      const matchTeam = hierarchy.team === 'All' || e.team === hierarchy.team;
+      return matchSearch && matchDept && matchTeam;
     });
   }, [employees, searchQuery, hierarchy]);
 
@@ -49,6 +52,21 @@ const Index = () => {
   }), [filteredEmployees, events]);
 
   // Handlers
+  const handleAddDepartment = (name: string) => {
+    if (!departments[name]) {
+      setDepartments(prev => ({ ...prev, [name]: [] }));
+    }
+  };
+
+  const handleAddTeam = (dept: string, teamName: string) => {
+    if (departments[dept] && !departments[dept].includes(teamName)) {
+      setDepartments(prev => ({
+        ...prev,
+        [dept]: [...prev[dept], teamName]
+      }));
+    }
+  };
+
   const handleAddEmployee = (employeeData: Omit<Employee, 'id'>, id?: number) => {
     if (id) {
       // Edit existing
@@ -98,6 +116,7 @@ const Index = () => {
       case 'timeline': return 'Strategic Roadmap';
       case 'roster': return 'Department Directory';
       case 'planner': return 'Strategic Movements';
+      case 'analytics': return 'Team Analytics';
       default: return 'Operations Center';
     }
   };
@@ -109,7 +128,10 @@ const Index = () => {
         view={view} 
         setView={setView} 
         hierarchy={hierarchy} 
-        setHierarchy={setHierarchy} 
+        setHierarchy={setHierarchy}
+        departments={departments}
+        onAddDepartment={handleAddDepartment}
+        onAddTeam={handleAddTeam}
       />
 
       {/* Main Content */}
@@ -117,9 +139,13 @@ const Index = () => {
         {/* Header */}
         <header className="mb-10">
           <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest mb-2">
-            <span>{hierarchy.group}</span>
-            <ChevronRight size={10} />
             <span>{hierarchy.dept}</span>
+            {hierarchy.team !== 'All' && (
+              <>
+                <ChevronRight size={10} />
+                <span>{hierarchy.team}</span>
+              </>
+            )}
           </div>
           
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4">
@@ -159,6 +185,7 @@ const Index = () => {
             events={events} 
             hierarchy={hierarchy}
             setHierarchy={setHierarchy}
+            departments={departments}
           />
         )}
 
@@ -188,6 +215,15 @@ const Index = () => {
             }}
           />
         )}
+
+        {view === 'analytics' && (
+          <TeamAnalytics
+            employees={employees}
+            events={events}
+            selectedTeam={hierarchy.team}
+            departments={departments}
+          />
+        )}
       </main>
 
       {/* Modals */}
@@ -197,6 +233,7 @@ const Index = () => {
         onSubmit={handleAddEmployee}
         editingEmployee={editingEmployee}
         hierarchy={hierarchy}
+        departments={departments}
       />
 
       <EventModal
