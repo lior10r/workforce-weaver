@@ -1,4 +1,4 @@
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus } from 'lucide-react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen } from 'lucide-react';
 import { Employee, WorkforceEvent, getRoleColor, getTimelinePosition, formatDate } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -21,6 +21,12 @@ interface EmployeeWithSegments {
   }[];
 }
 
+interface TrainingPeriod {
+  startDate: string;
+  endDate: string;
+  details: string;
+}
+
 export const Timeline = ({ employees, events, openPlannerForUser, allEmployees = [], selectedTeam = 'All', selectedDept = 'All' }: TimelineProps) => {
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
 
@@ -29,6 +35,17 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
     const teams = new Set<string>();
     emps.forEach(emp => teams.add(emp.team));
     return Array.from(teams).sort();
+  };
+
+  // Get training periods for an employee
+  const getTrainingPeriods = (empId: number): TrainingPeriod[] => {
+    return events
+      .filter(e => e.empId === empId && (e.type === 'Training' || e.type === 'Course') && e.endDate)
+      .map(e => ({
+        startDate: e.date,
+        endDate: e.endDate!,
+        details: e.details
+      }));
   };
 
   // Calculate segments for an employee based on movements
@@ -99,6 +116,7 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
     const teamSwapEvent = empEvents.find(e => e.type === 'Team Swap');
+    const trainingPeriods = getTrainingPeriods(emp.id);
     
     // Calculate bar positions
     let barStartDate = emp.joined;
@@ -232,6 +250,36 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
               </div>
             </TooltipContent>
           </Tooltip>
+
+          {/* Training Period Overlays */}
+          {!showAsIncoming && trainingPeriods.map((training, idx) => {
+            const trainStart = getTimelinePosition(training.startDate);
+            const trainEnd = getTimelinePosition(training.endDate);
+            const trainWidth = Math.max(0, trainEnd - trainStart);
+            
+            return (
+              <Tooltip key={`training-${idx}`}>
+                <TooltipTrigger asChild>
+                  <div 
+                    style={{ left: `${trainStart}%`, width: `${trainWidth}%` }}
+                    className="absolute inset-y-2 rounded-md training-stripe cursor-help z-10"
+                  />
+                </TooltipTrigger>
+                <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <BookOpen size={14} className="text-status-course" />
+                      <p className="font-bold text-foreground">Training Period</p>
+                    </div>
+                    <p className="text-muted-foreground">{training.details}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {formatDate(training.startDate)} - {formatDate(training.endDate)}
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
 
           {/* Event Markers - only show for non-incoming */}
           {!showAsIncoming && empEvents.map(ev => {
@@ -431,6 +479,10 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
           <div className="flex items-center gap-2">
             <div className="w-8 h-2 bg-accent-blue/30 rounded border border-accent-blue/50 border-dashed" />
             <span className="text-muted-foreground">Incoming Transfer</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-2 training-stripe rounded" />
+            <span className="text-muted-foreground">Training Period</span>
           </div>
         </div>
       </div>

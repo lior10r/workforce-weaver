@@ -18,9 +18,18 @@ import {
   DEPARTMENTS
 } from '@/lib/workforce-data';
 
+interface ScopeFilter {
+  departments: string[];
+  teams: string[];
+}
+
 const Index = () => {
   // State
-  const [hierarchy, setHierarchy] = useState<Hierarchy>({ dept: 'Engineering', team: 'All' });
+  const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(() => {
+    const allDepts = Object.keys(DEPARTMENTS);
+    const allTeams = Object.values(DEPARTMENTS).flat();
+    return { departments: allDepts, teams: allTeams };
+  });
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [events, setEvents] = useState<WorkforceEvent[]>(initialEvents);
   const [view, setView] = useState('dashboard');
@@ -33,15 +42,35 @@ const Index = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
 
-  // Filtered employees
+  // Legacy hierarchy for compatibility with some components
+  const hierarchy: Hierarchy = useMemo(() => {
+    const selectedDepts = scopeFilter.departments;
+    const selectedTeams = scopeFilter.teams;
+    
+    if (selectedDepts.length === Object.keys(departments).length) {
+      return { dept: 'All', team: 'All' };
+    } else if (selectedDepts.length === 1) {
+      const dept = selectedDepts[0];
+      const deptTeams = departments[dept] || [];
+      const selectedDeptTeams = selectedTeams.filter(t => deptTeams.includes(t));
+      if (selectedDeptTeams.length === deptTeams.length) {
+        return { dept, team: 'All' };
+      } else if (selectedDeptTeams.length === 1) {
+        return { dept, team: selectedDeptTeams[0] };
+      }
+      return { dept, team: 'All' };
+    }
+    return { dept: 'All', team: 'All' };
+  }, [scopeFilter, departments]);
+
+  // Filtered employees based on scope filter
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchDept = hierarchy.dept === 'All' || e.dept === hierarchy.dept;
-      const matchTeam = hierarchy.team === 'All' || e.team === hierarchy.team;
-      return matchSearch && matchDept && matchTeam;
+      const matchTeam = scopeFilter.teams.includes(e.team);
+      return matchSearch && matchTeam;
     });
-  }, [employees, searchQuery, hierarchy]);
+  }, [employees, searchQuery, scopeFilter]);
 
   // Stats
   const stats = useMemo(() => ({
@@ -63,6 +92,11 @@ const Index = () => {
       setDepartments(prev => ({
         ...prev,
         [dept]: [...prev[dept], teamName]
+      }));
+      // Auto-select new team
+      setScopeFilter(prev => ({
+        ...prev,
+        teams: [...prev.teams, teamName]
       }));
     }
   };
@@ -95,7 +129,7 @@ const Index = () => {
     setEditingEmployee(null);
   };
 
-  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string }) => {
+  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string }) => {
     setEvents(prev => [...prev, { ...eventData, id: Date.now() }]);
     setIsEventModalOpen(false);
   };
@@ -121,14 +155,29 @@ const Index = () => {
     }
   };
 
+  // Get display text for scope
+  const getScopeDisplay = () => {
+    const selectedDeptCount = scopeFilter.departments.length;
+    const totalDepts = Object.keys(departments).length;
+    
+    if (selectedDeptCount === totalDepts) {
+      return 'All Departments';
+    } else if (selectedDeptCount === 1) {
+      return scopeFilter.departments[0];
+    } else if (selectedDeptCount > 1) {
+      return `${selectedDeptCount} Departments`;
+    }
+    return 'No Selection';
+  };
+
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
       {/* Sidebar */}
       <Sidebar 
         view={view} 
         setView={setView} 
-        hierarchy={hierarchy} 
-        setHierarchy={setHierarchy}
+        scopeFilter={scopeFilter}
+        setScopeFilter={setScopeFilter}
         departments={departments}
         onAddDepartment={handleAddDepartment}
         onAddTeam={handleAddTeam}
@@ -139,11 +188,11 @@ const Index = () => {
         {/* Header */}
         <header className="mb-10">
           <div className="flex items-center gap-2 text-primary text-[10px] font-bold uppercase tracking-widest mb-2">
-            <span>{hierarchy.dept}</span>
-            {hierarchy.team !== 'All' && (
+            <span>{getScopeDisplay()}</span>
+            {scopeFilter.teams.length < Object.values(departments).flat().length && (
               <>
                 <ChevronRight size={10} />
-                <span>{hierarchy.team}</span>
+                <span>{scopeFilter.teams.length} Teams</span>
               </>
             )}
           </div>
@@ -184,7 +233,7 @@ const Index = () => {
             employees={filteredEmployees} 
             events={events} 
             hierarchy={hierarchy}
-            setHierarchy={setHierarchy}
+            setHierarchy={() => {}}
             departments={departments}
           />
         )}

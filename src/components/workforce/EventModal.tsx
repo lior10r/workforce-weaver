@@ -1,11 +1,11 @@
-import { X } from 'lucide-react';
-import { Employee, EVENT_TYPES, DEPARTMENTS } from '@/lib/workforce-data';
+import { X, BookOpen } from 'lucide-react';
+import { Employee, EVENT_TYPES, formatDate } from '@/lib/workforce-data';
 import { FormEvent, useState } from 'react';
 
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string }) => void;
+  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string }) => void;
   employees: Employee[];
   prefill: { empId: number | string; isFlag: boolean };
   departments: Record<string, string[]>;
@@ -14,6 +14,8 @@ interface EventModalProps {
 export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, departments }: EventModalProps) => {
   const [selectedType, setSelectedType] = useState(prefill.isFlag ? 'Decision Flag' : 'Promotion');
   const [selectedDept, setSelectedDept] = useState<string>(Object.keys(departments)[0] || '');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   if (!isOpen) return null;
 
@@ -29,10 +31,15 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
       details: formData.get('details') as string,
       isFlag: type === 'Decision Flag',
       targetTeam: type === 'Team Swap' ? formData.get('targetTeam') as string : undefined,
+      endDate: (type === 'Training' || type === 'Course') ? formData.get('endDate') as string : undefined,
     });
   };
 
   const allTeams = Object.values(departments).flat();
+  const isTrainingType = selectedType === 'Training' || selectedType === 'Course';
+
+  // Extended event types with Training
+  const eventTypes = [...EVENT_TYPES, 'Training', 'Course'];
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -78,21 +85,48 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
                 onChange={(e) => setSelectedType(e.target.value)}
                 className="select-field w-full"
               >
-                {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-                Target Date
+                {isTrainingType ? 'Start Date' : 'Target Date'}
               </label>
               <input 
                 type="date" 
                 required 
                 name="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="input-field" 
               />
+              {startDate && (
+                <p className="text-[10px] text-muted-foreground mt-1">{formatDate(startDate)}</p>
+              )}
             </div>
           </div>
+
+          {/* End Date for Training/Course */}
+          {isTrainingType && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-start-2">
+                <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                  End Date
+                </label>
+                <input 
+                  type="date" 
+                  required 
+                  name="endDate" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="input-field" 
+                />
+                {endDate && (
+                  <p className="text-[10px] text-muted-foreground mt-1">{formatDate(endDate)}</p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Target Team selector for Team Swap */}
           {selectedType === 'Team Swap' && (
@@ -128,13 +162,26 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
             </div>
           )}
 
+          {/* Training hint */}
+          {isTrainingType && (
+            <div className="flex items-start gap-3 p-3 bg-accent/50 rounded-xl border border-border">
+              <BookOpen size={16} className="text-primary mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                Training periods will be shown on the timeline with a striped pattern. The person remains on their team but is marked as "On Training".
+              </p>
+            </div>
+          )}
+
           <div>
             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
               Rationale / Context
             </label>
             <textarea 
               name="details" 
-              placeholder="e.g. Succession planning, compliance requirement..." 
+              placeholder={isTrainingType 
+                ? "e.g. React Advanced Course, AWS Certification training..." 
+                : "e.g. Succession planning, compliance requirement..."
+              }
               className="input-field h-24 resize-none" 
             />
           </div>
