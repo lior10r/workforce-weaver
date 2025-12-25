@@ -59,6 +59,7 @@ export interface WorkforceEvent {
   date: string;
   details: string;
   isFlag: boolean;
+  targetTeam?: string; // For Team Swap events
 }
 
 export interface Hierarchy {
@@ -151,8 +152,9 @@ export const initialEvents: WorkforceEvent[] = [
   { id: 1, empId: 1, type: 'Promotion', date: '2025-03-01', details: 'Moving to Team Lead', isFlag: false },
   { id: 2, empId: 3, type: 'Decision Flag', date: '2025-06-15', details: 'Decide on AWS Certification path', isFlag: true },
   { id: 3, empId: 5, type: 'Decision Flag', date: '2025-02-28', details: 'Succession planning required', isFlag: true },
-  { id: 4, empId: 2, type: 'Team Swap', date: '2025-08-01', details: 'Moving to Infrastructure team', isFlag: false },
+  { id: 4, empId: 2, type: 'Team Swap', date: '2025-08-01', details: 'Moving to Infrastructure team', isFlag: false, targetTeam: 'Infrastructure' },
   { id: 5, empId: 8, type: 'Course Start', date: '2025-04-15', details: 'React Advanced Training', isFlag: false },
+  { id: 6, empId: 13, type: 'Team Swap', date: '2025-09-15', details: 'Transferring to Backend Core', isFlag: false, targetTeam: 'Backend Core' },
   // Departure events (6-year rule)
   { id: 101, empId: 1, type: 'Departure', date: '2029-01-15', details: 'End of rotation cycle', isFlag: false },
   { id: 102, empId: 2, type: 'Departure', date: '2028-05-10', details: 'End of rotation cycle', isFlag: false },

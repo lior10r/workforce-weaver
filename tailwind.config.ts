@@ -64,6 +64,7 @@ export default {
         // Role colors
         role: {
           junior: "hsl(var(--role-junior))",
+          mid: "hsl(var(--role-mid))",
           senior: "hsl(var(--role-senior))",
           lead: "hsl(var(--role-lead))",
           architect: "hsl(var(--role-architect))",
@@ -83,6 +84,7 @@ export default {
         flag: "hsl(var(--flag-color))",
         success: "hsl(var(--success-color))",
         info: "hsl(var(--info-color))",
+        "accent-blue": "hsl(var(--accent-blue))",
       },
       borderRadius: {
         lg: "var(--radius)",

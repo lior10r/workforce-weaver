@@ -1,16 +1,20 @@
 import { X } from 'lucide-react';
-import { Employee, EVENT_TYPES } from '@/lib/workforce-data';
-import { FormEvent } from 'react';
+import { Employee, EVENT_TYPES, DEPARTMENTS } from '@/lib/workforce-data';
+import { FormEvent, useState } from 'react';
 
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean }) => void;
+  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string }) => void;
   employees: Employee[];
   prefill: { empId: number | string; isFlag: boolean };
+  departments: Record<string, string[]>;
 }
 
-export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill }: EventModalProps) => {
+export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, departments }: EventModalProps) => {
+  const [selectedType, setSelectedType] = useState(prefill.isFlag ? 'Decision Flag' : 'Promotion');
+  const [selectedDept, setSelectedDept] = useState<string>(Object.keys(departments)[0] || '');
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -24,8 +28,11 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill }: Ev
       date: formData.get('date') as string,
       details: formData.get('details') as string,
       isFlag: type === 'Decision Flag',
+      targetTeam: type === 'Team Swap' ? formData.get('targetTeam') as string : undefined,
     });
   };
+
+  const allTeams = Object.values(departments).flat();
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -54,7 +61,7 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill }: Ev
             >
               {employees.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.name} ({e.dept})
+                  {e.name} ({e.team})
                 </option>
               ))}
             </select>
@@ -67,7 +74,8 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill }: Ev
               </label>
               <select 
                 name="type" 
-                defaultValue={prefill.isFlag ? 'Decision Flag' : 'Promotion'} 
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
                 className="select-field w-full"
               >
                 {EVENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -85,6 +93,40 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill }: Ev
               />
             </div>
           </div>
+
+          {/* Target Team selector for Team Swap */}
+          {selectedType === 'Team Swap' && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                  Target Department
+                </label>
+                <select 
+                  value={selectedDept}
+                  onChange={(e) => setSelectedDept(e.target.value)}
+                  className="select-field w-full"
+                >
+                  {Object.keys(departments).map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                  Target Team
+                </label>
+                <select 
+                  name="targetTeam" 
+                  required
+                  className="select-field w-full"
+                >
+                  {(departments[selectedDept] || []).map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
