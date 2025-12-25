@@ -196,6 +196,7 @@ const Index = () => {
             openPlannerForUser={openPlannerForUser}
             allEmployees={employees}
             selectedTeam={hierarchy.team}
+            selectedDept={hierarchy.dept}
           />
         )}
 
