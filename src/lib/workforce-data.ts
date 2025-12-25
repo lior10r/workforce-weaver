@@ -35,7 +35,7 @@ export const ROLE_TEXT_COLORS: Record<string, string> = {
 
 export const ROLES = Object.keys(ROLE_COLORS).filter(r => r !== 'Default');
 export const STATUSES = ['Active', 'On Course', 'Parental Leave', 'Notice Period'] as const;
-export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Course Start', 'Course End', 'Departure', 'New Joiner', 'Decision Flag'] as const;
+export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Training', 'Course', 'Departure', 'New Joiner', 'Decision Flag'] as const;
 
 // Timeline Range (Jan 2020 - Dec 2030) - Extended to show historical data
 export const TIMELINE_START = new Date('2020-01-01');
@@ -60,6 +60,7 @@ export interface WorkforceEvent {
   details: string;
   isFlag: boolean;
   targetTeam?: string; // For Team Swap events
+  endDate?: string; // For Training/Course events
 }
 
 export interface Hierarchy {
