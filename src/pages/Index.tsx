@@ -95,7 +95,7 @@ const Index = () => {
     setEditingEmployee(null);
   };
 
-  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean }) => {
+  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string }) => {
     setEvents(prev => [...prev, { ...eventData, id: Date.now() }]);
     setIsEventModalOpen(false);
   };
@@ -194,6 +194,8 @@ const Index = () => {
             employees={filteredEmployees} 
             events={events}
             openPlannerForUser={openPlannerForUser}
+            allEmployees={employees}
+            selectedTeam={hierarchy.team}
           />
         )}
 
@@ -242,6 +244,7 @@ const Index = () => {
         onSubmit={handleAddEvent}
         employees={employees}
         prefill={eventPrefill}
+        departments={departments}
       />
     </div>
   );
