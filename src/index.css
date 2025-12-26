@@ -63,6 +63,7 @@
     --success-color: 160 84% 39%;
     --info-color: 217 91% 60%;
     --accent-blue: 199 89% 48%;
+    --potential-color: 280 70% 50%;
 
     /* Sidebar */
     --sidebar-background: 222 47% 5%;
@@ -228,6 +229,10 @@
   .border-accent-blue\/30 { border-color: hsl(var(--accent-blue) / 0.3); }
   .border-accent-blue\/50 { border-color: hsl(var(--accent-blue) / 0.5); }
 
+  /* Potential hire color */
+  .text-potential { color: hsl(var(--potential-color)); }
+  .bg-potential { background-color: hsl(var(--potential-color)); }
+
   /* Training stripe pattern */
   .training-stripe {
     background: repeating-linear-gradient(
@@ -238,6 +243,19 @@
       hsl(var(--status-course) / 0.3) 6px
     );
     opacity: 0.6;
+  }
+
+  /* Potential hire stripe pattern */
+  .potential-stripe {
+    background: repeating-linear-gradient(
+      -45deg,
+      hsl(var(--potential-color)),
+      hsl(var(--potential-color)) 3px,
+      hsl(var(--potential-color) / 0.2) 3px,
+      hsl(var(--potential-color) / 0.2) 6px
+    );
+    opacity: 0.5;
+    border: 1px dashed hsl(var(--potential-color) / 0.5);
   }
 
   .training-stripe-overlay {

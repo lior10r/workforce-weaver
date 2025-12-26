@@ -35,6 +35,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
       role: formData.get('role') as string,
       status: formData.get('status') as string,
       joined: formData.get('joined') as string,
+      isPotential: formData.get('isPotential') === 'on',
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -138,6 +139,19 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
               defaultValue={editingEmployee?.joined} 
               className="input-field" 
             />
+          </div>
+
+          <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-xl border border-border">
+            <input 
+              type="checkbox" 
+              name="isPotential" 
+              id="isPotential"
+              defaultChecked={editingEmployee?.isPotential}
+              className="w-4 h-4 rounded border-border"
+            />
+            <label htmlFor="isPotential" className="text-sm text-muted-foreground cursor-pointer">
+              <span className="font-medium text-foreground">Potential hire</span> — uncertain/planning only
+            </label>
           </div>
 
           <div className="flex gap-3 pt-4">
