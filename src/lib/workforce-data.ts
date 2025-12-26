@@ -41,6 +41,14 @@ export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Training', 'Course', 'Dep
 export const TIMELINE_START = new Date('2020-01-01');
 export const TIMELINE_END = new Date('2030-12-31');
 
+// Team Structure Definition
+export interface TeamStructure {
+  teamName: string;
+  department: string;
+  teamLeader?: number; // Employee ID of team leader
+  requiredRoles: Record<string, number>; // Role name -> count required
+}
+
 // Types
 export interface Employee {
   id: number;
@@ -50,6 +58,7 @@ export interface Employee {
   role: string;
   status: string;
   joined: string;
+  isPotential?: boolean; // Uncertain hire - for planning purposes
 }
 
 export interface WorkforceEvent {
@@ -125,6 +134,28 @@ export const getEffectiveRole = (originalRole: string, joined: string, asOfDate:
   return 'Junior Dev';
 };
 
+// Initial team structures
+export const initialTeamStructures: TeamStructure[] = [
+  { 
+    teamName: 'Frontend Alpha', 
+    department: 'Engineering', 
+    teamLeader: 12,
+    requiredRoles: { 'Senior Dev': 2, 'Mid-Level Dev': 2, 'Junior Dev': 2 }
+  },
+  { 
+    teamName: 'Frontend Beta', 
+    department: 'Engineering', 
+    teamLeader: 16,
+    requiredRoles: { 'Senior Dev': 1, 'Mid-Level Dev': 2, 'Junior Dev': 2 }
+  },
+  { 
+    teamName: 'Backend Core', 
+    department: 'Engineering', 
+    teamLeader: 2,
+    requiredRoles: { 'Senior Dev': 2, 'Mid-Level Dev': 1, 'Junior Dev': 1, 'QA Engineer': 1 }
+  },
+];
+
 // Initial data - with new hierarchy structure
 export const initialEmployees: Employee[] = [
   { id: 1, name: 'Alice Chen', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15' },
@@ -147,6 +178,8 @@ export const initialEmployees: Employee[] = [
   { id: 18, name: 'Rachel Green', dept: 'Engineering', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01' },
   { id: 19, name: 'Steve Wilson', dept: 'Engineering', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01' },
   { id: 20, name: 'Tina Turner', dept: 'Engineering', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10' },
+  // Potential employee - uncertain hire
+  { id: 21, name: 'Potential: Senior FE', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2025-06-01', isPotential: true },
 ];
 
 export const initialEvents: WorkforceEvent[] = [

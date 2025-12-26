@@ -13,8 +13,10 @@ import {
   Employee, 
   WorkforceEvent, 
   Hierarchy, 
+  TeamStructure,
   initialEmployees, 
   initialEvents,
+  initialTeamStructures,
   DEPARTMENTS
 } from '@/lib/workforce-data';
 
@@ -32,6 +34,7 @@ const Index = () => {
   });
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [events, setEvents] = useState<WorkforceEvent[]>(initialEvents);
+  const [teamStructures, setTeamStructures] = useState<TeamStructure[]>(initialTeamStructures);
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [departments, setDepartments] = useState<Record<string, string[]>>(DEPARTMENTS);
@@ -246,6 +249,7 @@ const Index = () => {
             allEmployees={employees}
             selectedTeam={hierarchy.team}
             selectedDept={hierarchy.dept}
+            teamStructures={teamStructures}
           />
         )}
 

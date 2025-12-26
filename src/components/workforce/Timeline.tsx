@@ -1,5 +1,5 @@
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen } from 'lucide-react';
-import { Employee, WorkforceEvent, getRoleColor, getTimelinePosition, formatDate } from '@/lib/workforce-data';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle } from 'lucide-react';
+import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TimelineProps {
@@ -9,16 +9,7 @@ interface TimelineProps {
   allEmployees?: Employee[];
   selectedTeam?: string;
   selectedDept?: string;
-}
-
-interface EmployeeWithSegments {
-  employee: Employee;
-  segments: {
-    team: string;
-    startDate: string;
-    endDate: string | null;
-    isIncoming: boolean;
-  }[];
+  teamStructures?: TeamStructure[];
 }
 
 interface TrainingPeriod {
@@ -27,8 +18,23 @@ interface TrainingPeriod {
   details: string;
 }
 
-export const Timeline = ({ employees, events, openPlannerForUser, allEmployees = [], selectedTeam = 'All', selectedDept = 'All' }: TimelineProps) => {
+interface TransferInfo {
+  fromTeam: string;
+  transferDate: string;
+}
+
+export const Timeline = ({ 
+  employees, 
+  events, 
+  openPlannerForUser, 
+  allEmployees = [], 
+  selectedTeam = 'All', 
+  selectedDept = 'All',
+  teamStructures = []
+}: TimelineProps) => {
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
+  const currentDate = new Date();
+  const currentDatePos = getTimelinePosition(currentDate.toISOString().split('T')[0]);
 
   // Get all unique teams from employees for grouping
   const getTeamsFromEmployees = (emps: Employee[]): string[] => {
@@ -48,71 +54,91 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
       }));
   };
 
-  // Calculate segments for an employee based on movements
-  const getEmployeeSegments = (emp: Employee): EmployeeWithSegments['segments'] => {
-    const empEvents = events.filter(e => e.empId === emp.id);
-    const departureEvent = empEvents.find(e => e.type === 'Departure');
-    const teamSwaps = empEvents.filter(e => e.type === 'Team Swap').sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+  // Get transfer info for an employee who transferred to a team
+  const getTransferInfo = (empId: number, targetTeam: string): TransferInfo | null => {
+    const swap = events.find(e => e.empId === empId && e.type === 'Team Swap' && e.targetTeam === targetTeam);
+    if (swap) {
+      const emp = allEmployees.find(e => e.id === empId);
+      return { fromTeam: emp?.team || 'Unknown', transferDate: swap.date };
+    }
+    return null;
+  };
 
-    const segments: EmployeeWithSegments['segments'] = [];
+  // Check what roles are missing in a team
+  const getMissingRoles = (teamName: string, teamEmployees: Employee[]): { role: string; missing: number }[] => {
+    const structure = teamStructures.find(t => t.teamName === teamName);
+    if (!structure) return [];
+
+    const missing: { role: string; missing: number }[] = [];
+    const roleCounts: Record<string, number> = {};
     
-    if (teamSwaps.length === 0) {
-      // No movements - single segment
-      segments.push({
-        team: emp.team,
-        startDate: emp.joined,
-        endDate: departureEvent?.date || null,
-        isIncoming: false
-      });
-    } else {
-      // First segment: from hire to first swap
-      segments.push({
-        team: emp.team,
-        startDate: emp.joined,
-        endDate: teamSwaps[0].date,
-        isIncoming: false
-      });
+    teamEmployees.forEach(emp => {
+      if (!emp.isPotential) {
+        roleCounts[emp.role] = (roleCounts[emp.role] || 0) + 1;
+      }
+    });
 
-      // Middle segments
-      for (let i = 0; i < teamSwaps.length; i++) {
-        const currentSwap = teamSwaps[i];
-        const nextSwap = teamSwaps[i + 1];
-        
-        segments.push({
-          team: currentSwap.targetTeam || 'Unknown',
-          startDate: currentSwap.date,
-          endDate: nextSwap?.date || departureEvent?.date || null,
-          isIncoming: false
+    Object.entries(structure.requiredRoles).forEach(([role, required]) => {
+      const actual = roleCounts[role] || 0;
+      if (actual < required) {
+        missing.push({ role, missing: required - actual });
+      }
+    });
+
+    return missing;
+  };
+
+  // Build map of employees who transferred INTO each team
+  const getEmployeesInTeam = (teamName: string) => {
+    const directMembers = employees.filter(e => e.team === teamName);
+    
+    // Find employees who transferred INTO this team
+    const transfersIn = events
+      .filter(ev => ev.type === 'Team Swap' && ev.targetTeam === teamName)
+      .map(mov => {
+        const emp = allEmployees.find(e => e.id === mov.empId);
+        return emp ? { employee: emp, movement: mov } : null;
+      })
+      .filter((item): item is { employee: Employee; movement: WorkforceEvent } => item !== null);
+    
+    // Create combined list - include transfers as regular members
+    const allTeamMembers: { 
+      employee: Employee; 
+      transferInfo?: TransferInfo;
+      isTransfer: boolean;
+    }[] = [];
+
+    // Add direct members (not transferred out)
+    directMembers.forEach(emp => {
+      const hasTransferOut = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
+      if (!hasTransferOut) {
+        allTeamMembers.push({ employee: emp, isTransfer: false });
+      }
+    });
+
+    // Add transferred in members
+    transfersIn.forEach(({ employee, movement }) => {
+      if (!directMembers.some(e => e.id === employee.id)) {
+        allTeamMembers.push({ 
+          employee: { ...employee, team: teamName, dept: employee.dept },
+          transferInfo: { fromTeam: employee.team, transferDate: movement.date },
+          isTransfer: true
         });
       }
-    }
+    });
 
-    return segments;
+    return allTeamMembers;
   };
 
   // Determine if we should group by team
   const shouldGroupByTeam = selectedDept !== 'All' || selectedTeam === 'All';
   const teams = shouldGroupByTeam ? getTeamsFromEmployees(employees) : [];
 
-  // Build employee segments data
-  const employeeSegmentsMap = new Map<number, EmployeeWithSegments['segments']>();
-  employees.forEach(emp => {
-    employeeSegmentsMap.set(emp.id, getEmployeeSegments(emp));
-  });
-
-  // Get incoming movements for a specific team
-  const getIncomingForTeam = (teamName: string) => {
-    return events.filter(ev => ev.type === 'Team Swap' && ev.targetTeam === teamName)
-      .map(mov => {
-        const emp = allEmployees.find(e => e.id === mov.empId);
-        return emp ? { employee: emp, movement: mov } : null;
-      })
-      .filter(Boolean) as { employee: Employee; movement: WorkforceEvent }[];
-  };
-
-  const renderEmployeeRow = (emp: Employee, showAsIncoming = false, incomingFromTeam?: string, movementDate?: string) => {
+  const renderEmployeeRow = (
+    emp: Employee, 
+    transferInfo?: TransferInfo,
+    isTransfer = false
+  ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
     const teamSwapEvent = empEvents.find(e => e.type === 'Team Swap');
@@ -122,11 +148,11 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
     let barStartDate = emp.joined;
     let barEndDate = departureEvent?.date || null;
     
-    if (showAsIncoming && movementDate) {
-      // For incoming section, show from movement date onwards
-      barStartDate = movementDate;
-    } else if (teamSwapEvent && !showAsIncoming) {
-      // For current team, stop at the swap date
+    if (isTransfer && transferInfo) {
+      // For transfers, bar starts at transfer date
+      barStartDate = transferInfo.transferDate;
+    } else if (teamSwapEvent) {
+      // Employee is transferring OUT - bar ends at swap date
       barEndDate = teamSwapEvent.date;
     }
     
@@ -134,56 +160,60 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
     const departurePos = barEndDate ? getTimelinePosition(barEndDate) : 100;
     const durationWidth = Math.max(0, departurePos - joinedPos);
 
+    const isPotential = emp.isPotential;
+
     return (
-      <div key={showAsIncoming ? `incoming-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${showAsIncoming ? 'opacity-70' : ''}`}>
+      <div key={isTransfer ? `transfer-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''}`}>
         {/* Name & Quick Actions */}
         <div className="w-72 pr-6 flex justify-between items-center">
           <Tooltip>
             <TooltipTrigger asChild>
               <div className="cursor-help">
-                {showAsIncoming ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <UserPlus size={12} className="text-accent-blue" />
-                      <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className={`w-2 h-2 rounded-full ${getRoleColor(emp.role)}`} />
-                      <p className="text-[10px] text-accent-blue uppercase font-bold tracking-wide">
-                        From {incomingFromTeam}
-                      </p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className={`w-2 h-2 rounded-full ${getRoleColor(emp.role)}`} />
-                      <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">
-                        {emp.role}
-                      </p>
-                    </div>
-                  </>
+                <div className="flex items-center gap-2">
+                  {isPotential && <HelpCircle size={12} className="text-potential" />}
+                  <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <div className={`w-2 h-2 rounded-full ${getRoleColor(emp.role)}`} />
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wide">
+                    {emp.role}
+                  </p>
+                </div>
+                {isTransfer && transferInfo && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <ArrowRight size={10} className="text-accent-blue" />
+                    <p className="text-[9px] text-accent-blue font-medium">
+                      From {transferInfo.fromTeam}
+                    </p>
+                  </div>
+                )}
+                {isPotential && (
+                  <p className="text-[9px] text-potential font-medium mt-0.5">
+                    Potential hire
+                  </p>
                 )}
               </div>
             </TooltipTrigger>
             <TooltipContent side="right" className="bg-popover border border-border p-3 rounded-xl">
               <div className="space-y-2 text-sm">
                 <p className="font-bold text-foreground">{emp.name}</p>
+                {isPotential && (
+                  <p className="text-potential text-xs font-medium">⚠ Potential / Uncertain hire</p>
+                )}
                 <div className="text-muted-foreground">
                   <p><span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}</p>
+                  {isTransfer && transferInfo && (
+                    <p><span className="text-accent-blue font-medium">Joined team:</span> {formatDate(transferInfo.transferDate)}</p>
+                  )}
                   {departureEvent && (
                     <p><span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}</p>
-                  )}
-                  {showAsIncoming && movementDate && (
-                    <p><span className="text-accent-blue font-medium">Transfer:</span> {formatDate(movementDate)}</p>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">{emp.team} • {emp.dept}</p>
               </div>
             </TooltipContent>
           </Tooltip>
-          {!showAsIncoming && (
+          {!isPotential && (
             <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
               <button 
                 onClick={() => openPlannerForUser(emp.id, true)}
@@ -204,7 +234,7 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
         </div>
 
         {/* Gantt Area */}
-        <div className={`flex-1 h-10 relative bg-secondary/30 rounded-lg ${showAsIncoming ? 'border border-accent-blue/30 border-dashed' : 'border border-border/50'}`}>
+        <div className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50`}>
           {/* Year grid lines */}
           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${years.length}, 1fr)` }}>
             {years.map((year, i) => (
@@ -217,32 +247,44 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
             ))}
           </div>
 
+          {/* Current Date Marker */}
+          <div 
+            style={{ left: `${currentDatePos}%` }}
+            className="absolute inset-y-0 w-0.5 bg-destructive z-30"
+          />
+
           {/* The Tenure Bar */}
           <Tooltip>
             <TooltipTrigger asChild>
               <div 
                 style={{ left: `${joinedPos}%`, width: `${durationWidth}%` }}
-                className={`absolute inset-y-2 rounded-md opacity-40 ${showAsIncoming ? 'bg-accent-blue/30 border border-accent-blue/50 border-dashed' : `${getRoleColor(emp.role)} border border-foreground/10`} cursor-help`}
+                className={`absolute inset-y-2 rounded-md cursor-help ${
+                  isPotential 
+                    ? 'potential-stripe' 
+                    : `${getRoleColor(emp.role)} opacity-40 border border-foreground/10`
+                }`}
               />
             </TooltipTrigger>
             <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
               <div className="space-y-1 text-sm">
                 <p className="font-bold text-foreground">{emp.name}</p>
-                {showAsIncoming && movementDate ? (
+                {isPotential && (
+                  <p className="text-potential text-xs font-medium">Potential / Uncertain</p>
+                )}
+                <p className="text-muted-foreground">
+                  <span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}
+                </p>
+                {isTransfer && transferInfo && (
                   <p className="text-muted-foreground">
-                    <span className="text-accent-blue font-medium">Transfer:</span> {formatDate(movementDate)}
-                  </p>
-                ) : (
-                  <p className="text-muted-foreground">
-                    <span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}
+                    <span className="text-accent-blue font-medium">Joined team:</span> {formatDate(transferInfo.transferDate)}
                   </p>
                 )}
-                {teamSwapEvent && !showAsIncoming && (
+                {teamSwapEvent && !isTransfer && (
                   <p className="text-muted-foreground">
                     <span className="text-accent-blue font-medium">Transfer out:</span> {formatDate(teamSwapEvent.date)}
                   </p>
                 )}
-                {!teamSwapEvent && departureEvent && (
+                {departureEvent && (
                   <p className="text-muted-foreground">
                     <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
                   </p>
@@ -252,7 +294,7 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
           </Tooltip>
 
           {/* Training Period Overlays */}
-          {!showAsIncoming && trainingPeriods.map((training, idx) => {
+          {!isPotential && trainingPeriods.map((training, idx) => {
             const trainStart = getTimelinePosition(training.startDate);
             const trainEnd = getTimelinePosition(training.endDate);
             const trainWidth = Math.max(0, trainEnd - trainStart);
@@ -281,8 +323,8 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
             );
           })}
 
-          {/* Event Markers - only show for non-incoming */}
-          {!showAsIncoming && empEvents.map(ev => {
+          {/* Event Markers */}
+          {!isPotential && empEvents.map(ev => {
             const pos = getTimelinePosition(ev.date);
             if (ev.type === 'Departure') return null;
 
@@ -330,19 +372,19 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
                 <div 
                   style={{ left: `${departurePos}%` }}
                   className={`absolute inset-y-0 w-px border-r border-dashed cursor-help ${
-                    teamSwapEvent && !showAsIncoming ? 'bg-accent-blue/50 border-accent-blue/30' : 'bg-destructive/50 border-destructive/30'
+                    teamSwapEvent && !isTransfer ? 'bg-accent-blue/50 border-accent-blue/30' : 'bg-destructive/50 border-destructive/30'
                   }`}
                 >
                   <div className={`absolute top-full left-1/2 -translate-x-1/2 text-[9px] font-bold mt-1 uppercase whitespace-nowrap ${
-                    teamSwapEvent && !showAsIncoming ? 'text-accent-blue' : 'text-destructive'
+                    teamSwapEvent && !isTransfer ? 'text-accent-blue' : 'text-destructive'
                   }`}>
-                    {teamSwapEvent && !showAsIncoming ? 'Transfer' : 'Exit'}
+                    {teamSwapEvent && !isTransfer ? 'Transfer' : 'Exit'}
                   </div>
                 </div>
               </TooltipTrigger>
               <TooltipContent className="bg-popover border border-border p-2 rounded-lg">
-                <p className={`text-xs font-medium ${teamSwapEvent && !showAsIncoming ? 'text-accent-blue' : 'text-destructive'}`}>
-                  {teamSwapEvent && !showAsIncoming 
+                <p className={`text-xs font-medium ${teamSwapEvent && !isTransfer ? 'text-accent-blue' : 'text-destructive'}`}>
+                  {teamSwapEvent && !isTransfer 
                     ? `Transfer to ${teamSwapEvent.targetTeam}: ${formatDate(teamSwapEvent.date)}`
                     : `Departure: ${formatDate(barEndDate)}`
                   }
@@ -351,8 +393,8 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
             </Tooltip>
           )}
           
-          {/* Start Marker */}
-          {showAsIncoming && movementDate && (
+          {/* Start Marker for transfers */}
+          {isTransfer && transferInfo && (
             <Tooltip>
               <TooltipTrigger asChild>
                 <div 
@@ -366,17 +408,16 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
               </TooltipTrigger>
               <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
                 <div className="space-y-1 text-sm">
-                  <p className="font-bold text-accent-blue">Incoming Transfer</p>
+                  <p className="font-bold text-accent-blue">Transferred from {transferInfo.fromTeam}</p>
                   <p className="text-foreground">{emp.name}</p>
-                  <p className="text-muted-foreground text-xs">From: {incomingFromTeam}</p>
-                  <p className="text-primary font-mono text-xs">{formatDate(movementDate)}</p>
+                  <p className="text-primary font-mono text-xs">{formatDate(transferInfo.transferDate)}</p>
                 </div>
               </TooltipContent>
             </Tooltip>
           )}
 
-          {/* Hire Start Marker - only for non-incoming */}
-          {!showAsIncoming && (
+          {/* Hire Start Marker - only for non-transfers */}
+          {!isTransfer && (
             <div 
               style={{ left: `${getTimelinePosition(emp.joined)}%` }}
               className="absolute inset-y-0 w-px bg-role-junior/50"
@@ -391,22 +432,41 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
     );
   };
 
-  const renderTeamSection = (teamName: string, teamEmployees: Employee[]) => {
-    const incoming = getIncomingForTeam(teamName).filter(
-      inc => !teamEmployees.some(e => e.id === inc.employee.id)
-    );
+  const renderTeamSection = (teamName: string) => {
+    const teamMembers = getEmployeesInTeam(teamName);
+    const directEmployees = employees.filter(e => e.team === teamName);
+    const missingRoles = getMissingRoles(teamName, directEmployees);
 
     return (
       <div key={teamName} className="mb-8">
         <div className="flex items-center gap-3 mb-4 pb-2 border-b border-border/50">
           <div className="w-2 h-2 rounded-full bg-primary" />
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">{teamName}</h3>
-          <span className="text-xs text-muted-foreground">({teamEmployees.length} members)</span>
+          <span className="text-xs text-muted-foreground">({teamMembers.length} members)</span>
+          {missingRoles.length > 0 && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-1 px-2 py-0.5 bg-destructive/10 text-destructive rounded-full cursor-help">
+                  <AlertTriangle size={12} />
+                  <span className="text-[10px] font-bold">Missing roles</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+                <div className="space-y-1">
+                  <p className="font-bold text-destructive text-sm">Missing Roles</p>
+                  {missingRoles.map(({ role, missing }) => (
+                    <p key={role} className="text-xs text-muted-foreground">
+                      {role}: <span className="text-destructive font-medium">{missing} needed</span>
+                    </p>
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
         <div className="space-y-3">
-          {teamEmployees.map(emp => renderEmployeeRow(emp))}
-          {incoming.map(({ employee, movement }) => 
-            renderEmployeeRow(employee, true, employee.team, movement.date)
+          {teamMembers.map(({ employee, transferInfo, isTransfer }) => 
+            renderEmployeeRow(employee, transferInfo, isTransfer)
           )}
         </div>
       </div>
@@ -421,7 +481,7 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
           <div className="w-72 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             Strategic Unit
           </div>
-          <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${years.length}, 1fr)` }}>
+          <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${years.length}, 1fr)` }}>
             {years.map(year => (
               <div 
                 key={year} 
@@ -432,6 +492,20 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
                 {year}
               </div>
             ))}
+            {/* Current date marker in header */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  style={{ left: `${currentDatePos}%` }}
+                  className="absolute -bottom-2 w-0 h-0 cursor-help"
+                >
+                  <div className="absolute -left-1.5 w-3 h-3 bg-destructive rounded-full border-2 border-background" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="bg-popover border border-border p-2 rounded-lg">
+                <p className="text-xs font-medium text-destructive">Today: {formatDate(currentDate.toISOString().split('T')[0])}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
         
@@ -439,27 +513,21 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
         <TooltipProvider>
           {shouldGroupByTeam && teams.length > 0 ? (
             // Group by team
-            teams.map(teamName => {
-              const teamEmployees = employees.filter(e => e.team === teamName);
-              return renderTeamSection(teamName, teamEmployees);
-            })
+            teams.map(teamName => renderTeamSection(teamName))
           ) : (
             // Single team view or flat list
             <div className="space-y-3">
               {employees.map(emp => renderEmployeeRow(emp))}
-              {selectedTeam !== 'All' && (
-                getIncomingForTeam(selectedTeam)
-                  .filter(inc => !employees.some(e => e.id === inc.employee.id))
-                  .map(({ employee, movement }) => 
-                    renderEmployeeRow(employee, true, employee.team, movement.date)
-                  )
-              )}
             </div>
           )}
         </TooltipProvider>
 
         {/* Legend */}
         <div className="mt-8 pt-6 border-t border-border flex flex-wrap items-center gap-6 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-0.5 h-4 bg-destructive rounded" />
+            <span className="text-muted-foreground">Current Date</span>
+          </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-flag" />
             <span className="text-muted-foreground">Decision Flag</span>
@@ -477,12 +545,12 @@ export const Timeline = ({ employees, events, openPlannerForUser, allEmployees =
             <span className="text-muted-foreground">Tenure Period</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-2 bg-accent-blue/30 rounded border border-accent-blue/50 border-dashed" />
-            <span className="text-muted-foreground">Incoming Transfer</span>
-          </div>
-          <div className="flex items-center gap-2">
             <div className="w-8 h-2 training-stripe rounded" />
             <span className="text-muted-foreground">Training Period</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-2 potential-stripe rounded" />
+            <span className="text-muted-foreground">Potential Hire</span>
           </div>
         </div>
       </div>
