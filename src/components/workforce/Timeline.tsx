@@ -1,5 +1,5 @@
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle } from 'lucide-react';
-import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate } from '@/lib/workforce-data';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3 } from 'lucide-react';
+import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface TimelineProps {
@@ -10,6 +10,8 @@ interface TimelineProps {
   selectedTeam?: string;
   selectedDept?: string;
   teamStructures?: TeamStructure[];
+  employeeDiffMap?: Map<number, { status: DiffStatus; changes?: string[] }>;
+  eventDiffMap?: Map<number, { status: DiffStatus }>;
 }
 
 interface TrainingPeriod {
@@ -23,6 +25,24 @@ interface TransferInfo {
   transferDate: string;
 }
 
+const getDiffBorderColor = (status?: DiffStatus) => {
+  switch (status) {
+    case 'added': return 'border-l-4 border-l-emerald-500';
+    case 'modified': return 'border-l-4 border-l-amber-500';
+    case 'removed': return 'border-l-4 border-l-destructive opacity-60';
+    default: return '';
+  }
+};
+
+const getDiffBgColor = (status?: DiffStatus) => {
+  switch (status) {
+    case 'added': return 'bg-emerald-500/5';
+    case 'modified': return 'bg-amber-500/5';
+    case 'removed': return 'bg-destructive/5';
+    default: return '';
+  }
+};
+
 export const Timeline = ({ 
   employees, 
   events, 
@@ -30,7 +50,9 @@ export const Timeline = ({
   allEmployees = [], 
   selectedTeam = 'All', 
   selectedDept = 'All',
-  teamStructures = []
+  teamStructures = [],
+  employeeDiffMap,
+  eventDiffMap
 }: TimelineProps) => {
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
   const currentDate = new Date();
@@ -161,9 +183,11 @@ export const Timeline = ({
     const durationWidth = Math.max(0, departurePos - joinedPos);
 
     const isPotential = emp.isPotential;
+    const diffInfo = employeeDiffMap?.get(emp.id);
+    const diffStatus = diffInfo?.status;
 
     return (
-      <div key={isTransfer ? `transfer-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''}`}>
+      <div key={isTransfer ? `transfer-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''} ${getDiffBorderColor(diffStatus)} ${getDiffBgColor(diffStatus)}`}>
         {/* Name & Quick Actions */}
         <div className="w-72 pr-6 flex justify-between items-center">
           <Tooltip>
@@ -172,6 +196,15 @@ export const Timeline = ({
                 <div className="flex items-center gap-2">
                   {isPotential && <HelpCircle size={12} className="text-potential" />}
                   <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
+                  {diffStatus && diffStatus !== 'unchanged' && (
+                    <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase ${
+                      diffStatus === 'added' ? 'bg-emerald-500/20 text-emerald-500' :
+                      diffStatus === 'modified' ? 'bg-amber-500/20 text-amber-500' :
+                      'bg-destructive/20 text-destructive'
+                    }`}>
+                      {diffStatus === 'added' ? <Plus size={8} /> : diffStatus === 'modified' ? <Edit3 size={8} /> : <Minus size={8} />}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <div className={`w-2 h-2 rounded-full ${getRoleColor(emp.role)}`} />
@@ -199,6 +232,14 @@ export const Timeline = ({
                 <p className="font-bold text-foreground">{emp.name}</p>
                 {isPotential && (
                   <p className="text-potential text-xs font-medium">⚠ Potential / Uncertain hire</p>
+                )}
+                {diffInfo?.changes && diffInfo.changes.length > 0 && (
+                  <div className="text-amber-500 text-xs">
+                    <p className="font-medium">Changes:</p>
+                    {diffInfo.changes.map((change, i) => (
+                      <p key={i}>• {change}</p>
+                    ))}
+                  </div>
                 )}
                 <div className="text-muted-foreground">
                   <p><span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}</p>
@@ -329,6 +370,7 @@ export const Timeline = ({
             if (ev.type === 'Departure') return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
+            const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
 
             return (
               <div 
@@ -337,7 +379,10 @@ export const Timeline = ({
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group/marker z-20"
               >
                 <div className={`p-1.5 rounded-full cursor-help shadow-lg transition-transform hover:scale-110
-                  ${ev.isFlag ? 'bg-flag' : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}`}
+                  ${ev.isFlag ? 'bg-flag' : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
+                  ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
+                  ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
+                `}
                 >
                   {ev.isFlag 
                     ? <Flag size={10} className="text-foreground" /> 
@@ -360,6 +405,13 @@ export const Timeline = ({
                     </p>
                   )}
                   <p className="text-muted-foreground mt-1.5 font-mono text-[10px]">{formatDate(ev.date)}</p>
+                  {evDiffStatus && evDiffStatus !== 'unchanged' && (
+                    <p className={`mt-1 font-bold text-[10px] ${
+                      evDiffStatus === 'added' ? 'text-emerald-500' : 'text-amber-500'
+                    }`}>
+                      {evDiffStatus === 'added' ? '+ New in scenario' : '~ Modified'}
+                    </p>
+                  )}
                 </div>
               </div>
             );
@@ -437,12 +489,23 @@ export const Timeline = ({
     const directEmployees = employees.filter(e => e.team === teamName);
     const missingRoles = getMissingRoles(teamName, directEmployees);
 
+    // Check if any team members have diffs
+    const hasDiffs = teamMembers.some(({ employee }) => {
+      const diff = employeeDiffMap?.get(employee.id);
+      return diff && diff.status !== 'unchanged';
+    });
+
     return (
       <div key={teamName} className="mb-8">
-        <div className="flex items-center gap-3 mb-4 pb-2 border-b border-border/50">
-          <div className="w-2 h-2 rounded-full bg-primary" />
+        <div className={`flex items-center gap-3 mb-4 pb-2 border-b border-border/50 ${hasDiffs ? 'border-b-amber-500/50' : ''}`}>
+          <div className={`w-2 h-2 rounded-full ${hasDiffs ? 'bg-amber-500' : 'bg-primary'}`} />
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">{teamName}</h3>
           <span className="text-xs text-muted-foreground">({teamMembers.length} members)</span>
+          {hasDiffs && (
+            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500">
+              HAS CHANGES
+            </span>
+          )}
           {missingRoles.length > 0 && (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -552,6 +615,23 @@ export const Timeline = ({
             <div className="w-8 h-2 potential-stripe rounded" />
             <span className="text-muted-foreground">Potential Hire</span>
           </div>
+          {(employeeDiffMap || eventDiffMap) && (
+            <>
+              <div className="w-px h-4 bg-border" />
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-emerald-500 rounded" />
+                <span className="text-muted-foreground">Added</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-amber-500 rounded" />
+                <span className="text-muted-foreground">Modified</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 bg-destructive rounded" />
+                <span className="text-muted-foreground">Removed</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

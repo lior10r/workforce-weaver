@@ -79,6 +79,17 @@ export interface Hierarchy {
   team: string;
 }
 
+// Changelog entry for tracking scenario changes
+export interface ScenarioChangelogEntry {
+  id: string;
+  timestamp: string;
+  type: 'employee_added' | 'employee_modified' | 'employee_removed' | 'event_added' | 'event_modified' | 'event_removed';
+  entityId: number;
+  entityName: string;
+  description: string;
+  details?: Record<string, { before?: string; after?: string }>;
+}
+
 // Strategic Scenario for what-if planning
 export interface Scenario {
   id: string;
@@ -86,6 +97,7 @@ export interface Scenario {
   description: string;
   createdAt: string;
   updatedAt: string;
+  parentScenarioId?: string; // For duplicated scenarios
   // Snapshot of data when scenario was created
   baseEmployees: Employee[];
   baseEvents: WorkforceEvent[];
@@ -96,6 +108,8 @@ export interface Scenario {
   // Track which items are scenario-specific
   deletedEmployeeIds: number[]; // Employees "removed" in this scenario
   deletedEventIds: number[]; // Events "removed" in this scenario
+  // Changelog for tracking all changes
+  changelog: ScenarioChangelogEntry[];
 }
 
 export const createScenario = (
@@ -103,21 +117,156 @@ export const createScenario = (
   description: string,
   employees: Employee[],
   events: WorkforceEvent[],
-  teamStructures: TeamStructure[]
+  teamStructures: TeamStructure[],
+  parentScenarioId?: string
 ): Scenario => ({
   id: `scenario-${Date.now()}`,
   name,
   description,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  parentScenarioId,
   baseEmployees: JSON.parse(JSON.stringify(employees)),
   baseEvents: JSON.parse(JSON.stringify(events)),
   baseTeamStructures: JSON.parse(JSON.stringify(teamStructures)),
   proposedEmployees: [],
   proposedEvents: [],
   deletedEmployeeIds: [],
-  deletedEventIds: []
+  deletedEventIds: [],
+  changelog: []
 });
+
+export const duplicateScenario = (
+  scenario: Scenario,
+  newName: string
+): Scenario => ({
+  id: `scenario-${Date.now()}`,
+  name: newName,
+  description: `Duplicated from "${scenario.name}"`,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  parentScenarioId: scenario.id,
+  baseEmployees: JSON.parse(JSON.stringify(scenario.baseEmployees)),
+  baseEvents: JSON.parse(JSON.stringify(scenario.baseEvents)),
+  baseTeamStructures: JSON.parse(JSON.stringify(scenario.baseTeamStructures)),
+  proposedEmployees: JSON.parse(JSON.stringify(scenario.proposedEmployees)),
+  proposedEvents: JSON.parse(JSON.stringify(scenario.proposedEvents)),
+  deletedEmployeeIds: [...scenario.deletedEmployeeIds],
+  deletedEventIds: [...scenario.deletedEventIds],
+  changelog: JSON.parse(JSON.stringify(scenario.changelog))
+});
+
+export const addScenarioChangelogEntry = (
+  scenario: Scenario,
+  type: ScenarioChangelogEntry['type'],
+  entityId: number,
+  entityName: string,
+  description: string,
+  details?: Record<string, { before?: string; after?: string }>
+): Scenario => ({
+  ...scenario,
+  updatedAt: new Date().toISOString(),
+  changelog: [
+    ...scenario.changelog,
+    {
+      id: `change-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: new Date().toISOString(),
+      type,
+      entityId,
+      entityName,
+      description,
+      details
+    }
+  ]
+});
+
+// Diff types for scenario comparison
+export type DiffStatus = 'added' | 'modified' | 'removed' | 'unchanged';
+
+export interface EmployeeDiff {
+  employee: Employee;
+  status: DiffStatus;
+  changes?: string[];
+}
+
+export interface EventDiff {
+  event: WorkforceEvent;
+  status: DiffStatus;
+  changes?: string[];
+}
+
+// Calculate employee diffs between master and scenario
+export const getEmployeeDiffs = (
+  masterEmployees: Employee[],
+  scenario: Scenario
+): EmployeeDiff[] => {
+  const scenarioEmployees = getScenarioEmployees(scenario);
+  const masterIds = new Set(masterEmployees.map(e => e.id));
+  const scenarioIds = new Set(scenarioEmployees.map(e => e.id));
+  const proposedIds = new Set(scenario.proposedEmployees.map(e => e.id));
+  
+  const diffs: EmployeeDiff[] = [];
+  
+  // Check all scenario employees
+  scenarioEmployees.forEach(emp => {
+    if (!masterIds.has(emp.id)) {
+      // Added in scenario
+      diffs.push({ employee: emp, status: 'added' });
+    } else if (proposedIds.has(emp.id)) {
+      // Modified in scenario
+      const masterEmp = masterEmployees.find(e => e.id === emp.id)!;
+      const changes: string[] = [];
+      if (masterEmp.team !== emp.team) changes.push(`Team: ${masterEmp.team} → ${emp.team}`);
+      if (masterEmp.role !== emp.role) changes.push(`Role: ${masterEmp.role} → ${emp.role}`);
+      if (masterEmp.status !== emp.status) changes.push(`Status: ${masterEmp.status} → ${emp.status}`);
+      if (masterEmp.managerId !== emp.managerId) changes.push(`Manager changed`);
+      diffs.push({ employee: emp, status: 'modified', changes });
+    } else {
+      diffs.push({ employee: emp, status: 'unchanged' });
+    }
+  });
+  
+  // Check for removed employees
+  scenario.deletedEmployeeIds.forEach(id => {
+    const emp = masterEmployees.find(e => e.id === id);
+    if (emp) {
+      diffs.push({ employee: emp, status: 'removed' });
+    }
+  });
+  
+  return diffs;
+};
+
+// Calculate event diffs between master and scenario
+export const getEventDiffs = (
+  masterEvents: WorkforceEvent[],
+  scenario: Scenario
+): EventDiff[] => {
+  const scenarioEvents = getScenarioEvents(scenario);
+  const masterIds = new Set(masterEvents.map(e => e.id));
+  const proposedIds = new Set(scenario.proposedEvents.map(e => e.id));
+  
+  const diffs: EventDiff[] = [];
+  
+  scenarioEvents.forEach(event => {
+    if (!masterIds.has(event.id)) {
+      diffs.push({ event, status: 'added' });
+    } else if (proposedIds.has(event.id)) {
+      diffs.push({ event, status: 'modified' });
+    } else {
+      diffs.push({ event, status: 'unchanged' });
+    }
+  });
+  
+  scenario.deletedEventIds.forEach(id => {
+    const event = masterEvents.find(e => e.id === id);
+    if (event) {
+      diffs.push({ event, status: 'removed' });
+    }
+  });
+  
+  return diffs;
+};
 
 // Get effective data for a scenario (base + proposed - deleted)
 export const getScenarioEmployees = (scenario: Scenario): Employee[] => {
