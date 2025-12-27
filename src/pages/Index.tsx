@@ -9,6 +9,7 @@ import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
+import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { 
   Employee, 
   WorkforceEvent, 
@@ -42,7 +43,9 @@ const Index = () => {
   // Modal states
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+  const [isTeamStructureModalOpen, setIsTeamStructureModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [editingTeamStructure, setEditingTeamStructure] = useState<{ teamName: string; department: string } | null>(null);
   const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
 
   // Legacy hierarchy for compatibility with some components
@@ -145,6 +148,25 @@ const Index = () => {
   const handleEditEmployee = (employee: Employee) => {
     setEditingEmployee(employee);
     setIsEmployeeModalOpen(true);
+  };
+
+  const handleConfigureTeam = (teamName: string, department: string) => {
+    setEditingTeamStructure({ teamName, department });
+    setIsTeamStructureModalOpen(true);
+  };
+
+  const handleSaveTeamStructure = (structure: TeamStructure) => {
+    setTeamStructures(prev => {
+      const existing = prev.findIndex(s => s.teamName === structure.teamName);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = structure;
+        return updated;
+      }
+      return [...prev, structure];
+    });
+    setIsTeamStructureModalOpen(false);
+    setEditingTeamStructure(null);
   };
 
   const getViewTitle = () => {
@@ -258,6 +280,8 @@ const Index = () => {
             employees={filteredEmployees}
             openPlannerForUser={openPlannerForUser}
             onEditEmployee={handleEditEmployee}
+            teamStructures={teamStructures}
+            onConfigureTeam={handleConfigureTeam}
           />
         )}
 
@@ -290,6 +314,7 @@ const Index = () => {
         editingEmployee={editingEmployee}
         hierarchy={hierarchy}
         departments={departments}
+        employees={employees}
       />
 
       <EventModal
@@ -299,6 +324,16 @@ const Index = () => {
         employees={employees}
         prefill={eventPrefill}
         departments={departments}
+      />
+
+      <TeamStructureModal
+        isOpen={isTeamStructureModalOpen}
+        onClose={() => { setIsTeamStructureModalOpen(false); setEditingTeamStructure(null); }}
+        onSubmit={handleSaveTeamStructure}
+        teamStructure={teamStructures.find(s => s.teamName === editingTeamStructure?.teamName)}
+        teamName={editingTeamStructure?.teamName || ''}
+        department={editingTeamStructure?.department || ''}
+        employees={employees}
       />
     </div>
   );

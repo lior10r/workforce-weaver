@@ -9,16 +9,20 @@ interface EmployeeModalProps {
   editingEmployee: Employee | null;
   hierarchy: Hierarchy;
   departments: Record<string, string[]>;
+  employees: Employee[];
 }
 
-export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy, departments }: EmployeeModalProps) => {
+export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
   const [selectedDept, setSelectedDept] = useState(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
+  const [selectedTeam, setSelectedTeam] = useState('');
 
   useEffect(() => {
     if (editingEmployee) {
       setSelectedDept(editingEmployee.dept);
+      setSelectedTeam(editingEmployee.team);
     } else {
       setSelectedDept(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
+      setSelectedTeam('');
     }
   }, [editingEmployee, hierarchy.dept, isOpen]);
 
@@ -28,6 +32,8 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
+    const managerValue = formData.get('managerId') as string;
+    
     const employeeData = {
       name: formData.get('name') as string,
       dept: formData.get('dept') as string,
@@ -36,6 +42,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
       status: formData.get('status') as string,
       joined: formData.get('joined') as string,
       isPotential: formData.get('isPotential') === 'on',
+      managerId: managerValue ? Number(managerValue) : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -43,6 +50,12 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
 
   const deptList = Object.keys(departments);
   const teamList = departments[selectedDept] || [];
+  
+  // Potential managers - anyone in same team or department excluding self
+  const potentialManagers = employees.filter(emp => 
+    emp.id !== editingEmployee?.id && 
+    (emp.team === (selectedTeam || editingEmployee?.team) || emp.dept === selectedDept)
+  );
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -93,12 +106,32 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
               </label>
               <select 
                 name="team" 
-                defaultValue={editingEmployee?.team} 
+                value={selectedTeam || editingEmployee?.team || teamList[0] || ''}
+                onChange={(e) => setSelectedTeam(e.target.value)}
                 className="select-field w-full"
               >
                 {teamList.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* Manager Selection */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+              Reports To (Manager)
+            </label>
+            <select 
+              name="managerId" 
+              defaultValue={editingEmployee?.managerId || ''}
+              className="select-field w-full"
+            >
+              <option value="">No manager</option>
+              {potentialManagers.map(m => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.role} - {m.team})
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -47,6 +47,7 @@ export interface TeamStructure {
   department: string;
   teamLeader?: number; // Employee ID of team leader
   requiredRoles: Record<string, number>; // Role name -> count required
+  targetSize?: number; // Optional target team size
 }
 
 // Types
@@ -59,6 +60,7 @@ export interface Employee {
   status: string;
   joined: string;
   isPotential?: boolean; // Uncertain hire - for planning purposes
+  managerId?: number; // Direct manager (flexible hierarchy)
 }
 
 export interface WorkforceEvent {
