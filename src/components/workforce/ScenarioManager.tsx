@@ -4,20 +4,24 @@ import {
   GitMerge, 
   Plus, 
   Trash2, 
-  Edit3, 
-  Eye, 
-  Check, 
   X,
   Copy,
   ArrowRightLeft,
-  Layers
+  Layers,
+  History,
+  UserPlus,
+  UserMinus,
+  Edit3,
+  Calendar
 } from 'lucide-react';
 import { 
   Scenario, 
   Employee, 
   WorkforceEvent, 
   TeamStructure,
+  ScenarioChangelogEntry,
   createScenario,
+  duplicateScenario,
   getScenarioEmployees,
   getScenarioEvents
 } from '@/lib/workforce-data';
@@ -56,9 +60,13 @@ export const ScenarioManager = ({
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isMergeConfirmOpen, setIsMergeConfirmOpen] = useState(false);
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
+  const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
   const [scenarioToMerge, setScenarioToMerge] = useState<Scenario | null>(null);
+  const [scenarioToDuplicate, setScenarioToDuplicate] = useState<Scenario | null>(null);
   const [newScenarioName, setNewScenarioName] = useState('');
   const [newScenarioDesc, setNewScenarioDesc] = useState('');
+  const [duplicateName, setDuplicateName] = useState('');
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
   const compareScenario = scenarios.find(s => s.id === compareScenarioId);
@@ -84,6 +92,20 @@ export const ScenarioManager = ({
     toast.success(`Created scenario: ${scenario.name}`);
   };
 
+  const handleDuplicateScenario = () => {
+    if (!scenarioToDuplicate || !duplicateName.trim()) {
+      toast.error('Please enter a name for the duplicated scenario');
+      return;
+    }
+
+    const newScenario = duplicateScenario(scenarioToDuplicate, duplicateName.trim());
+    onCreateScenario(newScenario);
+    setDuplicateName('');
+    setScenarioToDuplicate(null);
+    setIsDuplicateOpen(false);
+    toast.success(`Duplicated scenario as: ${newScenario.name}`);
+  };
+
   const handleMergeConfirm = () => {
     if (scenarioToMerge) {
       onMergeToMaster(scenarioToMerge);
@@ -104,7 +126,8 @@ export const ScenarioManager = ({
       events: events.length,
       proposedChanges,
       deletions,
-      flags: events.filter(e => e.isFlag).length
+      flags: events.filter(e => e.isFlag).length,
+      changelogCount: scenario.changelog.length
     };
   };
 
@@ -130,6 +153,28 @@ export const ScenarioManager = ({
     };
   };
 
+  const getChangelogIcon = (type: ScenarioChangelogEntry['type']) => {
+    switch (type) {
+      case 'employee_added': return <UserPlus size={14} className="text-emerald-500" />;
+      case 'employee_removed': return <UserMinus size={14} className="text-destructive" />;
+      case 'employee_modified': return <Edit3 size={14} className="text-amber-500" />;
+      case 'event_added': return <Calendar size={14} className="text-emerald-500" />;
+      case 'event_removed': return <Calendar size={14} className="text-destructive" />;
+      case 'event_modified': return <Calendar size={14} className="text-amber-500" />;
+      default: return <Edit3 size={14} />;
+    }
+  };
+
+  const formatChangelogDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString('en-GB', { 
+      day: '2-digit', 
+      month: 'short', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
   return (
     <>
       {/* Scenario Bar */}
@@ -148,22 +193,34 @@ export const ScenarioManager = ({
             Master Plan
           </button>
           {scenarios.map(scenario => (
-            <button
-              key={scenario.id}
-              onClick={() => onSetActiveScenario(scenario.id)}
-              className={`px-2 py-1 rounded transition-colors flex items-center gap-1 ${
-                activeScenarioId === scenario.id 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'hover:bg-accent text-foreground'
-              }`}
-            >
-              {scenario.name}
-              {getScenarioStats(scenario).proposedChanges > 0 && (
-                <span className="text-[10px] bg-status-warning/20 text-status-warning px-1 rounded">
-                  {getScenarioStats(scenario).proposedChanges}
-                </span>
-              )}
-            </button>
+            <div key={scenario.id} className="flex items-center gap-1">
+              <button
+                onClick={() => onSetActiveScenario(scenario.id)}
+                className={`px-2 py-1 rounded transition-colors flex items-center gap-1 ${
+                  activeScenarioId === scenario.id 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'hover:bg-accent text-foreground'
+                }`}
+              >
+                {scenario.name}
+                {getScenarioStats(scenario).proposedChanges > 0 && (
+                  <span className="text-[10px] bg-status-warning/20 text-status-warning px-1 rounded">
+                    {getScenarioStats(scenario).proposedChanges}
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setScenarioToDuplicate(scenario);
+                  setDuplicateName(`${scenario.name} (Copy)`);
+                  setIsDuplicateOpen(true);
+                }}
+                className="p-1 hover:bg-accent rounded transition-colors text-muted-foreground hover:text-foreground"
+                title="Duplicate scenario"
+              >
+                <Copy size={12} />
+              </button>
+            </div>
           ))}
         </div>
 
@@ -212,6 +269,19 @@ export const ScenarioManager = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsChangelogOpen(true)}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+              title="View changelog"
+            >
+              <History size={14} />
+              <span className="hidden sm:inline">History</span>
+              {activeScenario.changelog.length > 0 && (
+                <span className="px-1 bg-primary/20 text-primary rounded text-[10px]">
+                  {activeScenario.changelog.length}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => {
                 setScenarioToMerge(activeScenario);
@@ -344,6 +414,119 @@ export const ScenarioManager = ({
         </DialogContent>
       </Dialog>
 
+      {/* Duplicate Scenario Dialog */}
+      <Dialog open={isDuplicateOpen} onOpenChange={setIsDuplicateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Copy size={20} />
+              Duplicate Scenario
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-4">
+            <p className="text-sm text-muted-foreground">
+              Create a copy of <strong>"{scenarioToDuplicate?.name}"</strong> to explore alternative outcomes.
+            </p>
+            
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">New Scenario Name</label>
+              <input
+                type="text"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="e.g., Q3 Plan - Alternative"
+                className="input-field mt-1"
+              />
+            </div>
+
+            {scenarioToDuplicate && (
+              <div className="p-3 bg-accent/50 rounded-xl text-xs text-muted-foreground">
+                <p className="font-medium text-foreground mb-1">Will include:</p>
+                <ul className="space-y-1 ml-4 list-disc">
+                  <li>{getScenarioStats(scenarioToDuplicate).proposedChanges} proposed changes</li>
+                  <li>{scenarioToDuplicate.changelog.length} changelog entries</li>
+                </ul>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setIsDuplicateOpen(false)}
+                className="px-4 py-2 text-sm bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDuplicateScenario}
+                className="px-4 py-2 text-sm bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Copy size={16} />
+                Duplicate
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Changelog Dialog */}
+      <Dialog open={isChangelogOpen} onOpenChange={setIsChangelogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History size={20} />
+              Scenario History
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto pt-4">
+            {activeScenario?.changelog.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <History size={32} className="mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No changes recorded yet</p>
+                <p className="text-xs mt-1">Changes will appear here as you modify this scenario</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {activeScenario?.changelog.slice().reverse().map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="p-3 rounded-lg border border-border bg-card/50"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5">
+                        {getChangelogIcon(entry.type)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{entry.entityName}</p>
+                          <span className="text-[10px] text-muted-foreground">
+                            {formatChangelogDate(entry.timestamp)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
+                        {entry.details && Object.keys(entry.details).length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {Object.entries(entry.details).map(([key, value]) => (
+                              <div key={key} className="text-[10px] text-muted-foreground">
+                                <span className="font-medium">{key}:</span>{' '}
+                                {value.before && <span className="text-destructive line-through">{value.before}</span>}
+                                {value.before && value.after && ' → '}
+                                {value.after && <span className="text-emerald-500">{value.after}</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Compare Dialog */}
       <Dialog open={isCompareOpen} onOpenChange={setIsCompareOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -356,7 +539,7 @@ export const ScenarioManager = ({
           
           <div className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              Select a scenario to compare against the Master Plan.
+              Select a scenario to compare against the Master Plan. Differences will be highlighted in the roster and timeline views.
             </p>
             
             <div className="space-y-2">
@@ -382,9 +565,6 @@ export const ScenarioManager = ({
                           <p className="text-xs text-muted-foreground mt-1">{scenario.description}</p>
                         )}
                       </div>
-                      {compareScenarioId === scenario.id && (
-                        <Check size={16} className="text-primary" />
-                      )}
                     </div>
                     <div className="flex gap-3 mt-3 text-xs">
                       <span className="px-2 py-0.5 bg-accent rounded">{stats.employees} employees</span>
