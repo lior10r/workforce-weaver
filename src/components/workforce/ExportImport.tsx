@@ -1,8 +1,10 @@
 import { useState, useRef } from 'react';
-import { Download, Upload, FileJson, Users, Calendar, Building2, X } from 'lucide-react';
-import { Employee, WorkforceEvent, TeamStructure } from '@/lib/workforce-data';
+import { Download, Upload, FileJson, Users, Calendar, Building2, X, FileText, Image } from 'lucide-react';
+import { Employee, WorkforceEvent, TeamStructure, DEPARTMENTS } from '@/lib/workforce-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 interface ExportImportProps {
   employees: Employee[];
@@ -19,6 +21,16 @@ interface ExportImportProps {
     teamStructures?: TeamStructure[];
     departments?: Record<string, string[]>;
   }) => void;
+  orgChartRef?: React.RefObject<HTMLDivElement>;
+}
+
+interface FullExportData {
+  version: string;
+  exportedAt: string;
+  employees: Employee[];
+  events: WorkforceEvent[];
+  teamStructures: TeamStructure[];
+  departments: Record<string, string[]>;
 }
 
 interface ExportData {
@@ -39,11 +51,13 @@ export const ExportImport = ({
   onImportEvents,
   onImportTeamStructures,
   onImportDepartments,
-  onImportAll
+  onImportAll,
+  orgChartRef
 }: ExportImportProps) => {
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importPreview, setImportPreview] = useState<ExportData | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const downloadJSON = (data: object, filename: string) => {
@@ -72,7 +86,6 @@ export const ExportImport = ({
         headers.map(h => {
           const value = (row as Record<string, unknown>)[h];
           const stringValue = value === null || value === undefined ? '' : String(value);
-          // Escape quotes and wrap in quotes if contains comma or quote
           if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
             return `"${stringValue.replace(/"/g, '""')}"`;
           }
@@ -93,13 +106,51 @@ export const ExportImport = ({
     toast.success(`Exported ${filename}`);
   };
 
+  // Generate complete team structures for all teams (not just configured ones)
+  const getAllTeamStructures = (): TeamStructure[] => {
+    const allTeams: TeamStructure[] = [];
+    
+    Object.entries(departments).forEach(([dept, teams]) => {
+      teams.forEach(teamName => {
+        const existing = teamStructures.find(s => s.teamName === teamName);
+        if (existing) {
+          allTeams.push(existing);
+        } else {
+          // Create default structure for unconfigured teams
+          const teamMembers = employees.filter(e => e.team === teamName);
+          const teamLead = teamMembers.find(e => e.role === 'Team Lead');
+          allTeams.push({
+            teamName,
+            department: dept,
+            teamLeader: teamLead?.id,
+            requiredRoles: {},
+            targetSize: teamMembers.length
+          });
+        }
+      });
+    });
+    
+    return allTeams;
+  };
+
+  // Full comprehensive export with all data
   const exportAll = () => {
-    const data: ExportData = {
-      version: '1.0',
+    const allTeamStructures = getAllTeamStructures();
+    
+    const data: FullExportData = {
+      version: '2.0',
       exportedAt: new Date().toISOString(),
-      employees,
-      events,
-      teamStructures,
+      employees: employees.map(e => ({
+        ...e,
+        managerId: e.managerId || undefined,
+        isPotential: e.isPotential || undefined
+      })),
+      events: events.map(e => ({
+        ...e,
+        targetTeam: e.targetTeam || undefined,
+        endDate: e.endDate || undefined
+      })),
+      teamStructures: allTeamStructures,
       departments
     };
     downloadJSON(data, `workforce-full-export-${new Date().toISOString().split('T')[0]}.json`);
@@ -107,12 +158,26 @@ export const ExportImport = ({
   };
 
   const exportEmployeesJSON = () => {
-    downloadJSON({ version: '1.0', exportedAt: new Date().toISOString(), employees }, 'employees.json');
+    downloadJSON({ 
+      version: '1.0', 
+      exportedAt: new Date().toISOString(), 
+      employees: employees.map(e => ({
+        ...e,
+        managerId: e.managerId || undefined,
+        isPotential: e.isPotential || undefined
+      }))
+    }, 'employees.json');
   };
 
   const exportEmployeesCSV = () => {
     const flatEmployees = employees.map(e => ({
-      ...e,
+      id: e.id,
+      name: e.name,
+      dept: e.dept,
+      team: e.team,
+      role: e.role,
+      status: e.status,
+      joined: e.joined,
       managerId: e.managerId || '',
       isPotential: e.isPotential || false
     }));
@@ -120,12 +185,25 @@ export const ExportImport = ({
   };
 
   const exportEventsJSON = () => {
-    downloadJSON({ version: '1.0', exportedAt: new Date().toISOString(), events }, 'events.json');
+    downloadJSON({ 
+      version: '1.0', 
+      exportedAt: new Date().toISOString(), 
+      events: events.map(e => ({
+        ...e,
+        targetTeam: e.targetTeam || undefined,
+        endDate: e.endDate || undefined
+      }))
+    }, 'events.json');
   };
 
   const exportEventsCSV = () => {
     const flatEvents = events.map(e => ({
-      ...e,
+      id: e.id,
+      empId: e.empId,
+      type: e.type,
+      date: e.date,
+      details: e.details,
+      isFlag: e.isFlag,
       targetTeam: e.targetTeam || '',
       endDate: e.endDate || ''
     }));
@@ -133,11 +211,107 @@ export const ExportImport = ({
   };
 
   const exportTeamStructuresJSON = () => {
-    downloadJSON({ version: '1.0', exportedAt: new Date().toISOString(), teamStructures }, 'team-structures.json');
+    const allTeamStructures = getAllTeamStructures();
+    downloadJSON({ 
+      version: '1.0', 
+      exportedAt: new Date().toISOString(), 
+      teamStructures: allTeamStructures 
+    }, 'team-structures.json');
   };
 
   const exportDepartmentsJSON = () => {
     downloadJSON({ version: '1.0', exportedAt: new Date().toISOString(), departments }, 'departments.json');
+  };
+
+  // PDF Export for Org Chart
+  const exportOrgChartPDF = async () => {
+    if (!orgChartRef?.current) {
+      toast.error('Org chart not available');
+      return;
+    }
+
+    setIsExportingPDF(true);
+    toast.info('Generating PDF...');
+
+    try {
+      const element = orgChartRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0f0f1a'
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const imgWidth = canvas.width;
+      const imgHeight = canvas.height;
+
+      // Calculate PDF dimensions (landscape for wider charts)
+      const pdfWidth = 297; // A4 landscape width in mm
+      const pdfHeight = 210; // A4 landscape height in mm
+      
+      const ratio = Math.min(pdfWidth / (imgWidth * 0.264583), pdfHeight / (imgHeight * 0.264583));
+      const scaledWidth = imgWidth * 0.264583 * ratio;
+      const scaledHeight = imgHeight * 0.264583 * ratio;
+
+      const pdf = new jsPDF({
+        orientation: scaledWidth > scaledHeight ? 'landscape' : 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      // Center the image
+      const xOffset = (pdf.internal.pageSize.getWidth() - scaledWidth) / 2;
+      const yOffset = 10;
+
+      pdf.setFontSize(16);
+      pdf.text('Organization Chart', pdf.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+      pdf.setFontSize(10);
+      pdf.text(`Generated: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.getWidth() / 2, 22, { align: 'center' });
+      
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset + 20, scaledWidth, scaledHeight);
+
+      pdf.save(`org-chart-${new Date().toISOString().split('T')[0]}.pdf`);
+      toast.success('PDF exported successfully');
+    } catch (error) {
+      console.error('PDF export error:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
+  // Export org chart as PNG
+  const exportOrgChartImage = async () => {
+    if (!orgChartRef?.current) {
+      toast.error('Org chart not available');
+      return;
+    }
+
+    setIsExportingPDF(true);
+    toast.info('Generating image...');
+
+    try {
+      const element = orgChartRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#0f0f1a'
+      });
+
+      const link = document.createElement('a');
+      link.download = `org-chart-${new Date().toISOString().split('T')[0]}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+
+      toast.success('Image exported successfully');
+    } catch (error) {
+      console.error('Image export error:', error);
+      toast.error('Failed to export image');
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -224,7 +398,7 @@ export const ExportImport = ({
 
       {/* Export Dialog */}
       <Dialog open={isExportOpen} onOpenChange={setIsExportOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Download size={20} />
@@ -233,19 +407,49 @@ export const ExportImport = ({
           </DialogHeader>
           
           <div className="space-y-4 pt-4">
+            {/* Full Export */}
             <button
               onClick={exportAll}
               className="w-full flex items-center gap-3 p-4 bg-primary/10 hover:bg-primary/20 rounded-xl transition-colors border border-primary/20"
             >
               <FileJson size={24} className="text-primary" />
-              <div className="text-left">
-                <p className="font-semibold">Export All (JSON)</p>
+              <div className="text-left flex-1">
+                <p className="font-semibold">Export All Data (JSON)</p>
                 <p className="text-xs text-muted-foreground">
-                  Complete backup with all data
+                  Complete backup: {employees.length} employees, {events.length} events, {getAllTeamStructures().length} teams
                 </p>
               </div>
             </button>
 
+            {/* Org Chart Export */}
+            {orgChartRef && (
+              <div className="p-4 bg-accent/50 rounded-xl space-y-3">
+                <p className="font-semibold text-sm flex items-center gap-2">
+                  <Image size={16} className="text-primary" />
+                  Org Chart Export
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={exportOrgChartPDF}
+                    disabled={isExportingPDF}
+                    className="flex flex-col items-center gap-2 p-3 bg-background hover:bg-background/80 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    <FileText size={20} className="text-primary" />
+                    <span className="text-xs font-medium">PDF</span>
+                  </button>
+                  <button
+                    onClick={exportOrgChartImage}
+                    disabled={isExportingPDF}
+                    className="flex flex-col items-center gap-2 p-3 bg-background hover:bg-background/80 rounded-xl transition-colors disabled:opacity-50"
+                  >
+                    <Image size={20} className="text-primary" />
+                    <span className="text-xs font-medium">PNG Image</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Individual Exports */}
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={exportEmployeesJSON}
@@ -280,7 +484,7 @@ export const ExportImport = ({
                 className="flex flex-col items-center gap-2 p-3 bg-accent hover:bg-accent/80 rounded-xl transition-colors"
               >
                 <Building2 size={20} className="text-primary" />
-                <span className="text-xs font-medium">Team Structures</span>
+                <span className="text-xs font-medium">All Teams ({getAllTeamStructures().length})</span>
               </button>
               <button
                 onClick={exportDepartmentsJSON}
