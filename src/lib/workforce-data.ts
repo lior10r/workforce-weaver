@@ -158,30 +158,79 @@ export const initialTeamStructures: TeamStructure[] = [
   },
 ];
 
-// Initial data - with new hierarchy structure
+// Initial data - with proper hierarchy structure
+// Hierarchy: Department Head -> Group Manager -> Team Lead -> Developers
 export const initialEmployees: Employee[] = [
-  { id: 1, name: 'Alice Chen', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15' },
-  { id: 2, name: 'Bob Smith', dept: 'Engineering', team: 'Backend Core', role: 'Team Lead', status: 'Active', joined: '2022-05-10' },
-  { id: 3, name: 'Charlie Day', dept: 'Engineering', team: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01' },
-  { id: 4, name: 'Diana Ross', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2023-06-20' },
-  { id: 5, name: 'Edward Kim', dept: 'Engineering', team: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01' },
-  { id: 6, name: 'Fiona Walsh', dept: 'Engineering', team: 'Backend API', role: 'Senior Dev', status: 'Active', joined: '2023-03-15' },
-  { id: 7, name: 'George Liu', dept: 'Operations', team: 'HR & People', role: 'Team Lead', status: 'Active', joined: '2022-11-01' },
-  { id: 8, name: 'Hannah Moore', dept: 'Engineering', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01' },
-  { id: 9, name: 'Ivan Petrov', dept: 'Product & Design', team: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15' },
-  { id: 10, name: 'Julia Santos', dept: 'Engineering', team: 'Backend Core', role: 'QA Engineer', status: 'Active', joined: '2023-09-01' },
-  { id: 11, name: 'Kevin O\'Brien', dept: 'Operations', team: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20' },
-  { id: 12, name: 'Laura Martinez', dept: 'Engineering', team: 'Frontend Alpha', role: 'Engineering Manager', status: 'Active', joined: '2020-01-15' },
-  { id: 13, name: 'Mike Johnson', dept: 'Engineering', team: 'Frontend Alpha', role: 'Mid-Level Dev', status: 'Active', joined: '2023-04-01' },
-  { id: 14, name: 'Nina Patel', dept: 'Engineering', team: 'Frontend Alpha', role: 'Junior Dev', status: 'Active', joined: '2024-01-15' },
-  { id: 15, name: 'Oscar Lee', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2021-06-01' },
-  { id: 16, name: 'Paula Brown', dept: 'Engineering', team: 'Frontend Beta', role: 'Team Lead', status: 'Active', joined: '2021-03-01' },
-  { id: 17, name: 'Quinn Davis', dept: 'Engineering', team: 'Frontend Beta', role: 'Mid-Level Dev', status: 'Active', joined: '2023-07-15' },
-  { id: 18, name: 'Rachel Green', dept: 'Engineering', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01' },
-  { id: 19, name: 'Steve Wilson', dept: 'Engineering', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01' },
-  { id: 20, name: 'Tina Turner', dept: 'Engineering', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10' },
+  // === ENGINEERING DEPARTMENT ===
+  // Department Head (VP Engineering)
+  { id: 100, name: 'Victoria Palmer', dept: 'Engineering', team: 'Engineering', role: 'Engineering Manager', status: 'Active', joined: '2019-03-01' },
+  
+  // Group Manager - Frontend (manages Frontend Alpha & Frontend Beta)
+  { id: 101, name: 'Marcus Webb', dept: 'Engineering', team: 'Frontend Alpha', role: 'Engineering Manager', status: 'Active', joined: '2020-06-15', managerId: 100 },
+  
+  // Frontend Alpha Team
+  { id: 12, name: 'Laura Martinez', dept: 'Engineering', team: 'Frontend Alpha', role: 'Team Lead', status: 'Active', joined: '2020-01-15', managerId: 101 },
+  { id: 1, name: 'Alice Chen', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15', managerId: 12 },
+  { id: 15, name: 'Oscar Lee', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2021-06-01', managerId: 12 },
+  { id: 13, name: 'Mike Johnson', dept: 'Engineering', team: 'Frontend Alpha', role: 'Mid-Level Dev', status: 'Active', joined: '2023-04-01', managerId: 12 },
+  { id: 14, name: 'Nina Patel', dept: 'Engineering', team: 'Frontend Alpha', role: 'Junior Dev', status: 'Active', joined: '2024-01-15', managerId: 12 },
+  
+  // Frontend Beta Team
+  { id: 16, name: 'Paula Brown', dept: 'Engineering', team: 'Frontend Beta', role: 'Team Lead', status: 'Active', joined: '2021-03-01', managerId: 101 },
+  { id: 17, name: 'Quinn Davis', dept: 'Engineering', team: 'Frontend Beta', role: 'Mid-Level Dev', status: 'Active', joined: '2023-07-15', managerId: 16 },
+  { id: 22, name: 'Ryan Foster', dept: 'Engineering', team: 'Frontend Beta', role: 'Junior Dev', status: 'Active', joined: '2024-02-01', managerId: 16 },
+  
+  // Group Manager - Backend (manages Backend Core & Backend API)
+  { id: 102, name: 'Sandra Hughes', dept: 'Engineering', team: 'Backend Core', role: 'Engineering Manager', status: 'Active', joined: '2020-04-10', managerId: 100 },
+  
+  // Backend Core Team
+  { id: 2, name: 'Bob Smith', dept: 'Engineering', team: 'Backend Core', role: 'Team Lead', status: 'Active', joined: '2022-05-10', managerId: 102 },
+  { id: 18, name: 'Rachel Green', dept: 'Engineering', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01', managerId: 2 },
+  { id: 10, name: 'Julia Santos', dept: 'Engineering', team: 'Backend Core', role: 'QA Engineer', status: 'Active', joined: '2023-09-01', managerId: 2 },
+  { id: 23, name: 'Tom Bradley', dept: 'Engineering', team: 'Backend Core', role: 'Mid-Level Dev', status: 'Active', joined: '2023-05-15', managerId: 2 },
+  
+  // Backend API Team
+  { id: 24, name: 'Uma Krishnan', dept: 'Engineering', team: 'Backend API', role: 'Team Lead', status: 'Active', joined: '2021-08-01', managerId: 102 },
+  { id: 6, name: 'Fiona Walsh', dept: 'Engineering', team: 'Backend API', role: 'Senior Dev', status: 'Active', joined: '2023-03-15', managerId: 24 },
+  { id: 19, name: 'Steve Wilson', dept: 'Engineering', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01', managerId: 24 },
+  
+  // Infrastructure Team (reports directly to VP)
+  { id: 25, name: 'Walter Chang', dept: 'Engineering', team: 'Infrastructure', role: 'Team Lead', status: 'Active', joined: '2020-11-01', managerId: 100 },
+  { id: 3, name: 'Charlie Day', dept: 'Engineering', team: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01', managerId: 25 },
+  { id: 26, name: 'Xavier Moore', dept: 'Engineering', team: 'Infrastructure', role: 'Senior Dev', status: 'Active', joined: '2021-07-15', managerId: 25 },
+  
+  // Security Team (reports directly to VP)
+  { id: 5, name: 'Edward Kim', dept: 'Engineering', team: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01', managerId: 100 },
+  { id: 27, name: 'Yuki Tanaka', dept: 'Engineering', team: 'Security', role: 'Senior Dev', status: 'Active', joined: '2022-03-01', managerId: 5 },
+  
+  // Mobile Teams (reports directly to VP)
+  { id: 28, name: 'Zara Ahmed', dept: 'Engineering', team: 'Mobile iOS', role: 'Team Lead', status: 'Active', joined: '2021-05-01', managerId: 100 },
+  { id: 8, name: 'Hannah Moore', dept: 'Engineering', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01', managerId: 28 },
+  { id: 20, name: 'Tina Turner', dept: 'Engineering', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10', managerId: 100 },
+  
+  // === PRODUCT & DESIGN DEPARTMENT ===
+  // Department Head
+  { id: 200, name: 'Patricia Stone', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2019-08-01' },
+  
+  // Product Core Team
+  { id: 4, name: 'Diana Ross', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2023-06-20', managerId: 200 },
+  
+  // UX Design Team
+  { id: 201, name: 'Gregory Ellis', dept: 'Product & Design', team: 'UX Design', role: 'Team Lead', status: 'Active', joined: '2020-09-01', managerId: 200 },
+  { id: 9, name: 'Ivan Petrov', dept: 'Product & Design', team: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15', managerId: 201 },
+  
+  // === OPERATIONS DEPARTMENT ===
+  // Department Head
+  { id: 300, name: 'Robert Kane', dept: 'Operations', team: 'HR & People', role: 'Engineering Manager', status: 'Active', joined: '2019-01-15' },
+  
+  // HR & People Team
+  { id: 7, name: 'George Liu', dept: 'Operations', team: 'HR & People', role: 'Team Lead', status: 'Active', joined: '2022-11-01', managerId: 300 },
+  
+  // Finance Team
+  { id: 11, name: 'Kevin O\'Brien', dept: 'Operations', team: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20', managerId: 300 },
+  
   // Potential employee - uncertain hire
-  { id: 21, name: 'Potential: Senior FE', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2025-06-01', isPotential: true },
+  { id: 21, name: 'Potential: Senior FE', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2025-06-01', isPotential: true, managerId: 12 },
 ];
 
 export const initialEvents: WorkforceEvent[] = [
