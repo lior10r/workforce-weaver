@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, forwardRef } from 'react';
 import { ChevronDown, ChevronRight, User, Users, Building2, AlertCircle } from 'lucide-react';
 import { Employee, TeamStructure } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -15,7 +15,7 @@ interface OrgNode {
   directReports: OrgNode[];
 }
 
-export const OrgChart = ({ employees, teamStructures, departments, onEditEmployee }: OrgChartProps) => {
+export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, teamStructures, departments, onEditEmployee }, ref) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
   const [viewMode, setViewMode] = useState<'hierarchy' | 'department' | 'team'>('hierarchy');
 
@@ -330,7 +330,7 @@ export const OrgChart = ({ employees, teamStructures, departments, onEditEmploye
   );
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div ref={ref} className="space-y-6 animate-fade-in">
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex gap-2">
@@ -415,4 +415,6 @@ export const OrgChart = ({ employees, teamStructures, departments, onEditEmploye
       {viewMode === 'team' && renderTeamView()}
     </div>
   );
-};
+});
+
+OrgChart.displayName = 'OrgChart';

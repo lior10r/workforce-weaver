@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Search, UserPlus, ChevronRight } from 'lucide-react';
 import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
@@ -40,6 +40,7 @@ const Index = () => {
   const [teamStructures, setTeamStructures] = useState<TeamStructure[]>(initialTeamStructures);
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
+  const orgChartRef = useRef<HTMLDivElement>(null);
   const [departments, setDepartments] = useState<Record<string, string[]>>(DEPARTMENTS);
   
   // Modal states
@@ -300,6 +301,7 @@ const Index = () => {
                 onImportTeamStructures={handleImportTeamStructures}
                 onImportDepartments={handleImportDepartments}
                 onImportAll={handleImportAll}
+                orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
               />
             </div>
           </div>
@@ -363,6 +365,7 @@ const Index = () => {
 
         {view === 'orgchart' && (
           <OrgChart
+            ref={orgChartRef}
             employees={filteredEmployees}
             teamStructures={teamStructures}
             departments={departments}
