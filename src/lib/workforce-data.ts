@@ -79,6 +79,66 @@ export interface Hierarchy {
   team: string;
 }
 
+// Strategic Scenario for what-if planning
+export interface Scenario {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  // Snapshot of data when scenario was created
+  baseEmployees: Employee[];
+  baseEvents: WorkforceEvent[];
+  baseTeamStructures: TeamStructure[];
+  // Proposed changes within this scenario
+  proposedEmployees: Employee[]; // New hires or modified employees
+  proposedEvents: WorkforceEvent[]; // Proposed movements
+  // Track which items are scenario-specific
+  deletedEmployeeIds: number[]; // Employees "removed" in this scenario
+  deletedEventIds: number[]; // Events "removed" in this scenario
+}
+
+export const createScenario = (
+  name: string,
+  description: string,
+  employees: Employee[],
+  events: WorkforceEvent[],
+  teamStructures: TeamStructure[]
+): Scenario => ({
+  id: `scenario-${Date.now()}`,
+  name,
+  description,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  baseEmployees: JSON.parse(JSON.stringify(employees)),
+  baseEvents: JSON.parse(JSON.stringify(events)),
+  baseTeamStructures: JSON.parse(JSON.stringify(teamStructures)),
+  proposedEmployees: [],
+  proposedEvents: [],
+  deletedEmployeeIds: [],
+  deletedEventIds: []
+});
+
+// Get effective data for a scenario (base + proposed - deleted)
+export const getScenarioEmployees = (scenario: Scenario): Employee[] => {
+  const baseFiltered = scenario.baseEmployees.filter(
+    e => !scenario.deletedEmployeeIds.includes(e.id)
+  );
+  // Merge: proposed employees override base employees with same ID
+  const proposedIds = new Set(scenario.proposedEmployees.map(e => e.id));
+  const merged = baseFiltered.filter(e => !proposedIds.has(e.id));
+  return [...merged, ...scenario.proposedEmployees];
+};
+
+export const getScenarioEvents = (scenario: Scenario): WorkforceEvent[] => {
+  const baseFiltered = scenario.baseEvents.filter(
+    e => !scenario.deletedEventIds.includes(e.id)
+  );
+  const proposedIds = new Set(scenario.proposedEvents.map(e => e.id));
+  const merged = baseFiltered.filter(e => !proposedIds.has(e.id));
+  return [...merged, ...scenario.proposedEvents];
+};
+
 // Helper functions
 export const getRoleColor = (role: string): string => ROLE_COLORS[role] || ROLE_COLORS['Default'];
 export const getRoleTextColor = (role: string): string => ROLE_TEXT_COLORS[role] || ROLE_TEXT_COLORS['Default'];
