@@ -11,6 +11,7 @@ import { OrgChart } from '@/components/workforce/OrgChart';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
+import { ExportImport } from '@/components/workforce/ExportImport';
 import { 
   Employee, 
   WorkforceEvent, 
@@ -170,6 +171,48 @@ const Index = () => {
     setEditingTeamStructure(null);
   };
 
+  // Import handlers
+  const handleImportEmployees = (importedEmployees: Employee[]) => {
+    setEmployees(importedEmployees);
+  };
+
+  const handleImportEvents = (importedEvents: WorkforceEvent[]) => {
+    setEvents(importedEvents);
+  };
+
+  const handleImportTeamStructures = (importedStructures: TeamStructure[]) => {
+    setTeamStructures(importedStructures);
+  };
+
+  const handleImportDepartments = (importedDepartments: Record<string, string[]>) => {
+    setDepartments(importedDepartments);
+    // Update scope filter to include all new departments/teams
+    const allTeams = Object.values(importedDepartments).flat();
+    setScopeFilter({
+      departments: Object.keys(importedDepartments),
+      teams: allTeams
+    });
+  };
+
+  const handleImportAll = (data: {
+    employees?: Employee[];
+    events?: WorkforceEvent[];
+    teamStructures?: TeamStructure[];
+    departments?: Record<string, string[]>;
+  }) => {
+    if (data.employees) setEmployees(data.employees);
+    if (data.events) setEvents(data.events);
+    if (data.teamStructures) setTeamStructures(data.teamStructures);
+    if (data.departments) {
+      setDepartments(data.departments);
+      const allTeams = Object.values(data.departments).flat();
+      setScopeFilter({
+        departments: Object.keys(data.departments),
+        teams: allTeams
+      });
+    }
+  };
+
   const getViewTitle = () => {
     switch (view) {
       case 'dashboard': return 'Operations Center';
@@ -247,6 +290,17 @@ const Index = () => {
                 <UserPlus size={18} />
                 <span className="hidden sm:inline">Hire</span>
               </button>
+              <ExportImport
+                employees={employees}
+                events={events}
+                teamStructures={teamStructures}
+                departments={departments}
+                onImportEmployees={handleImportEmployees}
+                onImportEvents={handleImportEvents}
+                onImportTeamStructures={handleImportTeamStructures}
+                onImportDepartments={handleImportDepartments}
+                onImportAll={handleImportAll}
+              />
             </div>
           </div>
         </header>
