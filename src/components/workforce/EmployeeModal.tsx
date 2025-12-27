@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { X, Building2 } from 'lucide-react';
 import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, Hierarchy } from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect } from 'react';
 
@@ -15,16 +15,21 @@ interface EmployeeModalProps {
 export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
   const [selectedDept, setSelectedDept] = useState(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
   const [selectedTeam, setSelectedTeam] = useState('');
+  const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
 
   useEffect(() => {
     if (editingEmployee) {
       setSelectedDept(editingEmployee.dept);
       setSelectedTeam(editingEmployee.team);
+      // Check if this is a department-level manager (team same as dept or not in team list)
+      const teamList = departments[editingEmployee.dept] || [];
+      setIsDepartmentLevel(!teamList.includes(editingEmployee.team));
     } else {
       setSelectedDept(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
       setSelectedTeam('');
+      setIsDepartmentLevel(false);
     }
-  }, [editingEmployee, hierarchy.dept, isOpen]);
+  }, [editingEmployee, hierarchy.dept, isOpen, departments]);
 
   if (!isOpen) return null;
 
@@ -33,11 +38,15 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
     const formData = new FormData(e.currentTarget);
     
     const managerValue = formData.get('managerId') as string;
+    const dept = formData.get('dept') as string;
+    
+    // If department-level, use department name as team
+    const team = isDepartmentLevel ? dept : (formData.get('team') as string);
     
     const employeeData = {
       name: formData.get('name') as string,
-      dept: formData.get('dept') as string,
-      team: formData.get('team') as string,
+      dept: dept,
+      team: team,
       role: formData.get('role') as string,
       status: formData.get('status') as string,
       joined: formData.get('joined') as string,
@@ -51,11 +60,16 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
   const deptList = Object.keys(departments);
   const teamList = departments[selectedDept] || [];
   
-  // Potential managers - anyone in same team or department excluding self
+  // Potential managers - anyone in same department or higher level
   const potentialManagers = employees.filter(emp => 
     emp.id !== editingEmployee?.id && 
-    (emp.team === (selectedTeam || editingEmployee?.team) || emp.dept === selectedDept)
+    (emp.dept === selectedDept || !teamList.includes(emp.team))
   );
+
+  // Manager roles that typically don't belong to specific teams
+  const managerRoles = ['Engineering Manager', 'Product Manager', 'Architect'];
+  const selectedRole = editingEmployee?.role || ROLES[0];
+  const isManagerRole = managerRoles.includes(selectedRole);
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -94,7 +108,10 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
               <select 
                 name="dept" 
                 value={selectedDept}
-                onChange={(e) => setSelectedDept(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDept(e.target.value);
+                  setSelectedTeam('');
+                }}
                 className="select-field w-full"
               >
                 {deptList.map(d => <option key={d} value={d}>{d}</option>)}
@@ -104,15 +121,37 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
               <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
                 Team
               </label>
-              <select 
-                name="team" 
-                value={selectedTeam || editingEmployee?.team || teamList[0] || ''}
-                onChange={(e) => setSelectedTeam(e.target.value)}
-                className="select-field w-full"
-              >
-                {teamList.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
+              {isDepartmentLevel ? (
+                <div className="input-field bg-accent/50 flex items-center gap-2 text-muted-foreground">
+                  <Building2 size={14} />
+                  <span>Department Level</span>
+                </div>
+              ) : (
+                <select 
+                  name="team" 
+                  value={selectedTeam || editingEmployee?.team || teamList[0] || ''}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="select-field w-full"
+                >
+                  {teamList.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              )}
             </div>
+          </div>
+
+          {/* Department-level Manager Toggle */}
+          <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
+            <input 
+              type="checkbox" 
+              id="isDepartmentLevel"
+              checked={isDepartmentLevel}
+              onChange={(e) => setIsDepartmentLevel(e.target.checked)}
+              className="w-4 h-4 rounded border-border accent-primary"
+            />
+            <label htmlFor="isDepartmentLevel" className="text-sm text-muted-foreground cursor-pointer flex-1">
+              <span className="font-medium text-foreground">Department/Group Manager</span>
+              <p className="text-xs mt-0.5">Not assigned to a specific team (e.g., VP, Department Head, Group Manager)</p>
+            </label>
           </div>
 
           {/* Manager Selection */}
@@ -125,10 +164,10 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
               defaultValue={editingEmployee?.managerId || ''}
               className="select-field w-full"
             >
-              <option value="">No manager</option>
+              <option value="">No manager (Top-level)</option>
               {potentialManagers.map(m => (
                 <option key={m.id} value={m.id}>
-                  {m.name} ({m.role} - {m.team})
+                  {m.name} ({m.role}{!teamList.includes(m.team) ? ' - Dept Level' : ` - ${m.team}`})
                 </option>
               ))}
             </select>

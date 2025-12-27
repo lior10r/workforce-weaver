@@ -19,12 +19,16 @@ import {
   Hierarchy, 
   TeamStructure,
   Scenario,
+  DiffStatus,
   initialEmployees, 
   initialEvents,
   initialTeamStructures,
   DEPARTMENTS,
   getScenarioEmployees,
-  getScenarioEvents
+  getScenarioEvents,
+  getEmployeeDiffs,
+  getEventDiffs,
+  addScenarioChangelogEntry
 } from '@/lib/workforce-data';
 
 interface ScopeFilter {
@@ -68,6 +72,25 @@ const Index = () => {
     return masterTeamStructures;
   }, [activeScenario, masterTeamStructures]);
 
+  // Compute diff maps when in comparison mode
+  const compareScenario = scenarios.find(s => s.id === compareScenarioId);
+  
+  const employeeDiffMap = useMemo(() => {
+    if (!compareScenario) return undefined;
+    const diffs = getEmployeeDiffs(masterEmployees, compareScenario);
+    const map = new Map<number, { status: DiffStatus; changes?: string[] }>();
+    diffs.forEach(d => map.set(d.employee.id, { status: d.status, changes: d.changes }));
+    return map;
+  }, [compareScenario, masterEmployees]);
+
+  const eventDiffMap = useMemo(() => {
+    if (!compareScenario) return undefined;
+    const diffs = getEventDiffs(masterEvents, compareScenario);
+    const map = new Map<number, { status: DiffStatus }>();
+    diffs.forEach(d => map.set(d.event.id, { status: d.status }));
+    return map;
+  }, [compareScenario, masterEvents]);
+
   // Other state
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(() => {
     const allDepts = Object.keys(DEPARTMENTS);
@@ -109,13 +132,18 @@ const Index = () => {
   }, [scopeFilter, departments]);
 
   // Filtered employees based on scope filter
+  // Include both team members AND department-level managers (those whose team is not in any team list)
+  const allTeamsList = Object.values(departments).flat();
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchTeam = scopeFilter.teams.includes(e.team);
-      return matchSearch && matchTeam;
+      // Include department-level managers if their department is selected
+      const isDeptLevel = !allTeamsList.includes(e.team);
+      const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
+      return matchSearch && (matchTeam || matchDeptLevel);
     });
-  }, [employees, searchQuery, scopeFilter]);
+  }, [employees, searchQuery, scopeFilter, allTeamsList]);
 
   // Stats
   const stats = useMemo(() => ({
@@ -148,22 +176,50 @@ const Index = () => {
   const handleAddEmployee = (employeeData: Omit<Employee, 'id'>, id?: number) => {
     const newId = id || Date.now();
     const newEmployee = { ...employeeData, id: newId };
+    const isEditing = !!id;
+    const existingEmployee = isEditing ? employees.find(e => e.id === id) : null;
     
     if (activeScenario) {
-      // Add to scenario's proposed employees
+      // Add to scenario's proposed employees with changelog
       setScenarios(prev => prev.map(s => {
         if (s.id !== activeScenarioId) return s;
+        
+        let updatedScenario = { ...s };
         const existingIdx = s.proposedEmployees.findIndex(e => e.id === newId);
+        
         if (existingIdx >= 0) {
           const updated = [...s.proposedEmployees];
           updated[existingIdx] = newEmployee;
-          return { ...s, proposedEmployees: updated, updatedAt: new Date().toISOString() };
+          updatedScenario = { ...updatedScenario, proposedEmployees: updated };
+        } else {
+          updatedScenario = { 
+            ...updatedScenario, 
+            proposedEmployees: [...s.proposedEmployees, newEmployee]
+          };
         }
-        return { 
-          ...s, 
-          proposedEmployees: [...s.proposedEmployees, newEmployee],
-          updatedAt: new Date().toISOString()
-        };
+        
+        // Add changelog entry
+        const changeDetails: Record<string, { before?: string; after?: string }> = {};
+        if (isEditing && existingEmployee) {
+          if (existingEmployee.team !== newEmployee.team) {
+            changeDetails['Team'] = { before: existingEmployee.team, after: newEmployee.team };
+          }
+          if (existingEmployee.role !== newEmployee.role) {
+            changeDetails['Role'] = { before: existingEmployee.role, after: newEmployee.role };
+          }
+          if (existingEmployee.status !== newEmployee.status) {
+            changeDetails['Status'] = { before: existingEmployee.status, after: newEmployee.status };
+          }
+        }
+        
+        return addScenarioChangelogEntry(
+          updatedScenario,
+          isEditing ? 'employee_modified' : 'employee_added',
+          newId,
+          newEmployee.name,
+          isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team}`,
+          Object.keys(changeDetails).length > 0 ? changeDetails : undefined
+        );
       }));
     } else {
       // Add to master
@@ -192,15 +248,24 @@ const Index = () => {
 
   const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string }) => {
     const newEvent = { ...eventData, id: Date.now() };
+    const emp = employees.find(e => e.id === eventData.empId);
     
     if (activeScenario) {
       setScenarios(prev => prev.map(s => {
         if (s.id !== activeScenarioId) return s;
-        return { 
+        const updatedScenario = { 
           ...s, 
-          proposedEvents: [...s.proposedEvents, newEvent],
-          updatedAt: new Date().toISOString()
+          proposedEvents: [...s.proposedEvents, newEvent]
         };
+        
+        // Add changelog entry
+        return addScenarioChangelogEntry(
+          updatedScenario,
+          'event_added',
+          newEvent.id,
+          emp?.name || `Employee #${eventData.empId}`,
+          `Added ${eventData.type}${eventData.isFlag ? ' (Flag)' : ''}: ${eventData.details}`
+        );
       }));
     } else {
       setMasterEvents(prev => [...prev, newEvent]);
@@ -447,6 +512,8 @@ const Index = () => {
               selectedTeam={hierarchy.team}
               selectedDept={hierarchy.dept}
               teamStructures={teamStructures}
+              employeeDiffMap={employeeDiffMap}
+              eventDiffMap={eventDiffMap}
             />
           )}
 
@@ -457,6 +524,7 @@ const Index = () => {
               onEditEmployee={handleEditEmployee}
               teamStructures={teamStructures}
               onConfigureTeam={handleConfigureTeam}
+              employeeDiffMap={employeeDiffMap}
             />
           )}
 
