@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus, ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
 import { DEPARTMENTS, DEPARTMENT_NAMES } from '@/lib/workforce-data';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
@@ -160,6 +160,12 @@ export const Sidebar = ({
           label="Movement Planner" 
           active={view === 'planner'} 
           onClick={() => setView('planner')} 
+        />
+        <SidebarItem 
+          icon={GitBranch} 
+          label="Org Chart" 
+          active={view === 'orgchart'} 
+          onClick={() => setView('orgchart')} 
         />
         <SidebarItem 
           icon={BarChart3} 

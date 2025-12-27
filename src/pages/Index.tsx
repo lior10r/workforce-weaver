@@ -7,6 +7,7 @@ import { Timeline } from '@/components/workforce/Timeline';
 import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
+import { OrgChart } from '@/components/workforce/OrgChart';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
@@ -176,6 +177,7 @@ const Index = () => {
       case 'roster': return 'Department Directory';
       case 'planner': return 'Strategic Movements';
       case 'analytics': return 'Team Analytics';
+      case 'orgchart': return 'Organization Chart';
       default: return 'Operations Center';
     }
   };
@@ -302,6 +304,15 @@ const Index = () => {
             events={events}
             selectedTeam={hierarchy.team}
             departments={departments}
+          />
+        )}
+
+        {view === 'orgchart' && (
+          <OrgChart
+            employees={filteredEmployees}
+            teamStructures={teamStructures}
+            departments={departments}
+            onEditEmployee={handleEditEmployee}
           />
         )}
       </main>
