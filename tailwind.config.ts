@@ -79,12 +79,14 @@ export default {
           course: "hsl(var(--status-course))",
           leave: "hsl(var(--status-leave))",
           notice: "hsl(var(--status-notice))",
+          warning: "hsl(var(--status-leave))",
         },
         // Accent UI colors
         flag: "hsl(var(--flag-color))",
         success: "hsl(var(--success-color))",
         info: "hsl(var(--info-color))",
         "accent-blue": "hsl(var(--accent-blue))",
+        "potential-color": "hsl(var(--potential-color))",
       },
       borderRadius: {
         lg: "var(--radius)",
