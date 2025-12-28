@@ -19,11 +19,13 @@ import {
   Employee, 
   WorkforceEvent, 
   TeamStructure,
+  HierarchyStructure,
   ScenarioChangelogEntry,
   createScenario,
   duplicateScenario,
   getScenarioEmployees,
-  getScenarioEvents
+  getScenarioEvents,
+  initialHierarchy
 } from '@/lib/workforce-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
@@ -35,6 +37,7 @@ interface ScenarioManagerProps {
   masterEmployees: Employee[];
   masterEvents: WorkforceEvent[];
   masterTeamStructures: TeamStructure[];
+  masterHierarchy?: HierarchyStructure;
   onCreateScenario: (scenario: Scenario) => void;
   onUpdateScenario: (scenario: Scenario) => void;
   onDeleteScenario: (id: string) => void;
@@ -50,6 +53,7 @@ export const ScenarioManager = ({
   masterEmployees,
   masterEvents,
   masterTeamStructures,
+  masterHierarchy,
   onCreateScenario,
   onUpdateScenario,
   onDeleteScenario,
@@ -82,7 +86,8 @@ export const ScenarioManager = ({
       newScenarioDesc.trim(),
       masterEmployees,
       masterEvents,
-      masterTeamStructures
+      masterTeamStructures,
+      masterHierarchy || initialHierarchy
     );
 
     onCreateScenario(scenario);

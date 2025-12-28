@@ -4,10 +4,12 @@ import {
   WorkforceEvent,
   TeamStructure,
   Scenario,
-  DEPARTMENTS,
+  HierarchyStructure,
+  getDepartmentsFlat,
   initialEmployees,
   initialEvents,
   initialTeamStructures,
+  initialHierarchy,
 } from '@/lib/workforce-data';
 
 const STORAGE_KEY = 'workforce-planner-data';
@@ -16,7 +18,7 @@ interface WorkforceData {
   masterEmployees: Employee[];
   masterEvents: WorkforceEvent[];
   masterTeamStructures: TeamStructure[];
-  departments: Record<string, string[]>;
+  hierarchy: HierarchyStructure;
   scenarios: Scenario[];
 }
 
@@ -25,7 +27,7 @@ interface HistoryState {
   events: WorkforceEvent[];
   teamStructures: TeamStructure[];
   scenarios: Scenario[];
-  departments: Record<string, string[]>;
+  hierarchy: HierarchyStructure;
 }
 
 interface UndoRedoState {
@@ -45,7 +47,7 @@ export const useWorkforceData = () => {
           masterEmployees: parsed.masterEmployees || initialEmployees,
           masterEvents: parsed.masterEvents || initialEvents,
           masterTeamStructures: parsed.masterTeamStructures || initialTeamStructures,
-          departments: parsed.departments || DEPARTMENTS,
+          hierarchy: parsed.hierarchy || initialHierarchy,
           scenarios: parsed.scenarios || [],
         };
       }
@@ -56,7 +58,7 @@ export const useWorkforceData = () => {
       masterEmployees: initialEmployees,
       masterEvents: initialEvents,
       masterTeamStructures: initialTeamStructures,
-      departments: DEPARTMENTS,
+      hierarchy: initialHierarchy,
       scenarios: [],
     };
   };
@@ -64,8 +66,11 @@ export const useWorkforceData = () => {
   const [masterEmployees, setMasterEmployees] = useState<Employee[]>(() => loadInitialData().masterEmployees);
   const [masterEvents, setMasterEvents] = useState<WorkforceEvent[]>(() => loadInitialData().masterEvents);
   const [masterTeamStructures, setMasterTeamStructures] = useState<TeamStructure[]>(() => loadInitialData().masterTeamStructures);
-  const [departments, setDepartments] = useState<Record<string, string[]>>(() => loadInitialData().departments);
+  const [hierarchy, setHierarchy] = useState<HierarchyStructure>(() => loadInitialData().hierarchy);
   const [scenarios, setScenarios] = useState<Scenario[]>(() => loadInitialData().scenarios);
+
+  // Derived flat departments for backwards compatibility
+  const departments = useMemo(() => getDepartmentsFlat(hierarchy), [hierarchy]);
 
   // Undo/Redo state
   const [undoRedo, setUndoRedo] = useState<UndoRedoState>({
@@ -80,7 +85,7 @@ export const useWorkforceData = () => {
       masterEmployees,
       masterEvents,
       masterTeamStructures,
-      departments,
+      hierarchy,
       scenarios,
     };
     try {
@@ -88,7 +93,7 @@ export const useWorkforceData = () => {
     } catch (e) {
       console.error('Failed to save workforce data to localStorage:', e);
     }
-  }, [masterEmployees, masterEvents, masterTeamStructures, departments, scenarios]);
+  }, [masterEmployees, masterEvents, masterTeamStructures, hierarchy, scenarios]);
 
   // Create a snapshot of current state
   const createSnapshot = useCallback((): HistoryState => ({
@@ -96,8 +101,8 @@ export const useWorkforceData = () => {
     events: JSON.parse(JSON.stringify(masterEvents)),
     teamStructures: JSON.parse(JSON.stringify(masterTeamStructures)),
     scenarios: JSON.parse(JSON.stringify(scenarios)),
-    departments: JSON.parse(JSON.stringify(departments)),
-  }), [masterEmployees, masterEvents, masterTeamStructures, scenarios, departments]);
+    hierarchy: JSON.parse(JSON.stringify(hierarchy)),
+  }), [masterEmployees, masterEvents, masterTeamStructures, scenarios, hierarchy]);
 
   // Push to history (call before making changes)
   const pushToHistory = useCallback(() => {
@@ -122,7 +127,7 @@ export const useWorkforceData = () => {
       setMasterEvents(previousState.events);
       setMasterTeamStructures(previousState.teamStructures);
       setScenarios(previousState.scenarios);
-      setDepartments(previousState.departments);
+      setHierarchy(previousState.hierarchy);
       
       return {
         past: prev.past.slice(0, -1),
@@ -145,7 +150,7 @@ export const useWorkforceData = () => {
       setMasterEvents(nextState.events);
       setMasterTeamStructures(nextState.teamStructures);
       setScenarios(nextState.scenarios);
-      setDepartments(nextState.departments);
+      setHierarchy(nextState.hierarchy);
       
       return {
         past: [...prev.past, currentSnapshot],
@@ -166,7 +171,7 @@ export const useWorkforceData = () => {
     setMasterEvents(targetState.events);
     setMasterTeamStructures(targetState.teamStructures);
     setScenarios(targetState.scenarios);
-    setDepartments(targetState.departments);
+    setHierarchy(targetState.hierarchy);
     
     setUndoRedo({
       past: allHistory.slice(0, index),
@@ -212,32 +217,52 @@ export const useWorkforceData = () => {
   }, [pushToHistory]);
 
   // Delete team
-  const deleteTeam = useCallback((dept: string, teamName: string) => {
+  const deleteTeam = useCallback((dept: string, groupName: string, teamName: string) => {
     pushToHistory();
-    setDepartments(prev => ({
-      ...prev,
-      [dept]: prev[dept].filter(t => t !== teamName),
+    setHierarchy(prev => prev.map(d => {
+      if (d.name !== dept) return d;
+      return {
+        ...d,
+        groups: d.groups.map(g => {
+          if (g.name !== groupName) return g;
+          return {
+            ...g,
+            teams: g.teams.filter(t => t !== teamName)
+          };
+        }).filter(g => g.teams.length > 0) // Remove empty groups
+      };
     }));
-    // Move employees from deleted team to department level
+    // Move employees from deleted team to group level
     setMasterEmployees(prev => prev.map(e => 
-      e.team === teamName ? { ...e, team: dept } : e
+      e.team === teamName ? { ...e, team: groupName } : e
     ));
     // Remove team structure
     setMasterTeamStructures(prev => prev.filter(t => t.teamName !== teamName));
   }, [pushToHistory]);
 
+  // Delete group
+  const deleteGroup = useCallback((dept: string, groupName: string) => {
+    pushToHistory();
+    setHierarchy(prev => prev.map(d => {
+      if (d.name !== dept) return d;
+      return {
+        ...d,
+        groups: d.groups.filter(g => g.name !== groupName)
+      };
+    }));
+    // Delete all employees in this group
+    setMasterEmployees(prev => prev.filter(e => e.group !== groupName));
+    // Delete team structures
+    setMasterTeamStructures(prev => prev.filter(t => {
+      const group = hierarchy.find(d => d.name === dept)?.groups.find(g => g.name === groupName);
+      return !group?.teams.includes(t.teamName);
+    }));
+  }, [pushToHistory, hierarchy]);
+
   // Delete department
   const deleteDepartment = useCallback((dept: string) => {
     pushToHistory();
-    // Get teams in this department
-    const deptTeams = departments[dept] || [];
-    
-    // Remove department and its teams
-    setDepartments(prev => {
-      const updated = { ...prev };
-      delete updated[dept];
-      return updated;
-    });
+    setHierarchy(prev => prev.filter(d => d.name !== dept));
     
     // Delete all employees in this department
     setMasterEmployees(prev => prev.filter(e => e.dept !== dept));
@@ -248,7 +273,45 @@ export const useWorkforceData = () => {
     
     // Remove team structures
     setMasterTeamStructures(prev => prev.filter(t => t.department !== dept));
-  }, [pushToHistory, departments, masterEmployees]);
+  }, [pushToHistory, masterEmployees]);
+
+  // Add department
+  const addDepartment = useCallback((name: string) => {
+    pushToHistory();
+    setHierarchy(prev => [...prev, { name, groups: [] }]);
+  }, [pushToHistory]);
+
+  // Add group to department
+  const addGroup = useCallback((dept: string, groupName: string) => {
+    pushToHistory();
+    setHierarchy(prev => prev.map(d => {
+      if (d.name !== dept) return d;
+      if (d.groups.some(g => g.name === groupName)) return d;
+      return {
+        ...d,
+        groups: [...d.groups, { name: groupName, teams: [] }]
+      };
+    }));
+  }, [pushToHistory]);
+
+  // Add team to group
+  const addTeam = useCallback((dept: string, groupName: string, teamName: string) => {
+    pushToHistory();
+    setHierarchy(prev => prev.map(d => {
+      if (d.name !== dept) return d;
+      return {
+        ...d,
+        groups: d.groups.map(g => {
+          if (g.name !== groupName) return g;
+          if (g.teams.includes(teamName)) return g;
+          return {
+            ...g,
+            teams: [...g.teams, teamName]
+          };
+        })
+      };
+    }));
+  }, [pushToHistory]);
 
   // Clear all data and reset to initial
   const resetToInitial = useCallback(() => {
@@ -256,7 +319,7 @@ export const useWorkforceData = () => {
     setMasterEmployees(initialEmployees);
     setMasterEvents(initialEvents);
     setMasterTeamStructures(initialTeamStructures);
-    setDepartments(DEPARTMENTS);
+    setHierarchy(initialHierarchy);
     setScenarios([]);
   }, [pushToHistory]);
 
@@ -269,7 +332,8 @@ export const useWorkforceData = () => {
     masterEmployees,
     masterEvents,
     masterTeamStructures,
-    departments,
+    hierarchy,
+    departments, // Derived flat structure for backwards compat
     scenarios,
     // Setters with history
     setMasterEmployees: useCallback((updater: Employee[] | ((prev: Employee[]) => Employee[])) => {
@@ -284,21 +348,25 @@ export const useWorkforceData = () => {
       pushToHistory();
       setMasterTeamStructures(updater);
     }, [pushToHistory]),
-    setDepartments: useCallback((updater: Record<string, string[]> | ((prev: Record<string, string[]>) => Record<string, string[]>)) => {
+    setHierarchy: useCallback((updater: HierarchyStructure | ((prev: HierarchyStructure) => HierarchyStructure)) => {
       pushToHistory();
-      setDepartments(updater);
+      setHierarchy(updater);
     }, [pushToHistory]),
     setScenarios,
     // Direct setters (without history for bulk imports)
     setMasterEmployeesDirect: setMasterEmployees,
     setMasterEventsDirect: setMasterEvents,
     setMasterTeamStructuresDirect: setMasterTeamStructures,
-    setDepartmentsDirect: setDepartments,
-    // Delete operations
+    setHierarchyDirect: setHierarchy,
+    // Operations
     deleteEmployee,
     deleteEvent,
     deleteTeam,
+    deleteGroup,
     deleteDepartment,
+    addDepartment,
+    addGroup,
+    addTeam,
     // Undo/Redo
     undo,
     redo,
