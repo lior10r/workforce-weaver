@@ -1,12 +1,111 @@
-// Configuration & Constants - Hierarchy: Department → Teams
+// Configuration & Constants - Hierarchy: Department → Group → Team
+// Each level has a required manager: Department Manager, Group Manager, Team Leader
 
-// Departments with their teams (4-8 teams per department, 6-7 people per team)
-export const DEPARTMENTS: Record<string, string[]> = {
-  'Engineering': ['Frontend Alpha', 'Frontend Beta', 'Backend Core', 'Backend API', 'Infrastructure', 'Mobile iOS', 'Mobile Android', 'Security'],
-  'Product & Design': ['Product Core', 'Product Growth', 'UX Research', 'UX Design', 'Data Analytics'],
-  'Operations': ['HR & People', 'Finance', 'Legal', 'Office Management']
+// New structured hierarchy type
+export interface GroupStructure {
+  name: string;
+  teams: string[];
+  groupManagerId?: number; // Employee ID of group manager
+}
+
+export interface DepartmentStructure {
+  name: string;
+  groups: GroupStructure[];
+  departmentManagerId?: number; // Employee ID of department manager
+}
+
+// Full hierarchy structure
+export type HierarchyStructure = DepartmentStructure[];
+
+// Legacy flat structure for backwards compatibility (derived from hierarchy)
+export const getDepartmentsFlat = (hierarchy: HierarchyStructure): Record<string, string[]> => {
+  const flat: Record<string, string[]> = {};
+  hierarchy.forEach(dept => {
+    const allTeams: string[] = [];
+    dept.groups.forEach(group => {
+      allTeams.push(...group.teams);
+    });
+    flat[dept.name] = allTeams;
+  });
+  return flat;
 };
 
+// Get groups for a department
+export const getGroupsForDepartment = (hierarchy: HierarchyStructure, deptName: string): GroupStructure[] => {
+  const dept = hierarchy.find(d => d.name === deptName);
+  return dept?.groups || [];
+};
+
+// Get team's parent group
+export const getTeamGroup = (hierarchy: HierarchyStructure, teamName: string): { dept: DepartmentStructure; group: GroupStructure } | null => {
+  for (const dept of hierarchy) {
+    for (const group of dept.groups) {
+      if (group.teams.includes(teamName)) {
+        return { dept, group };
+      }
+    }
+  }
+  return null;
+};
+
+// Initial hierarchy structure
+export const initialHierarchy: HierarchyStructure = [
+  {
+    name: 'Engineering',
+    departmentManagerId: 100, // Victoria Palmer
+    groups: [
+      {
+        name: 'Frontend',
+        groupManagerId: 101, // Marcus Webb
+        teams: ['Frontend Alpha', 'Frontend Beta']
+      },
+      {
+        name: 'Backend',
+        groupManagerId: 102, // Sandra Hughes
+        teams: ['Backend Core', 'Backend API']
+      },
+      {
+        name: 'Platform',
+        teams: ['Infrastructure', 'Security']
+      },
+      {
+        name: 'Mobile',
+        teams: ['Mobile iOS', 'Mobile Android']
+      }
+    ]
+  },
+  {
+    name: 'Product & Design',
+    departmentManagerId: 200, // Patricia Stone
+    groups: [
+      {
+        name: 'Product',
+        teams: ['Product Core', 'Product Growth']
+      },
+      {
+        name: 'Design & Research',
+        teams: ['UX Research', 'UX Design', 'Data Analytics']
+      }
+    ]
+  },
+  {
+    name: 'Operations',
+    departmentManagerId: 300, // Robert Kane
+    groups: [
+      {
+        name: 'People & Culture',
+        teams: ['HR & People', 'Office Management']
+      },
+      {
+        name: 'Business Operations',
+        teams: ['Finance', 'Legal']
+      }
+    ]
+  }
+];
+
+// Legacy DEPARTMENTS for backwards compatibility
+export const DEPARTMENTS: Record<string, string[]> = getDepartmentsFlat(initialHierarchy);
 export const DEPARTMENT_NAMES = Object.keys(DEPARTMENTS);
 
 export const ROLE_COLORS: Record<string, string> = {
@@ -18,6 +117,8 @@ export const ROLE_COLORS: Record<string, string> = {
   'Product Manager': 'role-pm',
   'QA Engineer': 'role-qa',
   'Engineering Manager': 'role-manager',
+  'Group Manager': 'role-manager',
+  'Department Manager': 'role-manager',
   'Default': 'role-default'
 };
 
@@ -30,12 +131,17 @@ export const ROLE_TEXT_COLORS: Record<string, string> = {
   'Product Manager': 'text-role-pm',
   'QA Engineer': 'text-role-qa',
   'Engineering Manager': 'text-role-manager',
+  'Group Manager': 'text-role-manager',
+  'Department Manager': 'text-role-manager',
   'Default': 'text-muted-foreground'
 };
 
 export const ROLES = Object.keys(ROLE_COLORS).filter(r => r !== 'Default');
 export const STATUSES = ['Active', 'On Course', 'Parental Leave', 'Notice Period'] as const;
 export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Training', 'Course', 'Departure', 'New Joiner', 'Decision Flag'] as const;
+
+// Manager level types
+export type ManagerLevel = 'department' | 'group' | 'team' | 'none';
 
 // Timeline Range (Jan 2020 - Dec 2030) - Extended to show historical data
 export const TIMELINE_START = new Date('2020-01-01');
@@ -45,6 +151,7 @@ export const TIMELINE_END = new Date('2030-12-31');
 export interface TeamStructure {
   teamName: string;
   department: string;
+  group: string; // Parent group name
   teamLeader?: number; // Employee ID of team leader
   requiredRoles: Record<string, number>; // Role name -> count required
   targetSize?: number; // Optional target team size
@@ -55,12 +162,14 @@ export interface Employee {
   id: number;
   name: string;
   dept: string;
-  team: string;
+  group?: string; // Group name (for group managers or team members)
+  team: string; // Team name, or group name for group managers, or dept name for dept managers
   role: string;
   status: string;
   joined: string;
   isPotential?: boolean; // Uncertain hire - for planning purposes
-  managerId?: number; // Direct manager (flexible hierarchy)
+  managerId?: number; // Direct manager
+  managerLevel?: ManagerLevel; // What level of management is this person
 }
 
 export interface WorkforceEvent {
@@ -102,6 +211,7 @@ export interface Scenario {
   baseEmployees: Employee[];
   baseEvents: WorkforceEvent[];
   baseTeamStructures: TeamStructure[];
+  baseHierarchy: HierarchyStructure;
   // Proposed changes within this scenario
   proposedEmployees: Employee[]; // New hires or modified employees
   proposedEvents: WorkforceEvent[]; // Proposed movements
@@ -118,6 +228,7 @@ export const createScenario = (
   employees: Employee[],
   events: WorkforceEvent[],
   teamStructures: TeamStructure[],
+  hierarchy: HierarchyStructure,
   parentScenarioId?: string
 ): Scenario => ({
   id: `scenario-${Date.now()}`,
@@ -129,6 +240,7 @@ export const createScenario = (
   baseEmployees: JSON.parse(JSON.stringify(employees)),
   baseEvents: JSON.parse(JSON.stringify(events)),
   baseTeamStructures: JSON.parse(JSON.stringify(teamStructures)),
+  baseHierarchy: JSON.parse(JSON.stringify(hierarchy)),
   proposedEmployees: [],
   proposedEvents: [],
   deletedEmployeeIds: [],
@@ -149,6 +261,7 @@ export const duplicateScenario = (
   baseEmployees: JSON.parse(JSON.stringify(scenario.baseEmployees)),
   baseEvents: JSON.parse(JSON.stringify(scenario.baseEvents)),
   baseTeamStructures: JSON.parse(JSON.stringify(scenario.baseTeamStructures)),
+  baseHierarchy: JSON.parse(JSON.stringify(scenario.baseHierarchy)),
   proposedEmployees: JSON.parse(JSON.stringify(scenario.proposedEmployees)),
   proposedEvents: JSON.parse(JSON.stringify(scenario.proposedEvents)),
   deletedEmployeeIds: [...scenario.deletedEmployeeIds],
@@ -333,7 +446,7 @@ export const getCapacityWeight = (role: string, joined: string, asOfDate: Date =
 
 // Get effective role based on tenure
 export const getEffectiveRole = (originalRole: string, joined: string, asOfDate: Date = new Date()): string => {
-  if (originalRole === 'Team Lead' || originalRole === 'Architect' || originalRole === 'Engineering Manager' || originalRole === 'Product Manager') {
+  if (originalRole === 'Team Lead' || originalRole === 'Architect' || originalRole === 'Engineering Manager' || originalRole === 'Product Manager' || originalRole === 'Group Manager' || originalRole === 'Department Manager') {
     return originalRole;
   }
   
@@ -345,101 +458,144 @@ export const getEffectiveRole = (originalRole: string, joined: string, asOfDate:
   return 'Junior Dev';
 };
 
+// Determine employee's manager level
+export const getManagerLevel = (employee: Employee, hierarchy: HierarchyStructure): ManagerLevel => {
+  // Check if dept manager
+  const dept = hierarchy.find(d => d.departmentManagerId === employee.id);
+  if (dept) return 'department';
+  
+  // Check if group manager
+  for (const d of hierarchy) {
+    const group = d.groups.find(g => g.groupManagerId === employee.id);
+    if (group) return 'group';
+  }
+  
+  // Check if team lead (by role)
+  if (employee.role === 'Team Lead') return 'team';
+  
+  return 'none';
+};
+
 // Initial team structures
 export const initialTeamStructures: TeamStructure[] = [
   { 
     teamName: 'Frontend Alpha', 
     department: 'Engineering', 
+    group: 'Frontend',
     teamLeader: 12,
     requiredRoles: { 'Senior Dev': 2, 'Mid-Level Dev': 2, 'Junior Dev': 2 }
   },
   { 
     teamName: 'Frontend Beta', 
     department: 'Engineering', 
+    group: 'Frontend',
     teamLeader: 16,
     requiredRoles: { 'Senior Dev': 1, 'Mid-Level Dev': 2, 'Junior Dev': 2 }
   },
   { 
     teamName: 'Backend Core', 
     department: 'Engineering', 
+    group: 'Backend',
     teamLeader: 2,
     requiredRoles: { 'Senior Dev': 2, 'Mid-Level Dev': 1, 'Junior Dev': 1, 'QA Engineer': 1 }
   },
+  {
+    teamName: 'Backend API',
+    department: 'Engineering',
+    group: 'Backend',
+    teamLeader: 24,
+    requiredRoles: { 'Senior Dev': 1, 'Mid-Level Dev': 1, 'Junior Dev': 1 }
+  },
+  {
+    teamName: 'Infrastructure',
+    department: 'Engineering',
+    group: 'Platform',
+    teamLeader: 25,
+    requiredRoles: { 'Senior Dev': 2, 'Mid-Level Dev': 1 }
+  },
+  {
+    teamName: 'Security',
+    department: 'Engineering',
+    group: 'Platform',
+    teamLeader: 5,
+    requiredRoles: { 'Architect': 1, 'Senior Dev': 2 }
+  }
 ];
 
 // Initial data - with proper hierarchy structure
-// Hierarchy: Department Head -> Group Manager -> Team Lead -> Developers
+// Hierarchy: Department Manager -> Group Manager -> Team Lead -> Developers
 export const initialEmployees: Employee[] = [
   // === ENGINEERING DEPARTMENT ===
-  // Department Head (VP Engineering)
-  { id: 100, name: 'Victoria Palmer', dept: 'Engineering', team: 'Engineering', role: 'Engineering Manager', status: 'Active', joined: '2019-03-01' },
+  // Department Manager
+  { id: 100, name: 'Victoria Palmer', dept: 'Engineering', team: 'Engineering', role: 'Engineering Manager', status: 'Active', joined: '2019-03-01', managerLevel: 'department' },
   
-  // Group Manager - Frontend (manages Frontend Alpha & Frontend Beta)
-  { id: 101, name: 'Marcus Webb', dept: 'Engineering', team: 'Frontend Alpha', role: 'Engineering Manager', status: 'Active', joined: '2020-06-15', managerId: 100 },
+  // Group Manager - Frontend
+  { id: 101, name: 'Marcus Webb', dept: 'Engineering', group: 'Frontend', team: 'Frontend', role: 'Engineering Manager', status: 'Active', joined: '2020-06-15', managerId: 100, managerLevel: 'group' },
   
   // Frontend Alpha Team
-  { id: 12, name: 'Laura Martinez', dept: 'Engineering', team: 'Frontend Alpha', role: 'Team Lead', status: 'Active', joined: '2020-01-15', managerId: 101 },
-  { id: 1, name: 'Alice Chen', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15', managerId: 12 },
-  { id: 15, name: 'Oscar Lee', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2021-06-01', managerId: 12 },
-  { id: 13, name: 'Mike Johnson', dept: 'Engineering', team: 'Frontend Alpha', role: 'Mid-Level Dev', status: 'Active', joined: '2023-04-01', managerId: 12 },
-  { id: 14, name: 'Nina Patel', dept: 'Engineering', team: 'Frontend Alpha', role: 'Junior Dev', status: 'Active', joined: '2024-01-15', managerId: 12 },
+  { id: 12, name: 'Laura Martinez', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Team Lead', status: 'Active', joined: '2020-01-15', managerId: 101, managerLevel: 'team' },
+  { id: 1, name: 'Alice Chen', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2023-01-15', managerId: 12 },
+  { id: 15, name: 'Oscar Lee', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2021-06-01', managerId: 12 },
+  { id: 13, name: 'Mike Johnson', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Mid-Level Dev', status: 'Active', joined: '2023-04-01', managerId: 12 },
+  { id: 14, name: 'Nina Patel', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Junior Dev', status: 'Active', joined: '2024-01-15', managerId: 12 },
   
   // Frontend Beta Team
-  { id: 16, name: 'Paula Brown', dept: 'Engineering', team: 'Frontend Beta', role: 'Team Lead', status: 'Active', joined: '2021-03-01', managerId: 101 },
-  { id: 17, name: 'Quinn Davis', dept: 'Engineering', team: 'Frontend Beta', role: 'Mid-Level Dev', status: 'Active', joined: '2023-07-15', managerId: 16 },
-  { id: 22, name: 'Ryan Foster', dept: 'Engineering', team: 'Frontend Beta', role: 'Junior Dev', status: 'Active', joined: '2024-02-01', managerId: 16 },
+  { id: 16, name: 'Paula Brown', dept: 'Engineering', group: 'Frontend', team: 'Frontend Beta', role: 'Team Lead', status: 'Active', joined: '2021-03-01', managerId: 101, managerLevel: 'team' },
+  { id: 17, name: 'Quinn Davis', dept: 'Engineering', group: 'Frontend', team: 'Frontend Beta', role: 'Mid-Level Dev', status: 'Active', joined: '2023-07-15', managerId: 16 },
+  { id: 22, name: 'Ryan Foster', dept: 'Engineering', group: 'Frontend', team: 'Frontend Beta', role: 'Junior Dev', status: 'Active', joined: '2024-02-01', managerId: 16 },
   
-  // Group Manager - Backend (manages Backend Core & Backend API)
-  { id: 102, name: 'Sandra Hughes', dept: 'Engineering', team: 'Backend Core', role: 'Engineering Manager', status: 'Active', joined: '2020-04-10', managerId: 100 },
+  // Group Manager - Backend
+  { id: 102, name: 'Sandra Hughes', dept: 'Engineering', group: 'Backend', team: 'Backend', role: 'Engineering Manager', status: 'Active', joined: '2020-04-10', managerId: 100, managerLevel: 'group' },
   
   // Backend Core Team
-  { id: 2, name: 'Bob Smith', dept: 'Engineering', team: 'Backend Core', role: 'Team Lead', status: 'Active', joined: '2022-05-10', managerId: 102 },
-  { id: 18, name: 'Rachel Green', dept: 'Engineering', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01', managerId: 2 },
-  { id: 10, name: 'Julia Santos', dept: 'Engineering', team: 'Backend Core', role: 'QA Engineer', status: 'Active', joined: '2023-09-01', managerId: 2 },
-  { id: 23, name: 'Tom Bradley', dept: 'Engineering', team: 'Backend Core', role: 'Mid-Level Dev', status: 'Active', joined: '2023-05-15', managerId: 2 },
+  { id: 2, name: 'Bob Smith', dept: 'Engineering', group: 'Backend', team: 'Backend Core', role: 'Team Lead', status: 'Active', joined: '2022-05-10', managerId: 102, managerLevel: 'team' },
+  { id: 18, name: 'Rachel Green', dept: 'Engineering', group: 'Backend', team: 'Backend Core', role: 'Senior Dev', status: 'Active', joined: '2022-02-01', managerId: 2 },
+  { id: 10, name: 'Julia Santos', dept: 'Engineering', group: 'Backend', team: 'Backend Core', role: 'QA Engineer', status: 'Active', joined: '2023-09-01', managerId: 2 },
+  { id: 23, name: 'Tom Bradley', dept: 'Engineering', group: 'Backend', team: 'Backend Core', role: 'Mid-Level Dev', status: 'Active', joined: '2023-05-15', managerId: 2 },
   
   // Backend API Team
-  { id: 24, name: 'Uma Krishnan', dept: 'Engineering', team: 'Backend API', role: 'Team Lead', status: 'Active', joined: '2021-08-01', managerId: 102 },
-  { id: 6, name: 'Fiona Walsh', dept: 'Engineering', team: 'Backend API', role: 'Senior Dev', status: 'Active', joined: '2023-03-15', managerId: 24 },
-  { id: 19, name: 'Steve Wilson', dept: 'Engineering', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01', managerId: 24 },
+  { id: 24, name: 'Uma Krishnan', dept: 'Engineering', group: 'Backend', team: 'Backend API', role: 'Team Lead', status: 'Active', joined: '2021-08-01', managerId: 102, managerLevel: 'team' },
+  { id: 6, name: 'Fiona Walsh', dept: 'Engineering', group: 'Backend', team: 'Backend API', role: 'Senior Dev', status: 'Active', joined: '2023-03-15', managerId: 24 },
+  { id: 19, name: 'Steve Wilson', dept: 'Engineering', group: 'Backend', team: 'Backend API', role: 'Junior Dev', status: 'Active', joined: '2024-03-01', managerId: 24 },
   
-  // Infrastructure Team (reports directly to VP)
-  { id: 25, name: 'Walter Chang', dept: 'Engineering', team: 'Infrastructure', role: 'Team Lead', status: 'Active', joined: '2020-11-01', managerId: 100 },
-  { id: 3, name: 'Charlie Day', dept: 'Engineering', team: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01', managerId: 25 },
-  { id: 26, name: 'Xavier Moore', dept: 'Engineering', team: 'Infrastructure', role: 'Senior Dev', status: 'Active', joined: '2021-07-15', managerId: 25 },
+  // Platform Group (no dedicated group manager - reports to dept manager)
+  // Infrastructure Team
+  { id: 25, name: 'Walter Chang', dept: 'Engineering', group: 'Platform', team: 'Infrastructure', role: 'Team Lead', status: 'Active', joined: '2020-11-01', managerId: 100, managerLevel: 'team' },
+  { id: 3, name: 'Charlie Day', dept: 'Engineering', group: 'Platform', team: 'Infrastructure', role: 'Junior Dev', status: 'On Course', joined: '2024-02-01', managerId: 25 },
+  { id: 26, name: 'Xavier Moore', dept: 'Engineering', group: 'Platform', team: 'Infrastructure', role: 'Senior Dev', status: 'Active', joined: '2021-07-15', managerId: 25 },
   
-  // Security Team (reports directly to VP)
-  { id: 5, name: 'Edward Kim', dept: 'Engineering', team: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01', managerId: 100 },
-  { id: 27, name: 'Yuki Tanaka', dept: 'Engineering', team: 'Security', role: 'Senior Dev', status: 'Active', joined: '2022-03-01', managerId: 5 },
+  // Security Team
+  { id: 5, name: 'Edward Kim', dept: 'Engineering', group: 'Platform', team: 'Security', role: 'Architect', status: 'Active', joined: '2021-09-01', managerId: 100, managerLevel: 'team' },
+  { id: 27, name: 'Yuki Tanaka', dept: 'Engineering', group: 'Platform', team: 'Security', role: 'Senior Dev', status: 'Active', joined: '2022-03-01', managerId: 5 },
   
-  // Mobile Teams (reports directly to VP)
-  { id: 28, name: 'Zara Ahmed', dept: 'Engineering', team: 'Mobile iOS', role: 'Team Lead', status: 'Active', joined: '2021-05-01', managerId: 100 },
-  { id: 8, name: 'Hannah Moore', dept: 'Engineering', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01', managerId: 28 },
-  { id: 20, name: 'Tina Turner', dept: 'Engineering', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10', managerId: 100 },
+  // Mobile Group (no dedicated group manager)
+  { id: 28, name: 'Zara Ahmed', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Team Lead', status: 'Active', joined: '2021-05-01', managerId: 100, managerLevel: 'team' },
+  { id: 8, name: 'Hannah Moore', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01', managerId: 28 },
+  { id: 20, name: 'Tina Turner', dept: 'Engineering', group: 'Mobile', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10', managerId: 100 },
   
   // === PRODUCT & DESIGN DEPARTMENT ===
-  // Department Head
-  { id: 200, name: 'Patricia Stone', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2019-08-01' },
+  // Department Manager
+  { id: 200, name: 'Patricia Stone', dept: 'Product & Design', team: 'Product & Design', role: 'Product Manager', status: 'Active', joined: '2019-08-01', managerLevel: 'department' },
   
   // Product Core Team
-  { id: 4, name: 'Diana Ross', dept: 'Product & Design', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2023-06-20', managerId: 200 },
+  { id: 4, name: 'Diana Ross', dept: 'Product & Design', group: 'Product', team: 'Product Core', role: 'Product Manager', status: 'Active', joined: '2023-06-20', managerId: 200 },
   
   // UX Design Team
-  { id: 201, name: 'Gregory Ellis', dept: 'Product & Design', team: 'UX Design', role: 'Team Lead', status: 'Active', joined: '2020-09-01', managerId: 200 },
-  { id: 9, name: 'Ivan Petrov', dept: 'Product & Design', team: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15', managerId: 201 },
+  { id: 201, name: 'Gregory Ellis', dept: 'Product & Design', group: 'Design & Research', team: 'UX Design', role: 'Team Lead', status: 'Active', joined: '2020-09-01', managerId: 200, managerLevel: 'team' },
+  { id: 9, name: 'Ivan Petrov', dept: 'Product & Design', group: 'Design & Research', team: 'UX Design', role: 'Senior Dev', status: 'Parental Leave', joined: '2022-08-15', managerId: 201 },
   
   // === OPERATIONS DEPARTMENT ===
-  // Department Head
-  { id: 300, name: 'Robert Kane', dept: 'Operations', team: 'HR & People', role: 'Engineering Manager', status: 'Active', joined: '2019-01-15' },
+  // Department Manager
+  { id: 300, name: 'Robert Kane', dept: 'Operations', team: 'Operations', role: 'Engineering Manager', status: 'Active', joined: '2019-01-15', managerLevel: 'department' },
   
   // HR & People Team
-  { id: 7, name: 'George Liu', dept: 'Operations', team: 'HR & People', role: 'Team Lead', status: 'Active', joined: '2022-11-01', managerId: 300 },
+  { id: 7, name: 'George Liu', dept: 'Operations', group: 'People & Culture', team: 'HR & People', role: 'Team Lead', status: 'Active', joined: '2022-11-01', managerId: 300, managerLevel: 'team' },
   
   // Finance Team
-  { id: 11, name: 'Kevin O\'Brien', dept: 'Operations', team: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20', managerId: 300 },
+  { id: 11, name: 'Kevin O\'Brien', dept: 'Operations', group: 'Business Operations', team: 'Finance', role: 'Team Lead', status: 'Active', joined: '2021-04-20', managerId: 300, managerLevel: 'team' },
   
   // Potential employee - uncertain hire
-  { id: 21, name: 'Potential: Senior FE', dept: 'Engineering', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2025-06-01', isPotential: true, managerId: 12 },
+  { id: 21, name: 'Potential: Senior FE', dept: 'Engineering', group: 'Frontend', team: 'Frontend Alpha', role: 'Senior Dev', status: 'Active', joined: '2025-06-01', isPotential: true, managerId: 12 },
 ];
 
 export const initialEvents: WorkforceEvent[] = [

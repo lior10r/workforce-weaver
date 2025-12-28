@@ -119,9 +119,11 @@ export const ExportImport = ({
           // Create default structure for unconfigured teams
           const teamMembers = employees.filter(e => e.team === teamName);
           const teamLead = teamMembers.find(e => e.role === 'Team Lead');
+          const groupName = teamMembers[0]?.group || '';
           allTeams.push({
             teamName,
             department: dept,
+            group: groupName,
             teamLeader: teamLead?.id,
             requiredRoles: {},
             targetSize: teamMembers.length

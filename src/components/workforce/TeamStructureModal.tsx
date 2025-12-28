@@ -9,6 +9,7 @@ interface TeamStructureModalProps {
   teamStructure?: TeamStructure;
   teamName: string;
   department: string;
+  group?: string;
   employees: Employee[];
 }
 
@@ -19,6 +20,7 @@ export const TeamStructureModal = ({
   teamStructure,
   teamName,
   department,
+  group = '',
   employees
 }: TeamStructureModalProps) => {
   const [teamLeader, setTeamLeader] = useState<number | undefined>(teamStructure?.teamLeader);
@@ -64,6 +66,7 @@ export const TeamStructureModal = ({
     onSubmit({
       teamName,
       department,
+      group: teamStructure?.group || group,
       teamLeader,
       requiredRoles,
       targetSize
