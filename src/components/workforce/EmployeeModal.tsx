@@ -1,4 +1,4 @@
-import { X, Building2 } from 'lucide-react';
+import { X, Building2, Trash2 } from 'lucide-react';
 import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, Hierarchy } from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect } from 'react';
 
@@ -6,13 +6,15 @@ interface EmployeeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (employee: Omit<Employee, 'id'>, id?: number) => void;
+  onDelete?: (employeeId: number) => void;
   editingEmployee: Employee | null;
   hierarchy: Hierarchy;
   departments: Record<string, string[]>;
   employees: Employee[];
 }
 
-export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
+export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDept, setSelectedDept] = useState(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
@@ -227,19 +229,56 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, editingEmployee, hier
           </div>
 
           <div className="flex gap-3 pt-4">
-            <button 
-              type="button" 
-              onClick={onClose} 
-              className="btn-secondary flex-1 justify-center"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              className="btn-primary flex-1 justify-center"
-            >
-              {editingEmployee ? 'Save Changes' : 'Confirm Hire'}
-            </button>
+            {editingEmployee && onDelete && (
+              showDeleteConfirm ? (
+                <div className="flex-1 flex gap-2">
+                  <button 
+                    type="button" 
+                    onClick={() => setShowDeleteConfirm(false)} 
+                    className="btn-secondary flex-1 justify-center text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      onDelete(editingEmployee.id);
+                      onClose();
+                    }} 
+                    className="flex-1 justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl px-4 py-2 font-medium flex items-center gap-2"
+                  >
+                    <Trash2 size={16} />
+                    Confirm Delete
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  type="button" 
+                  onClick={() => setShowDeleteConfirm(true)} 
+                  className="p-2 text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+                  title="Delete Employee"
+                >
+                  <Trash2 size={20} />
+                </button>
+              )
+            )}
+            {!showDeleteConfirm && (
+              <>
+                <button 
+                  type="button" 
+                  onClick={onClose} 
+                  className="btn-secondary flex-1 justify-center"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn-primary flex-1 justify-center"
+                >
+                  {editingEmployee ? 'Save Changes' : 'Confirm Hire'}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>
