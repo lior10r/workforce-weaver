@@ -1,6 +1,9 @@
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3 } from 'lucide-react';
-import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus } from '@/lib/workforce-data';
+import { useState } from 'react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users } from 'lucide-react';
+import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, DEPARTMENTS } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
+type GroupingMode = 'team' | 'hierarchy';
 
 interface TimelineProps {
   employees: Employee[];
@@ -12,6 +15,7 @@ interface TimelineProps {
   teamStructures?: TeamStructure[];
   employeeDiffMap?: Map<number, { status: DiffStatus; changes?: string[] }>;
   eventDiffMap?: Map<number, { status: DiffStatus }>;
+  departments?: Record<string, string[]>;
 }
 
 interface TrainingPeriod {
@@ -52,8 +56,11 @@ export const Timeline = ({
   selectedDept = 'All',
   teamStructures = [],
   employeeDiffMap,
-  eventDiffMap
+  eventDiffMap,
+  departments = DEPARTMENTS
 }: TimelineProps) => {
+  const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
+  
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
   const currentDate = new Date();
   const currentDatePos = getTimelinePosition(currentDate.toISOString().split('T')[0]);
@@ -536,8 +543,98 @@ export const Timeline = ({
     );
   };
 
+  // Build hierarchy structure: Department -> Teams -> Employees
+  const getHierarchyStructure = () => {
+    const structure: { dept: string; teams: { name: string; members: Employee[] }[] }[] = [];
+    
+    Object.entries(departments).forEach(([dept, deptTeams]) => {
+      const deptEmployees = employees.filter(e => e.dept === dept);
+      const teams: { name: string; members: Employee[] }[] = [];
+      
+      // Department-level managers (not in any team)
+      const deptManagers = deptEmployees.filter(e => !deptTeams.includes(e.team));
+      if (deptManagers.length > 0) {
+        teams.push({ name: `${dept} (Managers)`, members: deptManagers });
+      }
+      
+      // Regular teams
+      deptTeams.forEach(teamName => {
+        const teamMembers = deptEmployees.filter(e => e.team === teamName);
+        if (teamMembers.length > 0) {
+          teams.push({ name: teamName, members: teamMembers });
+        }
+      });
+      
+      if (teams.length > 0) {
+        structure.push({ dept, teams });
+      }
+    });
+    
+    return structure;
+  };
+
+  const renderHierarchySection = () => {
+    const structure = getHierarchyStructure();
+    
+    return structure.map(({ dept, teams }) => (
+      <div key={dept} className="mb-10">
+        {/* Department Header */}
+        <div className="flex items-center gap-3 mb-4 pb-2 border-b-2 border-primary/30">
+          <Building2 size={16} className="text-primary" />
+          <h2 className="text-base font-bold text-primary uppercase tracking-wide">{dept}</h2>
+          <span className="text-xs text-muted-foreground">
+            ({teams.reduce((sum, t) => sum + t.members.length, 0)} employees)
+          </span>
+        </div>
+        
+        {/* Teams within Department */}
+        {teams.map(({ name, members }) => (
+          <div key={name} className="mb-6 ml-4">
+            <div className="flex items-center gap-2 mb-3 pb-1 border-b border-border/50">
+              <Users size={12} className="text-muted-foreground" />
+              <h3 className="text-sm font-semibold text-foreground">{name}</h3>
+              <span className="text-[10px] text-muted-foreground">({members.length})</span>
+            </div>
+            <div className="space-y-3">
+              {members.map(emp => renderEmployeeRow(emp))}
+            </div>
+          </div>
+        ))}
+      </div>
+    ));
+  };
+
   return (
     <div className="glass-card p-8 overflow-x-auto animate-fade-in">
+      {/* Grouping Mode Toggle */}
+      <div className="flex items-center gap-4 mb-6">
+        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Group by:</span>
+        <div className="flex bg-secondary/50 rounded-lg p-1">
+          <button
+            onClick={() => setGroupingMode('team')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              groupingMode === 'team' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Users size={12} className="inline mr-1.5" />
+            Team
+          </button>
+          <button
+            onClick={() => setGroupingMode('hierarchy')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+              groupingMode === 'hierarchy' 
+                ? 'bg-primary text-primary-foreground shadow-sm' 
+                : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <Building2 size={12} className="inline mr-1.5" />
+            Hierarchy
+          </button>
+        </div>
+      </div>
+
       <div className="min-w-[1800px]">
         {/* Header Rulers */}
         <div className="flex border-b border-border pb-4 mb-6">
@@ -574,7 +671,9 @@ export const Timeline = ({
         
         {/* Timeline Content */}
         <TooltipProvider>
-          {shouldGroupByTeam && teams.length > 0 ? (
+          {groupingMode === 'hierarchy' ? (
+            renderHierarchySection()
+          ) : shouldGroupByTeam && teams.length > 0 ? (
             // Group by team
             teams.map(teamName => renderTeamSection(teamName))
           ) : (

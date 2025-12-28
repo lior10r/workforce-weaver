@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus, ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus, ChevronDown, ChevronRight, GitBranch, Trash2 } from 'lucide-react';
 import { DEPARTMENTS, DEPARTMENT_NAMES } from '@/lib/workforce-data';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
@@ -34,6 +34,8 @@ interface SidebarProps {
   departments: Record<string, string[]>;
   onAddDepartment: (name: string) => void;
   onAddTeam: (dept: string, teamName: string) => void;
+  onDeleteDepartment?: (dept: string) => void;
+  onDeleteTeam?: (dept: string, teamName: string) => void;
 }
 
 export const Sidebar = ({ 
@@ -43,13 +45,16 @@ export const Sidebar = ({
   setScopeFilter,
   departments,
   onAddDepartment,
-  onAddTeam
+  onAddTeam,
+  onDeleteDepartment,
+  onDeleteTeam
 }: SidebarProps) => {
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddTeam, setShowAddTeam] = useState<string | null>(null);
   const [newDeptName, setNewDeptName] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'team'; dept: string; team?: string } | null>(null);
 
   const handleAddDept = () => {
     if (newDeptName.trim()) {
@@ -227,23 +232,61 @@ export const Sidebar = ({
                   >
                     {dept}
                   </label>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAddTeam(showAddTeam === dept ? null : dept);
-                    }}
-                    className="p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors opacity-0 group-hover:opacity-100"
-                    title="Add Team"
-                  >
-                    <Plus size={10} />
-                  </button>
+                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAddTeam(showAddTeam === dept ? null : dept);
+                      }}
+                      className="p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
+                      title="Add Team"
+                    >
+                      <Plus size={10} />
+                    </button>
+                    {onDeleteDepartment && (
+                      deleteConfirm?.type === 'dept' && deleteConfirm.dept === dept ? (
+                        <div className="flex items-center gap-1 ml-1">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteDepartment(dept);
+                              setDeleteConfirm(null);
+                            }}
+                            className="p-1 bg-destructive text-destructive-foreground rounded text-[9px] font-bold"
+                          >
+                            Yes
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirm(null);
+                            }}
+                            className="p-1 bg-muted text-muted-foreground rounded text-[9px]"
+                          >
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfirm({ type: 'dept', dept });
+                          }}
+                          className="p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-colors"
+                          title="Delete Department"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      )
+                    )}
+                  </div>
                 </div>
 
                 {/* Teams */}
                 {isExpanded && (
                   <div className="ml-5 space-y-0.5 animate-fade-in">
                     {deptTeams.map(team => (
-                      <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/30 rounded transition-colors">
+                      <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/30 rounded transition-colors group/team">
                         <Checkbox 
                           id={`team-${team}`}
                           checked={scopeFilter.teams.includes(team)}
@@ -256,6 +299,42 @@ export const Sidebar = ({
                         >
                           {team}
                         </label>
+                        {onDeleteTeam && (
+                          deleteConfirm?.type === 'team' && deleteConfirm.dept === dept && deleteConfirm.team === team ? (
+                            <div className="flex items-center gap-1">
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteTeam(dept, team);
+                                  setDeleteConfirm(null);
+                                }}
+                                className="p-0.5 bg-destructive text-destructive-foreground rounded text-[8px] font-bold"
+                              >
+                                Yes
+                              </button>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteConfirm(null);
+                                }}
+                                className="p-0.5 bg-muted text-muted-foreground rounded text-[8px]"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDeleteConfirm({ type: 'team', dept, team });
+                              }}
+                              className="p-0.5 opacity-0 group-hover/team:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-all"
+                              title="Delete Team"
+                            >
+                              <Trash2 size={10} />
+                            </button>
+                          )
+                        )}
                       </div>
                     ))}
                     

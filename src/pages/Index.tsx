@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
-import { Search, UserPlus, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { Search, UserPlus, ChevronRight, Undo2, Redo2, RotateCcw } from 'lucide-react';
 import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
@@ -13,6 +13,9 @@ import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
+import { Slider } from '@/components/ui/slider';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { 
   Employee, 
   WorkforceEvent, 
@@ -20,9 +23,6 @@ import {
   TeamStructure,
   Scenario,
   DiffStatus,
-  initialEmployees, 
-  initialEvents,
-  initialTeamStructures,
   DEPARTMENTS,
   getScenarioEmployees,
   getScenarioEvents,
@@ -37,13 +37,38 @@ interface ScopeFilter {
 }
 
 const Index = () => {
-  // Master Plan State (source of truth)
-  const [masterEmployees, setMasterEmployees] = useState<Employee[]>(initialEmployees);
-  const [masterEvents, setMasterEvents] = useState<WorkforceEvent[]>(initialEvents);
-  const [masterTeamStructures, setMasterTeamStructures] = useState<TeamStructure[]>(initialTeamStructures);
-  
+  // Use the workforce data hook for persistence and undo/redo
+  const {
+    masterEmployees,
+    masterEvents,
+    masterTeamStructures,
+    departments,
+    scenarios,
+    setMasterEmployees,
+    setMasterEvents,
+    setMasterTeamStructures,
+    setDepartments,
+    setScenarios,
+    setMasterEmployeesDirect,
+    setMasterEventsDirect,
+    setMasterTeamStructuresDirect,
+    setDepartmentsDirect,
+    deleteEmployee,
+    deleteEvent,
+    deleteTeam,
+    deleteDepartment,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    historyLength,
+    currentHistoryIndex,
+    jumpToHistory,
+    pushToHistory,
+    resetToInitial,
+  } = useWorkforceData();
+
   // Scenario State
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>(null);
 
@@ -93,14 +118,13 @@ const Index = () => {
 
   // Other state
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(() => {
-    const allDepts = Object.keys(DEPARTMENTS);
-    const allTeams = Object.values(DEPARTMENTS).flat();
+    const allDepts = Object.keys(departments);
+    const allTeams = Object.values(departments).flat();
     return { departments: allDepts, teams: allTeams };
   });
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const orgChartRef = useRef<HTMLDivElement>(null);
-  const [departments, setDepartments] = useState<Record<string, string[]>>(DEPARTMENTS);
   
   // Modal states
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -109,6 +133,16 @@ const Index = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editingTeamStructure, setEditingTeamStructure] = useState<{ teamName: string; department: string } | null>(null);
   const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
+
+  // Update scope filter when departments change
+  useEffect(() => {
+    const allDepts = Object.keys(departments);
+    const allTeams = Object.values(departments).flat();
+    setScopeFilter(prev => ({
+      departments: prev.departments.filter(d => allDepts.includes(d)),
+      teams: prev.teams.filter(t => allTeams.includes(t))
+    }));
+  }, [departments]);
 
   // Legacy hierarchy for compatibility with some components
   const hierarchy: Hierarchy = useMemo(() => {
@@ -132,13 +166,11 @@ const Index = () => {
   }, [scopeFilter, departments]);
 
   // Filtered employees based on scope filter
-  // Include both team members AND department-level managers (those whose team is not in any team list)
   const allTeamsList = Object.values(departments).flat();
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchTeam = scopeFilter.teams.includes(e.team);
-      // Include department-level managers if their department is selected
       const isDeptLevel = !allTeamsList.includes(e.team);
       const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
       return matchSearch && (matchTeam || matchDeptLevel);
@@ -173,6 +205,10 @@ const Index = () => {
     }
   };
 
+  const handleDeleteEmployee = (employeeId: number) => {
+    deleteEmployee(employeeId, activeScenarioId);
+  };
+
   const handleAddEmployee = (employeeData: Omit<Employee, 'id'>, id?: number) => {
     const newId = id || Date.now();
     const newEmployee = { ...employeeData, id: newId };
@@ -180,7 +216,6 @@ const Index = () => {
     const existingEmployee = isEditing ? employees.find(e => e.id === id) : null;
     
     if (activeScenario) {
-      // Add to scenario's proposed employees with changelog
       setScenarios(prev => prev.map(s => {
         if (s.id !== activeScenarioId) return s;
         
@@ -198,7 +233,6 @@ const Index = () => {
           };
         }
         
-        // Add changelog entry
         const changeDetails: Record<string, { before?: string; after?: string }> = {};
         if (isEditing && existingEmployee) {
           if (existingEmployee.team !== newEmployee.team) {
@@ -222,17 +256,17 @@ const Index = () => {
         );
       }));
     } else {
-      // Add to master
+      pushToHistory();
       if (id) {
-        setMasterEmployees(prev => prev.map(emp => 
+        setMasterEmployeesDirect(prev => prev.map(emp => 
           emp.id === id ? newEmployee : emp
         ));
       } else {
         const departureDate = new Date(employeeData.joined);
         departureDate.setFullYear(departureDate.getFullYear() + 6);
         
-        setMasterEmployees(prev => [...prev, newEmployee]);
-        setMasterEvents(prev => [...prev, {
+        setMasterEmployeesDirect(prev => [...prev, newEmployee]);
+        setMasterEventsDirect(prev => [...prev, {
           id: Date.now() + 1,
           empId: newId,
           type: 'Departure',
@@ -258,7 +292,6 @@ const Index = () => {
           proposedEvents: [...s.proposedEvents, newEvent]
         };
         
-        // Add changelog entry
         return addScenarioChangelogEntry(
           updatedScenario,
           'event_added',
@@ -268,7 +301,8 @@ const Index = () => {
         );
       }));
     } else {
-      setMasterEvents(prev => [...prev, newEvent]);
+      pushToHistory();
+      setMasterEventsDirect(prev => [...prev, newEvent]);
     }
     setIsEventModalOpen(false);
   };
@@ -291,7 +325,6 @@ const Index = () => {
   const handleSaveTeamStructure = (structure: TeamStructure) => {
     if (activeScenario) {
       // For now, team structures are read-only in scenarios
-      // Could be extended to support scenario-specific team structures
     } else {
       setMasterTeamStructures(prev => {
         const existing = prev.findIndex(s => s.teamName === structure.teamName);
@@ -328,32 +361,31 @@ const Index = () => {
   };
 
   const handleMergeToMaster = (scenario: Scenario) => {
-    // Apply proposed employees (merge with base, respecting deletions)
+    pushToHistory();
     const finalEmployees = getScenarioEmployees(scenario);
     const finalEvents = getScenarioEvents(scenario);
     
-    setMasterEmployees(finalEmployees);
-    setMasterEvents(finalEvents);
+    setMasterEmployeesDirect(finalEmployees);
+    setMasterEventsDirect(finalEvents);
     
-    // Delete the scenario after merge
     handleDeleteScenario(scenario.id);
   };
 
   // Import handlers (always affect master)
   const handleImportEmployees = (importedEmployees: Employee[]) => {
-    setMasterEmployees(importedEmployees);
+    setMasterEmployeesDirect(importedEmployees);
   };
 
   const handleImportEvents = (importedEvents: WorkforceEvent[]) => {
-    setMasterEvents(importedEvents);
+    setMasterEventsDirect(importedEvents);
   };
 
   const handleImportTeamStructures = (importedStructures: TeamStructure[]) => {
-    setMasterTeamStructures(importedStructures);
+    setMasterTeamStructuresDirect(importedStructures);
   };
 
   const handleImportDepartments = (importedDepartments: Record<string, string[]>) => {
-    setDepartments(importedDepartments);
+    setDepartmentsDirect(importedDepartments);
     const allTeams = Object.values(importedDepartments).flat();
     setScopeFilter({
       departments: Object.keys(importedDepartments),
@@ -367,11 +399,11 @@ const Index = () => {
     teamStructures?: TeamStructure[];
     departments?: Record<string, string[]>;
   }) => {
-    if (data.employees) setMasterEmployees(data.employees);
-    if (data.events) setMasterEvents(data.events);
-    if (data.teamStructures) setMasterTeamStructures(data.teamStructures);
+    if (data.employees) setMasterEmployeesDirect(data.employees);
+    if (data.events) setMasterEventsDirect(data.events);
+    if (data.teamStructures) setMasterTeamStructuresDirect(data.teamStructures);
     if (data.departments) {
-      setDepartments(data.departments);
+      setDepartmentsDirect(data.departments);
       const allTeams = Object.values(data.departments).flat();
       setScopeFilter({
         departments: Object.keys(data.departments),
@@ -417,6 +449,8 @@ const Index = () => {
         departments={departments}
         onAddDepartment={handleAddDepartment}
         onAddTeam={handleAddTeam}
+        onDeleteDepartment={deleteDepartment}
+        onDeleteTeam={deleteTeam}
       />
 
       {/* Main Content */}
@@ -455,7 +489,64 @@ const Index = () => {
                 {getViewTitle()}
               </h2>
               
-              <div className="flex gap-3 w-full lg:w-auto">
+              <div className="flex gap-3 w-full lg:w-auto items-center">
+                {/* Undo/Redo Controls */}
+                <TooltipProvider>
+                  <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={undo}
+                          disabled={!canUndo}
+                          className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Undo2 size={16} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Undo</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={redo}
+                          disabled={!canRedo}
+                          className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Redo2 size={16} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Redo</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button 
+                          onClick={resetToInitial}
+                          className="p-2 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
+                        >
+                          <RotateCcw size={16} />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Reset to Initial Data</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  
+                  {/* History Slider */}
+                  {historyLength > 1 && (
+                    <div className="hidden lg:flex items-center gap-2 bg-secondary/30 rounded-lg px-3 py-2 min-w-[150px]">
+                      <span className="text-[9px] text-muted-foreground uppercase font-bold whitespace-nowrap">History</span>
+                      <Slider
+                        value={[currentHistoryIndex]}
+                        min={0}
+                        max={historyLength - 1}
+                        step={1}
+                        onValueChange={(value) => jumpToHistory(value[0])}
+                        className="w-24"
+                      />
+                      <span className="text-[10px] text-muted-foreground font-mono">{currentHistoryIndex + 1}/{historyLength}</span>
+                    </div>
+                  )}
+                </TooltipProvider>
+
                 <div className="relative flex-1 lg:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                   <input 
@@ -514,6 +605,7 @@ const Index = () => {
               teamStructures={teamStructures}
               employeeDiffMap={employeeDiffMap}
               eventDiffMap={eventDiffMap}
+              departments={departments}
             />
           )}
 
@@ -565,6 +657,7 @@ const Index = () => {
         isOpen={isEmployeeModalOpen}
         onClose={() => { setIsEmployeeModalOpen(false); setEditingEmployee(null); }}
         onSubmit={handleAddEmployee}
+        onDelete={handleDeleteEmployee}
         editingEmployee={editingEmployee}
         hierarchy={hierarchy}
         departments={departments}
