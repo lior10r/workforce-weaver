@@ -1,13 +1,33 @@
 import { useState, useMemo, forwardRef } from 'react';
-import { ChevronDown, ChevronRight, User, Users, Building2, AlertCircle, FolderTree, Crown } from 'lucide-react';
+import { ChevronDown, ChevronRight, User, Users, Building2, FolderTree, Crown, Plus, Trash2, Settings } from 'lucide-react';
 import { Employee, TeamStructure, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 interface OrgChartProps {
   employees: Employee[];
   teamStructures: TeamStructure[];
   hierarchy: HierarchyStructure;
   onEditEmployee?: (employee: Employee) => void;
+  onAddDepartment?: (name: string) => void;
+  onAddGroup?: (dept: string, groupName: string) => void;
+  onAddTeam?: (dept: string, groupName: string | null, teamName: string) => void;
+  onDeleteDepartment?: (dept: string) => void;
+  onDeleteGroup?: (dept: string, groupName: string) => void;
+  onDeleteTeam?: (dept: string, groupName: string | null, teamName: string) => void;
+  onSetDepartmentManager?: (dept: string, managerId: number | null) => void;
+  onSetGroupManager?: (dept: string, groupName: string, managerId: number | null) => void;
+  onSetTeamLeader?: (teamName: string, leaderId: number | null) => void;
 }
 
 interface OrgNode {
@@ -15,11 +35,32 @@ interface OrgNode {
   directReports: OrgNode[];
 }
 
-export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, teamStructures, hierarchy, onEditEmployee }, ref) => {
+export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ 
+  employees, 
+  teamStructures, 
+  hierarchy, 
+  onEditEmployee,
+  onAddDepartment,
+  onAddGroup,
+  onAddTeam,
+  onDeleteDepartment,
+  onDeleteGroup,
+  onDeleteTeam,
+  onSetDepartmentManager,
+  onSetGroupManager,
+  onSetTeamLeader
+}, ref) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<'hierarchy' | 'structure' | 'team'>('structure');
+  
+  // Add dialogs state
+  const [showAddDeptDialog, setShowAddDeptDialog] = useState(false);
+  const [showAddGroupDialog, setShowAddGroupDialog] = useState<string | null>(null);
+  const [showAddTeamDialog, setShowAddTeamDialog] = useState<{ dept: string; group: string | null } | null>(null);
+  const [newName, setNewName] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string | null; team?: string } | null>(null);
 
   // Build org tree from manager relationships
   const orgTree = useMemo(() => {
@@ -126,6 +167,49 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
     );
   };
 
+  // Get employees eligible to be managers (for dropdowns)
+  const getEligibleManagers = (deptName?: string, groupName?: string, teamName?: string) => {
+    let eligible = employees.filter(e => !e.isPotential);
+    if (deptName) {
+      eligible = eligible.filter(e => e.dept === deptName);
+    }
+    if (groupName) {
+      const dept = hierarchy.find(d => d.name === deptName);
+      const group = dept?.groups.find(g => g.name === groupName);
+      if (group) {
+        eligible = eligible.filter(e => group.teams.includes(e.team));
+      }
+    }
+    if (teamName) {
+      eligible = eligible.filter(e => e.team === teamName);
+    }
+    return eligible;
+  };
+
+  const handleAddDept = () => {
+    if (newName.trim() && onAddDepartment) {
+      onAddDepartment(newName.trim());
+      setNewName('');
+      setShowAddDeptDialog(false);
+    }
+  };
+
+  const handleAddGroup = (dept: string) => {
+    if (newName.trim() && onAddGroup) {
+      onAddGroup(dept, newName.trim());
+      setNewName('');
+      setShowAddGroupDialog(null);
+    }
+  };
+
+  const handleAddTeam = (dept: string, group: string | null) => {
+    if (newName.trim() && onAddTeam) {
+      onAddTeam(dept, group, newName.trim());
+      setNewName('');
+      setShowAddTeamDialog(null);
+    }
+  };
+
   const renderEmployeeCard = (employee: Employee, managerLevel?: 'dept' | 'group' | 'team') => {
     const manager = employee.managerId ? employees.find(e => e.id === employee.managerId) : null;
     
@@ -210,7 +294,35 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
     );
   };
 
-  // Structure View: Department → Group → Team with managers
+  // Manager assignment dropdown
+  const renderManagerSelect = (
+    label: string, 
+    currentManagerId: number | undefined, 
+    eligibleEmployees: Employee[], 
+    onSelect: (id: number | null) => void
+  ) => (
+    <div className="flex items-center gap-2">
+      <Crown size={12} className="text-muted-foreground" />
+      <Select
+        value={currentManagerId?.toString() || 'none'}
+        onValueChange={(val) => onSelect(val === 'none' ? null : parseInt(val))}
+      >
+        <SelectTrigger className="h-7 text-xs w-48">
+          <SelectValue placeholder={`Select ${label}`} />
+        </SelectTrigger>
+        <SelectContent className="bg-popover border border-border z-50">
+          <SelectItem value="none">No {label}</SelectItem>
+          {eligibleEmployees.map(emp => (
+            <SelectItem key={emp.id} value={emp.id.toString()}>
+              {emp.name} - {emp.role}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  // Structure View: Department → Group → Team with managers and management controls
   const renderStructureView = () => (
     <div className="space-y-6">
       {hierarchy.map(dept => {
@@ -218,6 +330,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
         const deptManager = dept.departmentManagerId ? employees.find(e => e.id === dept.departmentManagerId) : null;
         const allDeptTeams = getAllDeptTeams(dept);
         const deptEmployees = employees.filter(e => allDeptTeams.includes(e.team) || e.dept === dept.name);
+        const eligibleDeptManagers = getEligibleManagers(dept.name);
 
         return (
           <div key={dept.name} className="glass-card overflow-hidden">
@@ -246,10 +359,60 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                   </p>
                 )}
               </div>
+              
+              {/* Department Actions */}
+              <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowAddGroupDialog(dept.name)}
+                  className="h-7 text-xs"
+                >
+                  <Plus size={12} className="mr-1" />
+                  Group
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setShowAddTeamDialog({ dept: dept.name, group: null })}
+                  className="h-7 text-xs"
+                >
+                  <Plus size={12} className="mr-1" />
+                  Direct Team
+                </Button>
+                {onDeleteDepartment && (
+                  deleteConfirm?.type === 'dept' && deleteConfirm.dept === dept.name ? (
+                    <div className="flex items-center gap-1">
+                      <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => { onDeleteDepartment(dept.name); setDeleteConfirm(null); }}>
+                        Confirm
+                      </Button>
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setDeleteConfirm(null)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setDeleteConfirm({ type: 'dept', dept: dept.name })}
+                      className="h-7 text-xs text-destructive hover:text-destructive"
+                    >
+                      <Trash2 size={12} />
+                    </Button>
+                  )
+                )}
+              </div>
             </div>
 
             {isDeptExpanded && (
               <div className="p-4 space-y-4">
+                {/* Department Manager Selector */}
+                {onSetDepartmentManager && (
+                  <div className="p-3 bg-accent/30 rounded-lg">
+                    {renderManagerSelect('Department Manager', dept.departmentManagerId, eligibleDeptManagers, (id) => onSetDepartmentManager(dept.name, id))}
+                  </div>
+                )}
+
                 {/* Department Manager Card */}
                 {deptManager && (
                   <div className="mb-4">
@@ -269,13 +432,40 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                         const teamMembers = employees.filter(e => e.team === teamName);
                         const structure = teamStructures.find(s => s.teamName === teamName);
                         const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+                        const eligibleLeaders = getEligibleManagers(dept.name, undefined, teamName);
 
                         return (
                           <div key={teamName} className="bg-background/50 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Users size={12} className="text-primary" />
-                              <span className="text-sm font-medium">{teamName}</span>
-                              <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <Users size={12} className="text-primary" />
+                                <span className="text-sm font-medium">{teamName}</span>
+                                <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {onSetTeamLeader && renderManagerSelect('Team Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
+                                {onDeleteTeam && (
+                                  deleteConfirm?.type === 'team' && deleteConfirm.team === teamName ? (
+                                    <div className="flex items-center gap-1">
+                                      <Button size="sm" variant="destructive" className="h-6 text-[10px]" onClick={() => { onDeleteTeam(dept.name, null, teamName); setDeleteConfirm(null); }}>
+                                        Yes
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDeleteConfirm(null)}>
+                                        No
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => setDeleteConfirm({ type: 'team', dept: dept.name, group: null, team: teamName })}
+                                      className="h-6 text-destructive hover:text-destructive"
+                                    >
+                                      <Trash2 size={10} />
+                                    </Button>
+                                  )
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                               {teamLeader && renderEmployeeCard(teamLeader, 'team')}
@@ -294,6 +484,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                   const isGroupExpanded = expandedGroups.has(groupKey);
                   const groupManager = group.groupManagerId ? employees.find(e => e.id === group.groupManagerId) : null;
                   const groupTeamMembers = employees.filter(e => group.teams.includes(e.team));
+                  const eligibleGroupManagers = getEligibleManagers(dept.name, group.name);
 
                   return (
                     <div key={group.name} className="border border-border rounded-xl overflow-hidden">
@@ -320,10 +511,51 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                             </p>
                           )}
                         </div>
+                        
+                        {/* Group Actions */}
+                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => setShowAddTeamDialog({ dept: dept.name, group: group.name })}
+                            className="h-6 text-[10px]"
+                          >
+                            <Plus size={10} className="mr-1" />
+                            Team
+                          </Button>
+                          {onDeleteGroup && (
+                            deleteConfirm?.type === 'group' && deleteConfirm.group === group.name ? (
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="destructive" className="h-6 text-[10px]" onClick={() => { onDeleteGroup(dept.name, group.name); setDeleteConfirm(null); }}>
+                                  Yes
+                                </Button>
+                                <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDeleteConfirm(null)}>
+                                  No
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => setDeleteConfirm({ type: 'group', dept: dept.name, group: group.name })}
+                                className="h-6 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 size={10} />
+                              </Button>
+                            )
+                          )}
+                        </div>
                       </div>
 
                       {isGroupExpanded && (
                         <div className="p-3 space-y-3">
+                          {/* Group Manager Selector */}
+                          {onSetGroupManager && (
+                            <div className="p-2 bg-accent/20 rounded-lg">
+                              {renderManagerSelect('Group Manager', group.groupManagerId, eligibleGroupManagers, (id) => onSetGroupManager(dept.name, group.name, id))}
+                            </div>
+                          )}
+
                           {/* Group Manager Card */}
                           {groupManager && (
                             <div className="mb-2">
@@ -336,18 +568,45 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                             const teamMembers = employees.filter(e => e.team === teamName);
                             const structure = teamStructures.find(s => s.teamName === teamName);
                             const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+                            const eligibleLeaders = getEligibleManagers(dept.name, group.name, teamName);
 
                             return (
                               <div key={teamName} className="bg-background/50 rounded-lg p-3">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <Users size={12} className="text-green-500" />
-                                  <span className="text-sm font-medium">{teamName}</span>
-                                  <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
-                                  {teamLeader && (
-                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                      • <Crown size={8} className="text-green-500" /> {teamLeader.name}
-                                    </span>
-                                  )}
+                                <div className="flex items-center justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <Users size={12} className="text-green-500" />
+                                    <span className="text-sm font-medium">{teamName}</span>
+                                    <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                                    {teamLeader && (
+                                      <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                        • <Crown size={8} className="text-green-500" /> {teamLeader.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {onSetTeamLeader && renderManagerSelect('Team Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
+                                    {onDeleteTeam && (
+                                      deleteConfirm?.type === 'team' && deleteConfirm.team === teamName ? (
+                                        <div className="flex items-center gap-1">
+                                          <Button size="sm" variant="destructive" className="h-6 text-[10px]" onClick={() => { onDeleteTeam(dept.name, group.name, teamName); setDeleteConfirm(null); }}>
+                                            Yes
+                                          </Button>
+                                          <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={() => setDeleteConfirm(null)}>
+                                            No
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm"
+                                          onClick={() => setDeleteConfirm({ type: 'team', dept: dept.name, group: group.name, team: teamName })}
+                                          className="h-6 text-destructive hover:text-destructive"
+                                        >
+                                          <Trash2 size={10} />
+                                        </Button>
+                                      )
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                                   {teamLeader && renderEmployeeCard(teamLeader, 'team')}
@@ -369,6 +628,18 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
           </div>
         );
       })}
+      
+      {/* Add Department Button */}
+      {onAddDepartment && (
+        <Button 
+          variant="outline" 
+          className="w-full border-dashed"
+          onClick={() => setShowAddDeptDialog(true)}
+        >
+          <Plus size={16} className="mr-2" />
+          Add Department
+        </Button>
+      )}
     </div>
   );
 
@@ -411,122 +682,185 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
 
   const renderHierarchyView = () => (
     <div className="space-y-4">
-      {orgTree.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <User size={48} className="mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No Reporting Structure</h3>
-          <p className="text-sm text-muted-foreground">
-            Assign managers to employees to build the org chart hierarchy.
-          </p>
-        </div>
-      ) : (
+      {orgTree.length > 0 ? (
         orgTree.map(node => renderOrgNode(node))
+      ) : (
+        <div className="text-center py-8 text-muted-foreground">
+          No employees with defined reporting structure
+        </div>
       )}
       
-      {employees.filter(e => !e.managerId && !employees.some(other => other.managerId === e.id)).length > 0 && orgTree.length > 0 && (
-        <div className="mt-8">
-          <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
-            Unassigned to Hierarchy
-          </h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {employees
-              .filter(e => !e.managerId && !employees.some(other => other.managerId === e.id))
-              .map(emp => renderEmployeeCard(emp))}
+      {/* Unassigned employees */}
+      {(() => {
+        const assignedIds = new Set<number>();
+        const collectIds = (nodes: OrgNode[]) => {
+          nodes.forEach(n => {
+            assignedIds.add(n.employee.id);
+            collectIds(n.directReports);
+          });
+        };
+        collectIds(orgTree);
+        
+        const unassigned = employees.filter(e => !assignedIds.has(e.id) && !e.managerId);
+        if (unassigned.length === 0) return null;
+        
+        return (
+          <div className="mt-8 pt-6 border-t border-border">
+            <h3 className="text-sm font-semibold text-muted-foreground mb-4">Unassigned (No Manager)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {unassigned.map(emp => renderEmployeeCard(emp))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 
-  const totalGroups = hierarchy.reduce((sum, d) => sum + d.groups.length, 0);
-  const totalTeams = hierarchy.reduce((sum, d) => sum + getAllDeptTeams(d).length, 0);
-
   return (
-    <div ref={ref} className="space-y-6 animate-fade-in">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setViewMode('structure')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'structure' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-accent hover:bg-accent/80 text-foreground'
-            }`}
-          >
-            <Building2 size={16} className="inline mr-2" />
-            Structure
-          </button>
-          <button
-            onClick={() => setViewMode('hierarchy')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'hierarchy' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-accent hover:bg-accent/80 text-foreground'
-            }`}
-          >
-            <User size={16} className="inline mr-2" />
-            Reporting
-          </button>
-          <button
-            onClick={() => setViewMode('team')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'team' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-accent hover:bg-accent/80 text-foreground'
-            }`}
-          >
-            <Users size={16} className="inline mr-2" />
-            Teams
-          </button>
+    <div ref={ref} className="glass-card p-6 animate-fade-in">
+      {/* Header Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">View:</span>
+          <div className="flex bg-secondary/50 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('structure')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'structure' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Building2 size={12} className="inline mr-1.5" />
+              Structure
+            </button>
+            <button
+              onClick={() => setViewMode('hierarchy')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'hierarchy' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <User size={12} className="inline mr-1.5" />
+              Reporting
+            </button>
+            <button
+              onClick={() => setViewMode('team')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                viewMode === 'team' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Users size={12} className="inline mr-1.5" />
+              Teams
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           <button
             onClick={expandAll}
-            className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
           >
             Expand All
           </button>
           <button
             onClick={collapseAll}
-            className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs bg-secondary hover:bg-secondary/80 rounded-lg transition-colors"
           >
             Collapse All
           </button>
         </div>
       </div>
 
-      {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-primary">{employees.length}</p>
-          <p className="text-xs text-muted-foreground">Total Employees</p>
+      {/* Stats */}
+      <div className="flex items-center gap-6 mb-6 pb-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-primary" />
+          <span className="text-sm font-medium">{employees.length} Employees</span>
         </div>
-        <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-purple-500">{hierarchy.length}</p>
-          <p className="text-xs text-muted-foreground">Departments</p>
+        <div className="flex items-center gap-2">
+          <Building2 size={14} className="text-purple-500" />
+          <span className="text-sm font-medium">{hierarchy.length} Departments</span>
         </div>
-        <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-blue-500">{totalGroups}</p>
-          <p className="text-xs text-muted-foreground">Groups</p>
+        <div className="flex items-center gap-2">
+          <FolderTree size={14} className="text-blue-500" />
+          <span className="text-sm font-medium">{hierarchy.reduce((sum, d) => sum + d.groups.length, 0)} Groups</span>
         </div>
-        <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-green-500">{totalTeams}</p>
-          <p className="text-xs text-muted-foreground">Teams</p>
-        </div>
-        <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-primary">
-            {employees.filter(e => employees.some(other => other.managerId === e.id)).length}
-          </p>
-          <p className="text-xs text-muted-foreground">Managers</p>
+        <div className="flex items-center gap-2">
+          <Users size={14} className="text-green-500" />
+          <span className="text-sm font-medium">{Object.keys(teamGroups).length} Teams</span>
         </div>
       </div>
 
-      {/* View Content */}
+      {/* Content */}
       {viewMode === 'structure' && renderStructureView()}
       {viewMode === 'hierarchy' && renderHierarchyView()}
       {viewMode === 'team' && renderTeamView()}
+
+      {/* Add Department Dialog */}
+      <Dialog open={showAddDeptDialog} onOpenChange={setShowAddDeptDialog}>
+        <DialogContent className="bg-background border border-border">
+          <DialogHeader>
+            <DialogTitle>Add Department</DialogTitle>
+            <DialogDescription>Create a new department in your organization.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Department name"
+            onKeyDown={(e) => e.key === 'Enter' && handleAddDept()}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setNewName(''); setShowAddDeptDialog(false); }}>Cancel</Button>
+            <Button onClick={handleAddDept}>Add Department</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Group Dialog */}
+      <Dialog open={!!showAddGroupDialog} onOpenChange={(open) => !open && setShowAddGroupDialog(null)}>
+        <DialogContent className="bg-background border border-border">
+          <DialogHeader>
+            <DialogTitle>Add Group</DialogTitle>
+            <DialogDescription>Create a new group in {showAddGroupDialog}.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Group name"
+            onKeyDown={(e) => e.key === 'Enter' && showAddGroupDialog && handleAddGroup(showAddGroupDialog)}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setNewName(''); setShowAddGroupDialog(null); }}>Cancel</Button>
+            <Button onClick={() => showAddGroupDialog && handleAddGroup(showAddGroupDialog)}>Add Group</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Team Dialog */}
+      <Dialog open={!!showAddTeamDialog} onOpenChange={(open) => !open && setShowAddTeamDialog(null)}>
+        <DialogContent className="bg-background border border-border">
+          <DialogHeader>
+            <DialogTitle>Add Team</DialogTitle>
+            <DialogDescription>
+              Create a new team {showAddTeamDialog?.group ? `in ${showAddTeamDialog.group}` : `directly under ${showAddTeamDialog?.dept}`}.
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="Team name"
+            onKeyDown={(e) => e.key === 'Enter' && showAddTeamDialog && handleAddTeam(showAddTeamDialog.dept, showAddTeamDialog.group)}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => { setNewName(''); setShowAddTeamDialog(null); }}>Cancel</Button>
+            <Button onClick={() => showAddTeamDialog && handleAddTeam(showAddTeamDialog.dept, showAddTeamDialog.group)}>Add Team</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });
