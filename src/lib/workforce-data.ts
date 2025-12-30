@@ -1,16 +1,25 @@
 // Configuration & Constants - Hierarchy: Department → Group → Team
 // Each level has a required manager: Department Manager, Group Manager, Team Leader
+// Teams can be under groups OR directly under departments
 
-// New structured hierarchy type
+// Team structure with leader
+export interface TeamInfo {
+  name: string;
+  teamLeaderId?: number; // Employee ID of team leader
+}
+
+// Group structure with teams
 export interface GroupStructure {
   name: string;
-  teams: string[];
+  teams: string[]; // Team names within this group
   groupManagerId?: number; // Employee ID of group manager
 }
 
+// Department structure - can have groups AND direct teams
 export interface DepartmentStructure {
   name: string;
-  groups: GroupStructure[];
+  groups: GroupStructure[]; // Groups with their teams
+  directTeams: string[]; // Teams directly under department (no group)
   departmentManagerId?: number; // Employee ID of department manager
 }
 
@@ -21,7 +30,7 @@ export type HierarchyStructure = DepartmentStructure[];
 export const getDepartmentsFlat = (hierarchy: HierarchyStructure): Record<string, string[]> => {
   const flat: Record<string, string[]> = {};
   hierarchy.forEach(dept => {
-    const allTeams: string[] = [];
+    const allTeams: string[] = [...(dept.directTeams || [])];
     dept.groups.forEach(group => {
       allTeams.push(...group.teams);
     });
@@ -30,15 +39,27 @@ export const getDepartmentsFlat = (hierarchy: HierarchyStructure): Record<string
   return flat;
 };
 
+// Get all teams in a department (both direct and under groups)
+export const getAllDeptTeams = (dept: DepartmentStructure): string[] => {
+  const teams: string[] = [...(dept.directTeams || [])];
+  dept.groups.forEach(g => teams.push(...g.teams));
+  return teams;
+};
+
 // Get groups for a department
 export const getGroupsForDepartment = (hierarchy: HierarchyStructure, deptName: string): GroupStructure[] => {
   const dept = hierarchy.find(d => d.name === deptName);
   return dept?.groups || [];
 };
 
-// Get team's parent group
-export const getTeamGroup = (hierarchy: HierarchyStructure, teamName: string): { dept: DepartmentStructure; group: GroupStructure } | null => {
+// Get team's parent (either group or direct under department)
+export const getTeamParent = (hierarchy: HierarchyStructure, teamName: string): { dept: DepartmentStructure; group: GroupStructure | null } | null => {
   for (const dept of hierarchy) {
+    // Check direct teams first
+    if (dept.directTeams?.includes(teamName)) {
+      return { dept, group: null };
+    }
+    // Check groups
     for (const group of dept.groups) {
       if (group.teams.includes(teamName)) {
         return { dept, group };
@@ -48,11 +69,21 @@ export const getTeamGroup = (hierarchy: HierarchyStructure, teamName: string): {
   return null;
 };
 
+// Legacy: Get team's parent group (for backwards compatibility)
+export const getTeamGroup = (hierarchy: HierarchyStructure, teamName: string): { dept: DepartmentStructure; group: GroupStructure } | null => {
+  const parent = getTeamParent(hierarchy, teamName);
+  if (parent && parent.group) {
+    return { dept: parent.dept, group: parent.group };
+  }
+  return null;
+};
+
 // Initial hierarchy structure
 export const initialHierarchy: HierarchyStructure = [
   {
     name: 'Engineering',
     departmentManagerId: 100, // Victoria Palmer
+    directTeams: [], // Teams directly under department
     groups: [
       {
         name: 'Frontend',
@@ -77,6 +108,7 @@ export const initialHierarchy: HierarchyStructure = [
   {
     name: 'Product & Design',
     departmentManagerId: 200, // Patricia Stone
+    directTeams: [],
     groups: [
       {
         name: 'Product',
@@ -91,6 +123,7 @@ export const initialHierarchy: HierarchyStructure = [
   {
     name: 'Operations',
     departmentManagerId: 300, // Robert Kane
+    directTeams: ['Executive Office'], // Example direct team
     groups: [
       {
         name: 'People & Culture',

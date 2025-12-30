@@ -216,11 +216,20 @@ export const useWorkforceData = () => {
     }
   }, [pushToHistory]);
 
-  // Delete team
-  const deleteTeam = useCallback((dept: string, groupName: string, teamName: string) => {
+  // Delete team (from group or direct)
+  const deleteTeam = useCallback((dept: string, groupName: string | null, teamName: string) => {
     pushToHistory();
     setHierarchy(prev => prev.map(d => {
       if (d.name !== dept) return d;
+      
+      if (groupName === null) {
+        // Direct team under department
+        return {
+          ...d,
+          directTeams: (d.directTeams || []).filter(t => t !== teamName)
+        };
+      }
+      
       return {
         ...d,
         groups: d.groups.map(g => {
@@ -232,9 +241,9 @@ export const useWorkforceData = () => {
         }).filter(g => g.teams.length > 0) // Remove empty groups
       };
     }));
-    // Move employees from deleted team to group level
+    // Move employees from deleted team
     setMasterEmployees(prev => prev.map(e => 
-      e.team === teamName ? { ...e, team: groupName } : e
+      e.team === teamName ? { ...e, team: groupName || dept } : e
     ));
     // Remove team structure
     setMasterTeamStructures(prev => prev.filter(t => t.teamName !== teamName));
@@ -278,7 +287,7 @@ export const useWorkforceData = () => {
   // Add department
   const addDepartment = useCallback((name: string) => {
     pushToHistory();
-    setHierarchy(prev => [...prev, { name, groups: [] }]);
+    setHierarchy(prev => [...prev, { name, groups: [], directTeams: [] }]);
   }, [pushToHistory]);
 
   // Add group to department
@@ -295,10 +304,20 @@ export const useWorkforceData = () => {
   }, [pushToHistory]);
 
   // Add team to group
-  const addTeam = useCallback((dept: string, groupName: string, teamName: string) => {
+  const addTeam = useCallback((dept: string, groupName: string | null, teamName: string) => {
     pushToHistory();
     setHierarchy(prev => prev.map(d => {
       if (d.name !== dept) return d;
+      
+      if (groupName === null) {
+        // Add as direct team under department
+        if ((d.directTeams || []).includes(teamName)) return d;
+        return {
+          ...d,
+          directTeams: [...(d.directTeams || []), teamName]
+        };
+      }
+      
       return {
         ...d,
         groups: d.groups.map(g => {
@@ -312,6 +331,11 @@ export const useWorkforceData = () => {
       };
     }));
   }, [pushToHistory]);
+
+  // Add direct team to department (convenience method)
+  const addDirectTeam = useCallback((dept: string, teamName: string) => {
+    addTeam(dept, null, teamName);
+  }, [addTeam]);
 
   // Clear all data and reset to initial
   const resetToInitial = useCallback(() => {
@@ -367,6 +391,7 @@ export const useWorkforceData = () => {
     addDepartment,
     addGroup,
     addTeam,
+    addDirectTeam,
     // Undo/Redo
     undo,
     redo,

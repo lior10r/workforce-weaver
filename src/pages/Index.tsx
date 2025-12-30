@@ -209,26 +209,12 @@ const Index = () => {
     }
   };
 
-  const handleAddTeamFull = (dept: string, groupName: string, teamName: string) => {
+  const handleAddTeamFull = (dept: string, groupName: string | null, teamName: string) => {
     addTeam(dept, groupName, teamName);
     setScopeFilter(prev => ({
       ...prev,
       teams: [...prev.teams, teamName]
     }));
-  };
-  
-  // Wrapper for deleteTeam to match old Sidebar interface (2 args instead of 3)
-  const handleDeleteTeam = (dept: string, teamName: string) => {
-    // Find the group containing this team
-    const deptData = hierarchy.find(d => d.name === dept);
-    if (deptData) {
-      for (const group of deptData.groups) {
-        if (group.teams.includes(teamName)) {
-          deleteTeam(dept, group.name, teamName);
-          return;
-        }
-      }
-    }
   };
 
   const handleDeleteEmployee = (employeeId: number) => {

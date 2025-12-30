@@ -1,12 +1,12 @@
 import { useState, useMemo, forwardRef } from 'react';
-import { ChevronDown, ChevronRight, User, Users, Building2, AlertCircle } from 'lucide-react';
-import { Employee, TeamStructure } from '@/lib/workforce-data';
+import { ChevronDown, ChevronRight, User, Users, Building2, AlertCircle, FolderTree, Crown } from 'lucide-react';
+import { Employee, TeamStructure, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface OrgChartProps {
   employees: Employee[];
   teamStructures: TeamStructure[];
-  departments: Record<string, string[]>;
+  hierarchy: HierarchyStructure;
   onEditEmployee?: (employee: Employee) => void;
 }
 
@@ -15,16 +15,16 @@ interface OrgNode {
   directReports: OrgNode[];
 }
 
-export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, teamStructures, departments, onEditEmployee }, ref) => {
+export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, teamStructures, hierarchy, onEditEmployee }, ref) => {
   const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set());
-  const [viewMode, setViewMode] = useState<'hierarchy' | 'department' | 'team'>('hierarchy');
+  const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<'hierarchy' | 'structure' | 'team'>('structure');
 
   // Build org tree from manager relationships
   const orgTree = useMemo(() => {
-    const employeeMap = new Map(employees.map(e => [e.id, e]));
     const childrenMap = new Map<number | null, Employee[]>();
     
-    // Group employees by their manager
     employees.forEach(emp => {
       const managerId = emp.managerId || null;
       if (!childrenMap.has(managerId)) {
@@ -33,7 +33,6 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
       childrenMap.get(managerId)!.push(emp);
     });
 
-    // Build tree recursively
     const buildNode = (employee: Employee): OrgNode => {
       const directReports = childrenMap.get(employee.id) || [];
       return {
@@ -44,33 +43,11 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
       };
     };
 
-    // Get root nodes (employees without managers)
     const rootEmployees = childrenMap.get(null) || [];
     return rootEmployees.map(buildNode).sort((a, b) => 
       a.employee.name.localeCompare(b.employee.name)
     );
   }, [employees]);
-
-  // Group by department
-  const departmentGroups = useMemo(() => {
-    const groups: Record<string, Employee[]> = {};
-    Object.keys(departments).forEach(dept => {
-      groups[dept] = [];
-    });
-    
-    employees.forEach(emp => {
-      // Find which department this employee's team belongs to
-      for (const [dept, teams] of Object.entries(departments)) {
-        if (teams.includes(emp.team)) {
-          if (!groups[dept]) groups[dept] = [];
-          groups[dept].push(emp);
-          break;
-        }
-      }
-    });
-    
-    return groups;
-  }, [employees, departments]);
 
   // Group by team
   const teamGroups = useMemo(() => {
@@ -85,21 +62,40 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
   const toggleNode = (id: number) => {
     setExpandedNodes(prev => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleDept = (name: string) => {
+    setExpandedDepts(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
 
   const expandAll = () => {
     setExpandedNodes(new Set(employees.map(e => e.id)));
+    setExpandedDepts(new Set(hierarchy.map(d => d.name)));
+    setExpandedGroups(new Set(hierarchy.flatMap(d => d.groups.map(g => `${d.name}-${g.name}`))));
   };
 
   const collapseAll = () => {
     setExpandedNodes(new Set());
+    setExpandedDepts(new Set());
+    setExpandedGroups(new Set());
   };
 
   const getStatusColor = (status: string) => {
@@ -107,12 +103,30 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
       case 'On Course': return 'bg-emerald-500';
       case 'Training': return 'bg-amber-500';
       case 'Parental Leave': return 'bg-blue-500';
-      case 'Notice': return 'bg-red-500';
+      case 'Notice Period': return 'bg-red-500';
       default: return 'bg-muted';
     }
   };
 
-  const renderEmployeeCard = (employee: Employee, isLeader?: boolean) => {
+  const getManagerBadge = (level: 'dept' | 'group' | 'team') => {
+    const colors = {
+      dept: 'bg-purple-500/20 text-purple-500',
+      group: 'bg-blue-500/20 text-blue-500',
+      team: 'bg-green-500/20 text-green-500'
+    };
+    const labels = {
+      dept: 'Dept Manager',
+      group: 'Group Manager',
+      team: 'Team Lead'
+    };
+    return (
+      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold uppercase ${colors[level]}`}>
+        {labels[level]}
+      </span>
+    );
+  };
+
+  const renderEmployeeCard = (employee: Employee, managerLevel?: 'dept' | 'group' | 'team') => {
     const manager = employee.managerId ? employees.find(e => e.id === employee.managerId) : null;
     
     return (
@@ -126,7 +140,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                   ? 'bg-potential-color/10 border-potential-color/30 border-dashed' 
                   : 'bg-card border-border hover:border-primary/50 hover:shadow-md'
                 }
-                ${isLeader ? 'ring-2 ring-primary/30' : ''}
+                ${managerLevel ? 'ring-2 ring-primary/20' : ''}
               `}
               onClick={() => onEditEmployee?.(employee)}
             >
@@ -134,13 +148,9 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
                 {employee.name.split(' ').map(n => n[0]).join('')}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-sm truncate">{employee.name}</span>
-                  {isLeader && (
-                    <span className="text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded-full font-bold uppercase">
-                      Lead
-                    </span>
-                  )}
+                  {managerLevel && getManagerBadge(managerLevel)}
                   {employee.isPotential && (
                     <span className="text-[9px] bg-potential-color/20 text-potential-color px-1.5 py-0.5 rounded-full font-bold">
                       Potential
@@ -200,32 +210,162 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
     );
   };
 
-  const renderDepartmentView = () => (
+  // Structure View: Department → Group → Team with managers
+  const renderStructureView = () => (
     <div className="space-y-6">
-      {Object.entries(departmentGroups).map(([dept, emps]) => {
-        if (emps.length === 0) return null;
-        
-        const teamsByDept = departments[dept] || [];
-        
+      {hierarchy.map(dept => {
+        const isDeptExpanded = expandedDepts.has(dept.name);
+        const deptManager = dept.departmentManagerId ? employees.find(e => e.id === dept.departmentManagerId) : null;
+        const allDeptTeams = getAllDeptTeams(dept);
+        const deptEmployees = employees.filter(e => allDeptTeams.includes(e.team) || e.dept === dept.name);
+
         return (
-          <div key={dept} className="glass-card p-6">
-            <div className="flex items-center gap-3 mb-4">
+          <div key={dept.name} className="glass-card overflow-hidden">
+            {/* Department Header */}
+            <div 
+              className="flex items-center gap-3 p-4 bg-primary/5 border-b border-border cursor-pointer hover:bg-primary/10 transition-colors"
+              onClick={() => toggleDept(dept.name)}
+            >
+              <button className="p-1 hover:bg-accent rounded">
+                {isDeptExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+              </button>
               <div className="p-2 bg-primary/10 rounded-lg">
                 <Building2 size={20} className="text-primary" />
               </div>
-              <div>
-                <h3 className="text-lg font-bold">{dept}</h3>
-                <p className="text-xs text-muted-foreground">{emps.length} employees • {teamsByDept.length} teams</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold">{dept.name}</h3>
+                  <span className="text-xs text-muted-foreground">
+                    {deptEmployees.length} employees • {dept.groups.length} groups • {allDeptTeams.length} teams
+                  </span>
+                </div>
+                {deptManager && (
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Crown size={12} className="text-purple-500" />
+                    {deptManager.name} (Department Manager)
+                  </p>
+                )}
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {emps.sort((a, b) => a.name.localeCompare(b.name)).map(emp => {
-                const structure = teamStructures.find(s => s.teamName === emp.team);
-                const isLeader = structure?.teamLeader === emp.id;
-                return renderEmployeeCard(emp, isLeader);
-              })}
-            </div>
+
+            {isDeptExpanded && (
+              <div className="p-4 space-y-4">
+                {/* Department Manager Card */}
+                {deptManager && (
+                  <div className="mb-4">
+                    {renderEmployeeCard(deptManager, 'dept')}
+                  </div>
+                )}
+
+                {/* Direct Teams (under department) */}
+                {dept.directTeams && dept.directTeams.length > 0 && (
+                  <div className="mb-4 p-4 bg-accent/30 rounded-xl">
+                    <h4 className="text-sm font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                      <Users size={14} />
+                      Direct Teams
+                    </h4>
+                    <div className="space-y-4">
+                      {dept.directTeams.map(teamName => {
+                        const teamMembers = employees.filter(e => e.team === teamName);
+                        const structure = teamStructures.find(s => s.teamName === teamName);
+                        const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+
+                        return (
+                          <div key={teamName} className="bg-background/50 rounded-lg p-3">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Users size={12} className="text-primary" />
+                              <span className="text-sm font-medium">{teamName}</span>
+                              <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {teamLeader && renderEmployeeCard(teamLeader, 'team')}
+                              {teamMembers.filter(m => m.id !== teamLeader?.id).map(emp => renderEmployeeCard(emp))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Groups */}
+                {dept.groups.map(group => {
+                  const groupKey = `${dept.name}-${group.name}`;
+                  const isGroupExpanded = expandedGroups.has(groupKey);
+                  const groupManager = group.groupManagerId ? employees.find(e => e.id === group.groupManagerId) : null;
+                  const groupTeamMembers = employees.filter(e => group.teams.includes(e.team));
+
+                  return (
+                    <div key={group.name} className="border border-border rounded-xl overflow-hidden">
+                      {/* Group Header */}
+                      <div 
+                        className="flex items-center gap-3 p-3 bg-accent/30 cursor-pointer hover:bg-accent/50 transition-colors"
+                        onClick={() => toggleGroup(groupKey)}
+                      >
+                        <button className="p-0.5 hover:bg-accent rounded">
+                          {isGroupExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                        <FolderTree size={16} className="text-blue-500" />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-semibold">{group.name}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              {groupTeamMembers.length} employees • {group.teams.length} teams
+                            </span>
+                          </div>
+                          {groupManager && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Crown size={10} className="text-blue-500" />
+                              {groupManager.name} (Group Manager)
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {isGroupExpanded && (
+                        <div className="p-3 space-y-3">
+                          {/* Group Manager Card */}
+                          {groupManager && (
+                            <div className="mb-2">
+                              {renderEmployeeCard(groupManager, 'group')}
+                            </div>
+                          )}
+
+                          {/* Teams in Group */}
+                          {group.teams.map(teamName => {
+                            const teamMembers = employees.filter(e => e.team === teamName);
+                            const structure = teamStructures.find(s => s.teamName === teamName);
+                            const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+
+                            return (
+                              <div key={teamName} className="bg-background/50 rounded-lg p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Users size={12} className="text-green-500" />
+                                  <span className="text-sm font-medium">{teamName}</span>
+                                  <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                                  {teamLeader && (
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                      • <Crown size={8} className="text-green-500" /> {teamLeader.name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                                  {teamLeader && renderEmployeeCard(teamLeader, 'team')}
+                                  {teamMembers.filter(m => m.id !== teamLeader?.id).map(emp => renderEmployeeCard(emp))}
+                                  {teamMembers.length === 0 && (
+                                    <p className="text-xs text-muted-foreground italic col-span-full">No team members</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         );
       })}
@@ -237,60 +377,30 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
       {Object.entries(teamGroups).map(([team, emps]) => {
         const structure = teamStructures.find(s => s.teamName === team);
         const leader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
-        const missingRoles = structure?.requiredRoles 
-          ? Object.entries(structure.requiredRoles).filter(
-              ([role, count]) => emps.filter(e => e.role === role).length < count
-            ).map(([role, count]) => ({ role, count: count as number }))
-          : [];
         
         return (
           <div key={team} className="glass-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Users size={20} className="text-primary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold">{team}</h3>
-                  <p className="text-xs text-muted-foreground">
-                    {emps.length} members
-                    {structure?.targetSize && ` / ${structure.targetSize} target`}
-                    {leader && ` • Led by ${leader.name}`}
-                  </p>
-                </div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Users size={20} className="text-primary" />
               </div>
-              
-              {missingRoles.length > 0 && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <div className="flex items-center gap-1 text-status-warning text-xs">
-                        <AlertCircle size={14} />
-                        <span>{missingRoles.length} missing</span>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <div className="space-y-1">
-                        <p className="font-semibold text-xs">Missing Roles:</p>
-                        {missingRoles.map((req, i) => (
-                          <p key={i} className="text-xs">{req.role}: need {req.count - emps.filter(e => e.role === req.role).length} more</p>
-                        ))}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+              <div>
+                <h3 className="text-lg font-bold">{team}</h3>
+                <p className="text-xs text-muted-foreground">
+                  {emps.length} members
+                  {leader && ` • Led by ${leader.name}`}
+                </p>
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
               {emps.sort((a, b) => {
-                // Sort leader first
                 if (structure?.teamLeader === a.id) return -1;
                 if (structure?.teamLeader === b.id) return 1;
                 return a.name.localeCompare(b.name);
               }).map(emp => {
                 const isLeader = structure?.teamLeader === emp.id;
-                return renderEmployeeCard(emp, isLeader);
+                return renderEmployeeCard(emp, isLeader ? 'team' : undefined);
               })}
             </div>
           </div>
@@ -313,7 +423,6 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
         orgTree.map(node => renderOrgNode(node))
       )}
       
-      {/* Unassigned employees (those without managers who also have no reports) */}
       {employees.filter(e => !e.managerId && !employees.some(other => other.managerId === e.id)).length > 0 && orgTree.length > 0 && (
         <div className="mt-8">
           <h4 className="text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wider">
@@ -329,11 +438,25 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
     </div>
   );
 
+  const totalGroups = hierarchy.reduce((sum, d) => sum + d.groups.length, 0);
+  const totalTeams = hierarchy.reduce((sum, d) => sum + getAllDeptTeams(d).length, 0);
+
   return (
     <div ref={ref} className="space-y-6 animate-fade-in">
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex gap-2">
+          <button
+            onClick={() => setViewMode('structure')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              viewMode === 'structure' 
+                ? 'bg-primary text-primary-foreground' 
+                : 'bg-accent hover:bg-accent/80 text-foreground'
+            }`}
+          >
+            <Building2 size={16} className="inline mr-2" />
+            Structure
+          </button>
           <button
             onClick={() => setViewMode('hierarchy')}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -343,18 +466,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
             }`}
           >
             <User size={16} className="inline mr-2" />
-            Hierarchy
-          </button>
-          <button
-            onClick={() => setViewMode('department')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'department' 
-                ? 'bg-primary text-primary-foreground' 
-                : 'bg-accent hover:bg-accent/80 text-foreground'
-            }`}
-          >
-            <Building2 size={16} className="inline mr-2" />
-            Departments
+            Reporting
           </button>
           <button
             onClick={() => setViewMode('team')}
@@ -369,36 +481,38 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
           </button>
         </div>
 
-        {viewMode === 'hierarchy' && orgTree.length > 0 && (
-          <div className="flex gap-2">
-            <button
-              onClick={expandAll}
-              className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
-            >
-              Expand All
-            </button>
-            <button
-              onClick={collapseAll}
-              className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
-            >
-              Collapse All
-            </button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <button
+            onClick={expandAll}
+            className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+          >
+            Expand All
+          </button>
+          <button
+            onClick={collapseAll}
+            className="px-3 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+          >
+            Collapse All
+          </button>
+        </div>
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <div className="glass-card p-4">
           <p className="text-2xl font-bold text-primary">{employees.length}</p>
           <p className="text-xs text-muted-foreground">Total Employees</p>
         </div>
         <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-primary">{Object.keys(departments).length}</p>
+          <p className="text-2xl font-bold text-purple-500">{hierarchy.length}</p>
           <p className="text-xs text-muted-foreground">Departments</p>
         </div>
         <div className="glass-card p-4">
-          <p className="text-2xl font-bold text-primary">{Object.keys(teamGroups).length}</p>
+          <p className="text-2xl font-bold text-blue-500">{totalGroups}</p>
+          <p className="text-xs text-muted-foreground">Groups</p>
+        </div>
+        <div className="glass-card p-4">
+          <p className="text-2xl font-bold text-green-500">{totalTeams}</p>
           <p className="text-xs text-muted-foreground">Teams</p>
         </div>
         <div className="glass-card p-4">
@@ -410,8 +524,8 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({ employees, 
       </div>
 
       {/* View Content */}
+      {viewMode === 'structure' && renderStructureView()}
       {viewMode === 'hierarchy' && renderHierarchyView()}
-      {viewMode === 'department' && renderDepartmentView()}
       {viewMode === 'team' && renderTeamView()}
     </div>
   );
