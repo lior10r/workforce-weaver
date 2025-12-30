@@ -630,6 +630,43 @@ const Index = () => {
               teamStructures={teamStructures}
               onConfigureTeam={handleConfigureTeam}
               employeeDiffMap={employeeDiffMap}
+              hierarchy={hierarchy}
+              onAddDepartment={handleAddDepartment}
+              onAddGroup={addGroup}
+              onAddTeam={handleAddTeamFull}
+              onDeleteDepartment={deleteDepartment}
+              onDeleteGroup={deleteGroup}
+              onDeleteTeam={deleteTeam}
+              onSetDepartmentManager={(dept, id) => {
+                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
+              }}
+              onSetGroupManager={(dept, groupName, id) => {
+                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, groups: d.groups.map(g => g.name === groupName ? { ...g, groupManagerId: id || undefined } : g) } : d));
+              }}
+              onSetTeamLeader={(teamName, id) => {
+                setMasterTeamStructures(prev => {
+                  const existing = prev.find(s => s.teamName === teamName);
+                  if (existing) {
+                    return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
+                  }
+                  let teamDept = '';
+                  let teamGroup = '';
+                  for (const dept of hierarchy) {
+                    if (dept.directTeams?.includes(teamName)) {
+                      teamDept = dept.name;
+                      break;
+                    }
+                    for (const group of dept.groups) {
+                      if (group.teams.includes(teamName)) {
+                        teamDept = dept.name;
+                        teamGroup = group.name;
+                        break;
+                      }
+                    }
+                  }
+                  return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
+                });
+              }}
             />
           )}
 
@@ -678,7 +715,23 @@ const Index = () => {
                   if (existing) {
                     return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
                   }
-                  return [...prev, { teamName, department: '', requiredRoles: {}, teamLeader: id || undefined }];
+                  // Find the team's parent info from hierarchy
+                  let teamDept = '';
+                  let teamGroup = '';
+                  for (const dept of hierarchy) {
+                    if (dept.directTeams?.includes(teamName)) {
+                      teamDept = dept.name;
+                      break;
+                    }
+                    for (const group of dept.groups) {
+                      if (group.teams.includes(teamName)) {
+                        teamDept = dept.name;
+                        teamGroup = group.name;
+                        break;
+                      }
+                    }
+                  }
+                  return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
                 });
               }}
             />
