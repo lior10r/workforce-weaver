@@ -31,14 +31,14 @@ interface SidebarProps {
   view: string;
   setView: (view: string) => void;
   scopeFilter: ScopeFilter;
-  setScopeFilter: (filter: ScopeFilter) => void;
+  setScopeFilter: (filter: ScopeFilter | ((prev: ScopeFilter) => ScopeFilter)) => void;
   hierarchy: HierarchyStructure;
   onAddDepartment: (name: string) => void;
   onAddGroup: (dept: string, groupName: string) => void;
-  onAddTeam: (dept: string, groupName: string, teamName: string) => void;
+  onAddTeam: (dept: string, groupName: string | null, teamName: string) => void;
   onDeleteDepartment?: (dept: string) => void;
   onDeleteGroup?: (dept: string, groupName: string) => void;
-  onDeleteTeam?: (dept: string, groupName: string, teamName: string) => void;
+  onDeleteTeam?: (dept: string, groupName: string | null, teamName: string) => void;
 }
 
 export const Sidebar = ({ 
@@ -56,13 +56,14 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const [showAddDept, setShowAddDept] = useState(false);
   const [showAddGroup, setShowAddGroup] = useState<string | null>(null);
-  const [showAddTeam, setShowAddTeam] = useState<{ dept: string; group: string } | null>(null);
+  const [showAddTeam, setShowAddTeam] = useState<{ dept: string; group: string | null } | null>(null);
+  const [showAddDirectTeam, setShowAddDirectTeam] = useState<string | null>(null);
   const [newDeptName, setNewDeptName] = useState('');
   const [newGroupName, setNewGroupName] = useState('');
   const [newTeamName, setNewTeamName] = useState('');
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string; team?: string } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string | null; team?: string } | null>(null);
 
   const handleAddDept = () => {
     if (newDeptName.trim()) {
@@ -80,11 +81,12 @@ export const Sidebar = ({
     }
   };
 
-  const handleAddTeam = (dept: string, group: string) => {
+  const handleAddTeam = (dept: string, group: string | null) => {
     if (newTeamName.trim()) {
       onAddTeam(dept, group, newTeamName.trim());
       setNewTeamName('');
       setShowAddTeam(null);
+      setShowAddDirectTeam(null);
     }
   };
 
@@ -100,9 +102,9 @@ export const Sidebar = ({
     );
   };
 
-  // Get all teams in a department
-  const getDeptTeams = (dept: { name: string; groups: GroupStructure[] }): string[] => {
-    const teams: string[] = [];
+  // Get all teams in a department (including direct teams)
+  const getDeptTeams = (dept: { name: string; groups: GroupStructure[]; directTeams?: string[] }): string[] => {
+    const teams: string[] = [...(dept.directTeams || [])];
     dept.groups.forEach(g => teams.push(...g.teams));
     return teams;
   };
@@ -549,9 +551,103 @@ export const Sidebar = ({
                         </div>
                       );
                     })}
-                    {dept.groups.length === 0 && (
-                      <p className="text-[10px] text-muted-foreground/50 italic ml-4 py-1">No groups</p>
+                    {dept.groups.length === 0 && (!dept.directTeams || dept.directTeams.length === 0) && (
+                      <p className="text-[10px] text-muted-foreground/50 italic ml-4 py-1">No groups or teams</p>
                     )}
+                    
+                    {/* Direct Teams (under department, not in groups) */}
+                    {dept.directTeams && dept.directTeams.length > 0 && (
+                      <div className="mt-1 pt-1 border-t border-border/30">
+                        <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1 ml-1">Direct Teams</p>
+                        {dept.directTeams.map(team => (
+                          <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/20 rounded transition-colors group/team">
+                            <Checkbox 
+                              id={`dteam-${team}`}
+                              checked={scopeFilter.teams.includes(team)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setScopeFilter(prev => ({ ...prev, teams: [...prev.teams, team] }));
+                                } else {
+                                  setScopeFilter(prev => ({ ...prev, teams: prev.teams.filter(t => t !== team) }));
+                                }
+                              }}
+                              className="h-2.5 w-2.5"
+                            />
+                            <Users size={8} className="text-primary/60" />
+                            <label 
+                              htmlFor={`dteam-${team}`}
+                              className="text-[10px] text-muted-foreground/80 cursor-pointer truncate flex-1"
+                            >
+                              {team}
+                            </label>
+                            {onDeleteTeam && (
+                              deleteConfirm?.type === 'team' && deleteConfirm.dept === dept.name && deleteConfirm.group === null && deleteConfirm.team === team ? (
+                                <div className="flex items-center gap-1">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteTeam(dept.name, null, team);
+                                      setDeleteConfirm(null);
+                                    }}
+                                    className="p-0.5 bg-destructive text-destructive-foreground rounded text-[7px] font-bold"
+                                  >
+                                    Yes
+                                  </button>
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteConfirm(null);
+                                    }}
+                                    className="p-0.5 bg-muted text-muted-foreground rounded text-[7px]"
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteConfirm({ type: 'team', dept: dept.name, group: null, team });
+                                  }}
+                                  className="p-0.5 opacity-0 group-hover/team:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-all"
+                                  title="Delete Team"
+                                >
+                                  <Trash2 size={8} />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add Direct Team */}
+                    <div className="mt-1 pt-1 border-t border-border/30">
+                      {showAddDirectTeam === dept.name ? (
+                        <div className="flex gap-1 animate-fade-in">
+                          <input 
+                            type="text"
+                            value={newTeamName}
+                            onChange={(e) => setNewTeamName(e.target.value)}
+                            placeholder="Direct team name"
+                            className="input-field flex-1 text-[9px] py-0.5 px-1.5"
+                            onKeyDown={(e) => e.key === 'Enter' && handleAddTeam(dept.name, null)}
+                            autoFocus
+                          />
+                          <button onClick={() => handleAddTeam(dept.name, null)} className="btn-primary py-0.5 px-1.5 text-[9px]">
+                            Add
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={() => setShowAddDirectTeam(dept.name)}
+                          className="flex items-center gap-1 text-[9px] text-primary/70 hover:text-primary hover:underline"
+                        >
+                          <Plus size={8} />
+                          Add Direct Team
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
