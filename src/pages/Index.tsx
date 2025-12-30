@@ -463,12 +463,6 @@ const Index = () => {
         scopeFilter={scopeFilter}
         setScopeFilter={setScopeFilter}
         hierarchy={hierarchy}
-        onAddDepartment={handleAddDepartment}
-        onAddGroup={addGroup}
-        onAddTeam={handleAddTeamFull}
-        onDeleteDepartment={deleteDepartment}
-        onDeleteGroup={deleteGroup}
-        onDeleteTeam={deleteTeam}
       />
 
       {/* Main Content */}
@@ -666,6 +660,27 @@ const Index = () => {
               teamStructures={teamStructures}
               hierarchy={hierarchy}
               onEditEmployee={handleEditEmployee}
+              onAddDepartment={handleAddDepartment}
+              onAddGroup={addGroup}
+              onAddTeam={handleAddTeamFull}
+              onDeleteDepartment={deleteDepartment}
+              onDeleteGroup={deleteGroup}
+              onDeleteTeam={deleteTeam}
+              onSetDepartmentManager={(dept, id) => {
+                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
+              }}
+              onSetGroupManager={(dept, groupName, id) => {
+                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, groups: d.groups.map(g => g.name === groupName ? { ...g, groupManagerId: id || undefined } : g) } : d));
+              }}
+              onSetTeamLeader={(teamName, id) => {
+                setMasterTeamStructures(prev => {
+                  const existing = prev.find(s => s.teamName === teamName);
+                  if (existing) {
+                    return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
+                  }
+                  return [...prev, { teamName, department: '', requiredRoles: {}, teamLeader: id || undefined }];
+                });
+              }}
             />
           )}
         </main>

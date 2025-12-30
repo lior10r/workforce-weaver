@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Plus, ChevronDown, ChevronRight, GitBranch, Trash2, FolderTree } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,12 +33,6 @@ interface SidebarProps {
   scopeFilter: ScopeFilter;
   setScopeFilter: (filter: ScopeFilter | ((prev: ScopeFilter) => ScopeFilter)) => void;
   hierarchy: HierarchyStructure;
-  onAddDepartment: (name: string) => void;
-  onAddGroup: (dept: string, groupName: string) => void;
-  onAddTeam: (dept: string, groupName: string | null, teamName: string) => void;
-  onDeleteDepartment?: (dept: string) => void;
-  onDeleteGroup?: (dept: string, groupName: string) => void;
-  onDeleteTeam?: (dept: string, groupName: string | null, teamName: string) => void;
 }
 
 export const Sidebar = ({ 
@@ -46,49 +40,10 @@ export const Sidebar = ({
   setView, 
   scopeFilter, 
   setScopeFilter,
-  hierarchy,
-  onAddDepartment,
-  onAddGroup,
-  onAddTeam,
-  onDeleteDepartment,
-  onDeleteGroup,
-  onDeleteTeam
+  hierarchy
 }: SidebarProps) => {
-  const [showAddDept, setShowAddDept] = useState(false);
-  const [showAddGroup, setShowAddGroup] = useState<string | null>(null);
-  const [showAddTeam, setShowAddTeam] = useState<{ dept: string; group: string | null } | null>(null);
-  const [showAddDirectTeam, setShowAddDirectTeam] = useState<string | null>(null);
-  const [newDeptName, setNewDeptName] = useState('');
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newTeamName, setNewTeamName] = useState('');
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string | null; team?: string } | null>(null);
-
-  const handleAddDept = () => {
-    if (newDeptName.trim()) {
-      onAddDepartment(newDeptName.trim());
-      setNewDeptName('');
-      setShowAddDept(false);
-    }
-  };
-
-  const handleAddGroup = (dept: string) => {
-    if (newGroupName.trim()) {
-      onAddGroup(dept, newGroupName.trim());
-      setNewGroupName('');
-      setShowAddGroup(null);
-    }
-  };
-
-  const handleAddTeam = (dept: string, group: string | null) => {
-    if (newTeamName.trim()) {
-      onAddTeam(dept, group, newTeamName.trim());
-      setNewTeamName('');
-      setShowAddTeam(null);
-      setShowAddDirectTeam(null);
-    }
-  };
 
   const toggleDeptExpanded = (dept: string) => {
     setExpandedDepts(prev => 
@@ -164,10 +119,9 @@ export const Sidebar = ({
     setScopeFilter({ departments: newDepts, groups: newGroups, teams: newTeams });
   };
 
-  const handleTeamCheckbox = (deptName: string, groupName: string, team: string, checked: boolean) => {
+  const handleTeamCheckbox = (deptName: string, groupName: string | null, team: string, checked: boolean) => {
     const dept = hierarchy.find(d => d.name === deptName);
-    const group = dept?.groups.find(g => g.name === groupName);
-    if (!group) return;
+    if (!dept) return;
     
     let newTeams: string[];
     
@@ -177,20 +131,28 @@ export const Sidebar = ({
       newTeams = scopeFilter.teams.filter(t => t !== team);
     }
     
-    // Update group checkbox state
-    const allTeamsInGroupChecked = group.teams.every(t => newTeams.includes(t));
-    let newGroups = allTeamsInGroupChecked 
-      ? [...scopeFilter.groups.filter(g => g !== groupName), groupName]
-      : scopeFilter.groups.filter(g => g !== groupName);
-    
-    // Update dept checkbox state
-    const deptGroups = getDeptGroups(dept!);
-    const allGroupsChecked = deptGroups.every(g => newGroups.includes(g));
-    const newDepts = allGroupsChecked 
-      ? [...scopeFilter.departments.filter(d => d !== deptName), deptName]
-      : scopeFilter.departments.filter(d => d !== deptName);
+    if (groupName) {
+      const group = dept.groups.find(g => g.name === groupName);
+      if (!group) return;
+      
+      // Update group checkbox state
+      const allTeamsInGroupChecked = group.teams.every(t => newTeams.includes(t));
+      let newGroups = allTeamsInGroupChecked 
+        ? [...scopeFilter.groups.filter(g => g !== groupName), groupName]
+        : scopeFilter.groups.filter(g => g !== groupName);
+      
+      // Update dept checkbox state
+      const deptGroups = getDeptGroups(dept);
+      const allGroupsChecked = deptGroups.every(g => newGroups.includes(g));
+      const newDepts = allGroupsChecked 
+        ? [...scopeFilter.departments.filter(d => d !== deptName), deptName]
+        : scopeFilter.departments.filter(d => d !== deptName);
 
-    setScopeFilter({ departments: newDepts, groups: newGroups, teams: newTeams });
+      setScopeFilter({ departments: newDepts, groups: newGroups, teams: newTeams });
+    } else {
+      // Direct team under department
+      setScopeFilter(prev => ({ ...prev, teams: newTeams }));
+    }
   };
 
   const selectAll = () => {
@@ -202,6 +164,9 @@ export const Sidebar = ({
         allGroups.push(g.name);
         allTeams.push(...g.teams);
       });
+      if (d.directTeams) {
+        allTeams.push(...d.directTeams);
+      }
     });
     setScopeFilter({ departments: allDepts, groups: allGroups, teams: allTeams });
   };
@@ -297,7 +262,7 @@ export const Sidebar = ({
             return (
               <div key={dept.name} className="space-y-1">
                 {/* Department Row */}
-                <div className="flex items-center gap-2 py-1 px-1 hover:bg-accent/50 rounded-lg transition-colors group">
+                <div className="flex items-center gap-2 py-1 px-1 hover:bg-accent/50 rounded-lg transition-colors">
                   <button
                     onClick={() => toggleDeptExpanded(dept.name)}
                     className="p-0.5 hover:bg-accent rounded transition-colors"
@@ -317,75 +282,9 @@ export const Sidebar = ({
                   >
                     {dept.name}
                   </label>
-                  <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowAddGroup(showAddGroup === dept.name ? null : dept.name);
-                      }}
-                      className="p-1 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-                      title="Add Group"
-                    >
-                      <Plus size={10} />
-                    </button>
-                    {onDeleteDepartment && (
-                      deleteConfirm?.type === 'dept' && deleteConfirm.dept === dept.name ? (
-                        <div className="flex items-center gap-1 ml-1">
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteDepartment(dept.name);
-                              setDeleteConfirm(null);
-                            }}
-                            className="p-1 bg-destructive text-destructive-foreground rounded text-[9px] font-bold"
-                          >
-                            Yes
-                          </button>
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeleteConfirm(null);
-                            }}
-                            className="p-1 bg-muted text-muted-foreground rounded text-[9px]"
-                          >
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirm({ type: 'dept', dept: dept.name });
-                          }}
-                          className="p-1 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-colors"
-                          title="Delete Department"
-                        >
-                          <Trash2 size={10} />
-                        </button>
-                      )
-                    )}
-                  </div>
                 </div>
 
-                {/* Add Group Input */}
-                {showAddGroup === dept.name && (
-                  <div className="flex gap-1 ml-5 mt-1 animate-fade-in">
-                    <input 
-                      type="text"
-                      value={newGroupName}
-                      onChange={(e) => setNewGroupName(e.target.value)}
-                      placeholder="Group name"
-                      className="input-field flex-1 text-[10px] py-1 px-2"
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddGroup(dept.name)}
-                      autoFocus
-                    />
-                    <button onClick={() => handleAddGroup(dept.name)} className="btn-primary py-1 px-2 text-[10px]">
-                      Add
-                    </button>
-                  </div>
-                )}
-
-                {/* Groups */}
+                {/* Groups & Direct Teams */}
                 {isDeptExpanded && (
                   <div className="ml-5 space-y-0.5 animate-fade-in">
                     {dept.groups.map(group => {
@@ -398,7 +297,7 @@ export const Sidebar = ({
                       return (
                         <div key={group.name} className="space-y-0.5">
                           {/* Group Row */}
-                          <div className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/30 rounded transition-colors group/group">
+                          <div className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/30 rounded transition-colors">
                             <button
                               onClick={() => toggleGroupExpanded(groupKey)}
                               className="p-0.5 hover:bg-accent rounded transition-colors"
@@ -419,79 +318,13 @@ export const Sidebar = ({
                             >
                               {group.name}
                             </label>
-                            <div className="flex items-center gap-0.5 opacity-0 group-hover/group:opacity-100 transition-opacity">
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setShowAddTeam(showAddTeam?.dept === dept.name && showAddTeam?.group === group.name ? null : { dept: dept.name, group: group.name });
-                                }}
-                                className="p-0.5 bg-primary/10 hover:bg-primary/20 text-primary rounded transition-colors"
-                                title="Add Team"
-                              >
-                                <Plus size={8} />
-                              </button>
-                              {onDeleteGroup && (
-                                deleteConfirm?.type === 'group' && deleteConfirm.dept === dept.name && deleteConfirm.group === group.name ? (
-                                  <div className="flex items-center gap-1">
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        onDeleteGroup(dept.name, group.name);
-                                        setDeleteConfirm(null);
-                                      }}
-                                      className="p-0.5 bg-destructive text-destructive-foreground rounded text-[8px] font-bold"
-                                    >
-                                      Yes
-                                    </button>
-                                    <button 
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteConfirm(null);
-                                      }}
-                                      className="p-0.5 bg-muted text-muted-foreground rounded text-[8px]"
-                                    >
-                                      No
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirm({ type: 'group', dept: dept.name, group: group.name });
-                                    }}
-                                    className="p-0.5 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-all"
-                                    title="Delete Group"
-                                  >
-                                    <Trash2 size={8} />
-                                  </button>
-                                )
-                              )}
-                            </div>
                           </div>
 
-                          {/* Add Team Input */}
-                          {showAddTeam?.dept === dept.name && showAddTeam?.group === group.name && (
-                            <div className="flex gap-1 ml-6 mt-0.5 animate-fade-in">
-                              <input 
-                                type="text"
-                                value={newTeamName}
-                                onChange={(e) => setNewTeamName(e.target.value)}
-                                placeholder="Team name"
-                                className="input-field flex-1 text-[9px] py-0.5 px-1.5"
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddTeam(dept.name, group.name)}
-                                autoFocus
-                              />
-                              <button onClick={() => handleAddTeam(dept.name, group.name)} className="btn-primary py-0.5 px-1.5 text-[9px]">
-                                Add
-                              </button>
-                            </div>
-                          )}
-
-                          {/* Teams */}
+                          {/* Teams in Group */}
                           {isGroupExpanded && (
                             <div className="ml-6 space-y-0 animate-fade-in">
                               {group.teams.map(team => (
-                                <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/20 rounded transition-colors group/team">
+                                <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/20 rounded transition-colors">
                                   <Checkbox 
                                     id={`team-${team}`}
                                     checked={scopeFilter.teams.includes(team)}
@@ -505,42 +338,6 @@ export const Sidebar = ({
                                   >
                                     {team}
                                   </label>
-                                  {onDeleteTeam && (
-                                    deleteConfirm?.type === 'team' && deleteConfirm.dept === dept.name && deleteConfirm.group === group.name && deleteConfirm.team === team ? (
-                                      <div className="flex items-center gap-1">
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onDeleteTeam(dept.name, group.name, team);
-                                            setDeleteConfirm(null);
-                                          }}
-                                          className="p-0.5 bg-destructive text-destructive-foreground rounded text-[7px] font-bold"
-                                        >
-                                          Yes
-                                        </button>
-                                        <button 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setDeleteConfirm(null);
-                                          }}
-                                          className="p-0.5 bg-muted text-muted-foreground rounded text-[7px]"
-                                        >
-                                          No
-                                        </button>
-                                      </div>
-                                    ) : (
-                                      <button 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDeleteConfirm({ type: 'team', dept: dept.name, group: group.name, team });
-                                        }}
-                                        className="p-0.5 opacity-0 group-hover/team:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-all"
-                                        title="Delete Team"
-                                      >
-                                        <Trash2 size={8} />
-                                      </button>
-                                    )
-                                  )}
                                 </div>
                               ))}
                               {group.teams.length === 0 && (
@@ -551,26 +348,17 @@ export const Sidebar = ({
                         </div>
                       );
                     })}
-                    {dept.groups.length === 0 && (!dept.directTeams || dept.directTeams.length === 0) && (
-                      <p className="text-[10px] text-muted-foreground/50 italic ml-4 py-1">No groups or teams</p>
-                    )}
                     
                     {/* Direct Teams (under department, not in groups) */}
                     {dept.directTeams && dept.directTeams.length > 0 && (
                       <div className="mt-1 pt-1 border-t border-border/30">
                         <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1 ml-1">Direct Teams</p>
                         {dept.directTeams.map(team => (
-                          <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/20 rounded transition-colors group/team">
+                          <div key={team} className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/20 rounded transition-colors">
                             <Checkbox 
                               id={`dteam-${team}`}
                               checked={scopeFilter.teams.includes(team)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setScopeFilter(prev => ({ ...prev, teams: [...prev.teams, team] }));
-                                } else {
-                                  setScopeFilter(prev => ({ ...prev, teams: prev.teams.filter(t => t !== team) }));
-                                }
-                              }}
+                              onCheckedChange={(checked) => handleTeamCheckbox(dept.name, null, team, checked as boolean)}
                               className="h-2.5 w-2.5"
                             />
                             <Users size={8} className="text-primary/60" />
@@ -580,107 +368,19 @@ export const Sidebar = ({
                             >
                               {team}
                             </label>
-                            {onDeleteTeam && (
-                              deleteConfirm?.type === 'team' && deleteConfirm.dept === dept.name && deleteConfirm.group === null && deleteConfirm.team === team ? (
-                                <div className="flex items-center gap-1">
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onDeleteTeam(dept.name, null, team);
-                                      setDeleteConfirm(null);
-                                    }}
-                                    className="p-0.5 bg-destructive text-destructive-foreground rounded text-[7px] font-bold"
-                                  >
-                                    Yes
-                                  </button>
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteConfirm(null);
-                                    }}
-                                    className="p-0.5 bg-muted text-muted-foreground rounded text-[7px]"
-                                  >
-                                    No
-                                  </button>
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteConfirm({ type: 'team', dept: dept.name, group: null, team });
-                                  }}
-                                  className="p-0.5 opacity-0 group-hover/team:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded transition-all"
-                                  title="Delete Team"
-                                >
-                                  <Trash2 size={8} />
-                                </button>
-                              )
-                            )}
                           </div>
                         ))}
                       </div>
                     )}
-                    
-                    {/* Add Direct Team */}
-                    <div className="mt-1 pt-1 border-t border-border/30">
-                      {showAddDirectTeam === dept.name ? (
-                        <div className="flex gap-1 animate-fade-in">
-                          <input 
-                            type="text"
-                            value={newTeamName}
-                            onChange={(e) => setNewTeamName(e.target.value)}
-                            placeholder="Direct team name"
-                            className="input-field flex-1 text-[9px] py-0.5 px-1.5"
-                            onKeyDown={(e) => e.key === 'Enter' && handleAddTeam(dept.name, null)}
-                            autoFocus
-                          />
-                          <button onClick={() => handleAddTeam(dept.name, null)} className="btn-primary py-0.5 px-1.5 text-[9px]">
-                            Add
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={() => setShowAddDirectTeam(dept.name)}
-                          className="flex items-center gap-1 text-[9px] text-primary/70 hover:text-primary hover:underline"
-                        >
-                          <Plus size={8} />
-                          Add Direct Team
-                        </button>
-                      )}
-                    </div>
+
+                    {dept.groups.length === 0 && (!dept.directTeams || dept.directTeams.length === 0) && (
+                      <p className="text-[10px] text-muted-foreground/50 italic ml-4 py-1">No groups or teams</p>
+                    )}
                   </div>
                 )}
               </div>
             );
           })}
-        </div>
-
-        {/* Add Department */}
-        <div className="mt-3 pt-3 border-t border-border">
-          {showAddDept ? (
-            <div className="flex gap-1 animate-fade-in">
-              <input 
-                type="text"
-                value={newDeptName}
-                onChange={(e) => setNewDeptName(e.target.value)}
-                placeholder="Department name"
-                className="input-field flex-1 text-xs py-1.5"
-                onKeyDown={(e) => e.key === 'Enter' && handleAddDept()}
-                autoFocus
-              />
-              <button onClick={handleAddDept} className="btn-primary py-1.5 px-2 text-xs">
-                Add
-              </button>
-            </div>
-          ) : (
-            <button 
-              onClick={() => setShowAddDept(true)}
-              className="flex items-center gap-2 text-xs text-primary hover:underline w-full"
-            >
-              <Plus size={12} />
-              Add Department
-            </button>
-          )}
         </div>
       </div>
     </aside>

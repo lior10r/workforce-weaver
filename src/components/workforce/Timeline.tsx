@@ -167,7 +167,9 @@ export const Timeline = ({
   const renderEmployeeRow = (
     emp: Employee, 
     transferInfo?: TransferInfo,
-    isTransfer = false
+    isTransfer = false,
+    isManagerRow = false,
+    managerLevel?: 'dept' | 'group'
   ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
@@ -194,8 +196,14 @@ export const Timeline = ({
     const diffInfo = employeeDiffMap?.get(emp.id);
     const diffStatus = diffInfo?.status;
 
+    // Manager badge colors
+    const managerBadgeColors = {
+      dept: 'bg-purple-500/20 text-purple-500',
+      group: 'bg-blue-500/20 text-blue-500'
+    };
+
     return (
-      <div key={isTransfer ? `transfer-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''} ${getDiffBorderColor(diffStatus)} ${getDiffBgColor(diffStatus)}`}>
+      <div key={isTransfer ? `transfer-${emp.id}` : `${isManagerRow ? 'mgr-' : ''}${emp.id}`} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''} ${getDiffBorderColor(diffStatus)} ${getDiffBgColor(diffStatus)} ${isManagerRow ? 'bg-accent/20' : ''}`}>
         {/* Name & Quick Actions */}
         <div className="w-72 pr-6 flex justify-between items-center">
           <Tooltip>
@@ -204,6 +212,11 @@ export const Timeline = ({
                 <div className="flex items-center gap-2">
                   {isPotential && <HelpCircle size={12} className="text-potential" />}
                   <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
+                  {managerLevel && (
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${managerBadgeColors[managerLevel]}`}>
+                      {managerLevel === 'dept' ? 'Dept Mgr' : 'Group Mgr'}
+                    </span>
+                  )}
                   {diffStatus && diffStatus !== 'unchanged' && (
                     <span className={`px-1 py-0.5 rounded text-[8px] font-bold uppercase ${
                       diffStatus === 'added' ? 'bg-emerald-500/20 text-emerald-500' :
@@ -544,14 +557,17 @@ export const Timeline = ({
     );
   };
 
-  // Build full hierarchy structure: Department → Group → Team with managers
+  // Build full hierarchy structure: Department → Group → Team with managers on their own lines
   const renderHierarchySection = () => {
+    // Get all teams from hierarchy to identify team members vs managers
+    const allTeams = hierarchy.flatMap(d => [...getAllDeptTeams(d)]);
+    
     return hierarchy.map(dept => {
       const deptManager = dept.departmentManagerId ? allEmployees.find(e => e.id === dept.departmentManagerId) : null;
       const allDeptTeams = getAllDeptTeams(dept);
       const deptEmployees = employees.filter(e => allDeptTeams.includes(e.team) || e.dept === dept.name);
       
-      if (deptEmployees.length === 0) return null;
+      if (deptEmployees.length === 0 && !deptManager) return null;
 
       return (
         <div key={dept.name} className="mb-10">
@@ -565,14 +581,21 @@ export const Timeline = ({
                   ({deptEmployees.length} employees • {dept.groups.length} groups • {allDeptTeams.length} teams)
                 </span>
               </div>
-              {deptManager && (
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <Crown size={10} className="text-purple-500" />
-                  {deptManager.name} (Department Manager)
-                </p>
-              )}
             </div>
           </div>
+
+          {/* Department Manager - on their own line, not in any team */}
+          {deptManager && (
+            <div className="mb-4 ml-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Crown size={12} className="text-purple-500" />
+                <span className="text-xs font-semibold text-purple-500 uppercase tracking-wide">Department Manager</span>
+              </div>
+              <div className="space-y-3">
+                {renderEmployeeRow(deptManager, undefined, false, true, 'dept')}
+              </div>
+            </div>
+          )}
 
           {/* Direct Teams (under department, no group) */}
           {dept.directTeams && dept.directTeams.length > 0 && (
@@ -614,7 +637,7 @@ export const Timeline = ({
             const groupManager = group.groupManagerId ? allEmployees.find(e => e.id === group.groupManagerId) : null;
             const groupEmployees = employees.filter(e => group.teams.includes(e.team));
             
-            if (groupEmployees.length === 0) return null;
+            if (groupEmployees.length === 0 && !groupManager) return null;
 
             return (
               <div key={group.name} className="ml-4 mb-6">
@@ -628,18 +651,26 @@ export const Timeline = ({
                         ({groupEmployees.length} employees • {group.teams.length} teams)
                       </span>
                     </div>
-                    {groupManager && (
-                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                        <Crown size={8} className="text-blue-500" />
-                        {groupManager.name} (Group Manager)
-                      </p>
-                    )}
                   </div>
                 </div>
 
+                {/* Group Manager - on their own line, not in any team */}
+                {groupManager && (
+                  <div className="mb-4 ml-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Crown size={10} className="text-blue-500" />
+                      <span className="text-[10px] font-semibold text-blue-500 uppercase tracking-wide">Group Manager</span>
+                    </div>
+                    <div className="space-y-3">
+                      {renderEmployeeRow(groupManager, undefined, false, true, 'group')}
+                    </div>
+                  </div>
+                )}
+
                 {/* Teams in Group */}
                 {group.teams.map(teamName => {
-                  const teamMembers = employees.filter(e => e.team === teamName);
+                  // Filter out group manager from team members
+                  const teamMembers = employees.filter(e => e.team === teamName && e.id !== groupManager?.id);
                   if (teamMembers.length === 0) return null;
 
                   const structure = teamStructures.find(s => s.teamName === teamName);
@@ -780,6 +811,14 @@ export const Timeline = ({
           <div className="flex items-center gap-2">
             <div className="w-8 h-2 potential-stripe rounded" />
             <span className="text-muted-foreground">Potential Hire</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-500 rounded text-[9px] font-bold">Dept Mgr</span>
+            <span className="text-muted-foreground">Department Manager</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-500 rounded text-[9px] font-bold">Group Mgr</span>
+            <span className="text-muted-foreground">Group Manager</span>
           </div>
           {(employeeDiffMap || eventDiffMap) && (
             <>
