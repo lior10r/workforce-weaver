@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users } from 'lucide-react';
-import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, DEPARTMENTS } from '@/lib/workforce-data';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown } from 'lucide-react';
+import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type GroupingMode = 'team' | 'hierarchy';
@@ -15,7 +15,7 @@ interface TimelineProps {
   teamStructures?: TeamStructure[];
   employeeDiffMap?: Map<number, { status: DiffStatus; changes?: string[] }>;
   eventDiffMap?: Map<number, { status: DiffStatus }>;
-  departments?: Record<string, string[]>;
+  hierarchy?: HierarchyStructure;
 }
 
 interface TrainingPeriod {
@@ -57,8 +57,9 @@ export const Timeline = ({
   teamStructures = [],
   employeeDiffMap,
   eventDiffMap,
-  departments = DEPARTMENTS
+  hierarchy = []
 }: TimelineProps) => {
+  const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
@@ -543,65 +544,131 @@ export const Timeline = ({
     );
   };
 
-  // Build hierarchy structure: Department -> Teams -> Employees
-  const getHierarchyStructure = () => {
-    const structure: { dept: string; teams: { name: string; members: Employee[] }[] }[] = [];
-    
-    Object.entries(departments).forEach(([dept, deptTeams]) => {
-      const deptEmployees = employees.filter(e => e.dept === dept);
-      const teams: { name: string; members: Employee[] }[] = [];
-      
-      // Department-level managers (not in any team)
-      const deptManagers = deptEmployees.filter(e => !deptTeams.includes(e.team));
-      if (deptManagers.length > 0) {
-        teams.push({ name: `${dept} (Managers)`, members: deptManagers });
-      }
-      
-      // Regular teams
-      deptTeams.forEach(teamName => {
-        const teamMembers = deptEmployees.filter(e => e.team === teamName);
-        if (teamMembers.length > 0) {
-          teams.push({ name: teamName, members: teamMembers });
-        }
-      });
-      
-      if (teams.length > 0) {
-        structure.push({ dept, teams });
-      }
-    });
-    
-    return structure;
-  };
-
+  // Build full hierarchy structure: Department → Group → Team with managers
   const renderHierarchySection = () => {
-    const structure = getHierarchyStructure();
-    
-    return structure.map(({ dept, teams }) => (
-      <div key={dept} className="mb-10">
-        {/* Department Header */}
-        <div className="flex items-center gap-3 mb-4 pb-2 border-b-2 border-primary/30">
-          <Building2 size={16} className="text-primary" />
-          <h2 className="text-base font-bold text-primary uppercase tracking-wide">{dept}</h2>
-          <span className="text-xs text-muted-foreground">
-            ({teams.reduce((sum, t) => sum + t.members.length, 0)} employees)
-          </span>
-        </div>
-        
-        {/* Teams within Department */}
-        {teams.map(({ name, members }) => (
-          <div key={name} className="mb-6 ml-4">
-            <div className="flex items-center gap-2 mb-3 pb-1 border-b border-border/50">
-              <Users size={12} className="text-muted-foreground" />
-              <h3 className="text-sm font-semibold text-foreground">{name}</h3>
-              <span className="text-[10px] text-muted-foreground">({members.length})</span>
-            </div>
-            <div className="space-y-3">
-              {members.map(emp => renderEmployeeRow(emp))}
+    return hierarchy.map(dept => {
+      const deptManager = dept.departmentManagerId ? allEmployees.find(e => e.id === dept.departmentManagerId) : null;
+      const allDeptTeams = getAllDeptTeams(dept);
+      const deptEmployees = employees.filter(e => allDeptTeams.includes(e.team) || e.dept === dept.name);
+      
+      if (deptEmployees.length === 0) return null;
+
+      return (
+        <div key={dept.name} className="mb-10">
+          {/* Department Header */}
+          <div className="flex items-center gap-3 mb-4 pb-2 border-b-2 border-primary/30">
+            <Building2 size={18} className="text-primary" />
+            <div className="flex-1">
+              <div className="flex items-center gap-3">
+                <h2 className="text-base font-bold text-primary uppercase tracking-wide">{dept.name}</h2>
+                <span className="text-xs text-muted-foreground">
+                  ({deptEmployees.length} employees • {dept.groups.length} groups • {allDeptTeams.length} teams)
+                </span>
+              </div>
+              {deptManager && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Crown size={10} className="text-purple-500" />
+                  {deptManager.name} (Department Manager)
+                </p>
+              )}
             </div>
           </div>
-        ))}
-      </div>
-    ));
+
+          {/* Direct Teams (under department, no group) */}
+          {dept.directTeams && dept.directTeams.length > 0 && (
+            <div className="ml-4 mb-6">
+              <div className="flex items-center gap-2 mb-3 pb-1 border-b border-border/50">
+                <Users size={12} className="text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">Direct Teams</h3>
+              </div>
+              {dept.directTeams.map(teamName => {
+                const teamMembers = employees.filter(e => e.team === teamName);
+                if (teamMembers.length === 0) return null;
+                
+                const structure = teamStructures.find(s => s.teamName === teamName);
+                const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader) : null;
+
+                return (
+                  <div key={teamName} className="mb-4 ml-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                      <span className="text-xs font-medium text-foreground">{teamName}</span>
+                      <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                      {teamLeader && (
+                        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                          • <Crown size={8} className="text-green-500" /> {teamLeader.name}
+                        </span>
+                      )}
+                    </div>
+                    <div className="space-y-3 ml-3">
+                      {teamMembers.map(emp => renderEmployeeRow(emp))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Groups */}
+          {dept.groups.map(group => {
+            const groupManager = group.groupManagerId ? allEmployees.find(e => e.id === group.groupManagerId) : null;
+            const groupEmployees = employees.filter(e => group.teams.includes(e.team));
+            
+            if (groupEmployees.length === 0) return null;
+
+            return (
+              <div key={group.name} className="ml-4 mb-6">
+                {/* Group Header */}
+                <div className="flex items-center gap-3 mb-3 pb-1 border-b border-border/50">
+                  <FolderTree size={14} className="text-blue-500" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold text-foreground">{group.name}</h3>
+                      <span className="text-[10px] text-muted-foreground">
+                        ({groupEmployees.length} employees • {group.teams.length} teams)
+                      </span>
+                    </div>
+                    {groupManager && (
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        <Crown size={8} className="text-blue-500" />
+                        {groupManager.name} (Group Manager)
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Teams in Group */}
+                {group.teams.map(teamName => {
+                  const teamMembers = employees.filter(e => e.team === teamName);
+                  if (teamMembers.length === 0) return null;
+
+                  const structure = teamStructures.find(s => s.teamName === teamName);
+                  const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader) : null;
+
+                  return (
+                    <div key={teamName} className="mb-4 ml-6">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                        <span className="text-xs font-medium text-foreground">{teamName}</span>
+                        <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                        {teamLeader && (
+                          <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                            • <Crown size={8} className="text-green-500" /> {teamLeader.name}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-3 ml-3">
+                        {teamMembers.map(emp => renderEmployeeRow(emp))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      );
+    });
   };
 
   return (

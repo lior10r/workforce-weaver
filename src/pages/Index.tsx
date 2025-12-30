@@ -624,7 +624,7 @@ const Index = () => {
               teamStructures={teamStructures}
               employeeDiffMap={employeeDiffMap}
               eventDiffMap={eventDiffMap}
-              departments={departments}
+              hierarchy={hierarchy}
             />
           )}
 
@@ -664,7 +664,7 @@ const Index = () => {
               ref={orgChartRef}
               employees={filteredEmployees}
               teamStructures={teamStructures}
-              departments={departments}
+              hierarchy={hierarchy}
               onEditEmployee={handleEditEmployee}
             />
           )}
