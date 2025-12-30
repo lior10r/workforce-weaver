@@ -33,6 +33,7 @@ import {
 
 interface ScopeFilter {
   departments: string[];
+  groups: string[];
   teams: string[];
 }
 
@@ -123,9 +124,14 @@ const Index = () => {
 
   // Other state
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>(() => {
-    const allDepts = Object.keys(departments);
-    const allTeams = Object.values(departments).flat();
-    return { departments: allDepts, teams: allTeams };
+    const allDepts = hierarchy.map(d => d.name);
+    const allGroups: string[] = [];
+    const allTeams: string[] = [];
+    hierarchy.forEach(d => d.groups.forEach(g => {
+      allGroups.push(g.name);
+      allTeams.push(...g.teams);
+    }));
+    return { departments: allDepts, groups: allGroups, teams: allTeams };
   });
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
@@ -139,15 +145,21 @@ const Index = () => {
   const [editingTeamStructure, setEditingTeamStructure] = useState<{ teamName: string; department: string } | null>(null);
   const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
 
-  // Update scope filter when departments change
+  // Update scope filter when hierarchy changes
   useEffect(() => {
-    const allDepts = Object.keys(departments);
-    const allTeams = Object.values(departments).flat();
+    const allDepts = hierarchy.map(d => d.name);
+    const allGroups: string[] = [];
+    const allTeams: string[] = [];
+    hierarchy.forEach(d => d.groups.forEach(g => {
+      allGroups.push(g.name);
+      allTeams.push(...g.teams);
+    }));
     setScopeFilter(prev => ({
       departments: prev.departments.filter(d => allDepts.includes(d)),
+      groups: prev.groups.filter(g => allGroups.includes(g)),
       teams: prev.teams.filter(t => allTeams.includes(t))
     }));
-  }, [departments]);
+  }, [hierarchy]);
 
   // Legacy hierarchy for compatibility with some components
   const legacyHierarchy: Hierarchy = useMemo(() => {
@@ -197,16 +209,12 @@ const Index = () => {
     }
   };
 
-  const handleAddTeam = (dept: string, teamName: string) => {
-    // For the new hierarchy, we need a group - for backwards compat, use first group or create one
-    const deptData = hierarchy.find(d => d.name === dept);
-    if (deptData && deptData.groups.length > 0) {
-      addTeam(dept, deptData.groups[0].name, teamName);
-      setScopeFilter(prev => ({
-        ...prev,
-        teams: [...prev.teams, teamName]
-      }));
-    }
+  const handleAddTeamFull = (dept: string, groupName: string, teamName: string) => {
+    addTeam(dept, groupName, teamName);
+    setScopeFilter(prev => ({
+      ...prev,
+      teams: [...prev.teams, teamName]
+    }));
   };
   
   // Wrapper for deleteTeam to match old Sidebar interface (2 args instead of 3)
@@ -409,6 +417,7 @@ const Index = () => {
     const allTeams = Object.values(importedDepartments).flat();
     setScopeFilter({
       departments: Object.keys(importedDepartments),
+      groups: [],
       teams: allTeams
     });
   };
@@ -427,6 +436,7 @@ const Index = () => {
       const allTeams = Object.values(data.departments).flat();
       setScopeFilter({
         departments: Object.keys(data.departments),
+        groups: [],
         teams: allTeams
       });
     }
@@ -466,11 +476,13 @@ const Index = () => {
         setView={setView} 
         scopeFilter={scopeFilter}
         setScopeFilter={setScopeFilter}
-        departments={departments}
+        hierarchy={hierarchy}
         onAddDepartment={handleAddDepartment}
-        onAddTeam={handleAddTeam}
+        onAddGroup={addGroup}
+        onAddTeam={handleAddTeamFull}
         onDeleteDepartment={deleteDepartment}
-        onDeleteTeam={handleDeleteTeam}
+        onDeleteGroup={deleteGroup}
+        onDeleteTeam={deleteTeam}
       />
 
       {/* Main Content */}
