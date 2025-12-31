@@ -1,6 +1,6 @@
 import { X, Building2, Trash2 } from 'lucide-react';
-import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, Hierarchy } from '@/lib/workforce-data';
-import { FormEvent, useState, useEffect } from 'react';
+import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, HierarchyStructure, getTeamParent } from '@/lib/workforce-data';
+import { FormEvent, useState, useEffect, useMemo } from 'react';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -8,30 +8,124 @@ interface EmployeeModalProps {
   onSubmit: (employee: Omit<Employee, 'id'>, id?: number) => void;
   onDelete?: (employeeId: number) => void;
   editingEmployee: Employee | null;
-  hierarchy: Hierarchy;
+  hierarchy: HierarchyStructure;
   departments: Record<string, string[]>;
   employees: Employee[];
 }
 
 export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [selectedDept, setSelectedDept] = useState(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
+  const [selectedDept, setSelectedDept] = useState(DEPARTMENT_NAMES[0]);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState('');
   const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
+  const [isGroupLevel, setIsGroupLevel] = useState(false);
+
+  // Get the department structure
+  const deptStructure = useMemo(() => 
+    hierarchy.find(d => d.name === selectedDept),
+    [hierarchy, selectedDept]
+  );
+
+  // Get available groups for selected department
+  const availableGroups = useMemo(() => 
+    deptStructure?.groups || [],
+    [deptStructure]
+  );
+
+  // Get available teams based on selected group or direct teams
+  const availableTeams = useMemo(() => {
+    if (!deptStructure) return [];
+    if (selectedGroup) {
+      const group = deptStructure.groups.find(g => g.name === selectedGroup);
+      return group?.teams || [];
+    }
+    // If no group selected, show direct teams
+    return deptStructure.directTeams || [];
+  }, [deptStructure, selectedGroup]);
+
+  // Auto-calculate manager based on hierarchy
+  const autoManager = useMemo(() => {
+    if (isDepartmentLevel) {
+      // Department manager reports to no one
+      return undefined;
+    }
+    
+    if (isGroupLevel && selectedGroup) {
+      // Group manager reports to department manager
+      return deptStructure?.departmentManagerId;
+    }
+    
+    if (selectedTeam && selectedGroup) {
+      // Team member reports to group manager if exists, else department manager
+      const group = deptStructure?.groups.find(g => g.name === selectedGroup);
+      return group?.groupManagerId || deptStructure?.departmentManagerId;
+    }
+    
+    if (selectedTeam && !selectedGroup) {
+      // Direct team member reports to department manager
+      return deptStructure?.departmentManagerId;
+    }
+    
+    return undefined;
+  }, [isDepartmentLevel, isGroupLevel, selectedDept, selectedGroup, selectedTeam, deptStructure]);
+
+  // Get manager name for display
+  const managerName = useMemo(() => {
+    if (autoManager) {
+      const manager = employees.find(e => e.id === autoManager);
+      return manager?.name || 'Unknown';
+    }
+    return 'No manager (Top-level)';
+  }, [autoManager, employees]);
 
   useEffect(() => {
     if (editingEmployee) {
       setSelectedDept(editingEmployee.dept);
-      setSelectedTeam(editingEmployee.team);
-      // Check if this is a department-level manager (team same as dept or not in team list)
+      
+      // Determine group and team
+      if (editingEmployee.group) {
+        const isGroupMgr = hierarchy.some(d => 
+          d.groups.some(g => g.name === editingEmployee.group && g.groupManagerId === editingEmployee.id)
+        );
+        setIsGroupLevel(isGroupMgr);
+        setSelectedGroup(editingEmployee.group);
+      } else {
+        setSelectedGroup(null);
+        setIsGroupLevel(false);
+      }
+      
+      // Check if department level manager
+      const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
+      setIsDepartmentLevel(isDeptMgr);
+      
+      // Set team
       const teamList = departments[editingEmployee.dept] || [];
-      setIsDepartmentLevel(!teamList.includes(editingEmployee.team));
+      const isInTeam = teamList.includes(editingEmployee.team);
+      setSelectedTeam(isInTeam ? editingEmployee.team : '');
     } else {
-      setSelectedDept(hierarchy.dept === 'All' ? DEPARTMENT_NAMES[0] : hierarchy.dept);
+      setSelectedDept(DEPARTMENT_NAMES[0]);
+      setSelectedGroup(null);
       setSelectedTeam('');
       setIsDepartmentLevel(false);
+      setIsGroupLevel(false);
     }
-  }, [editingEmployee, hierarchy.dept, isOpen, departments]);
+    setShowDeleteConfirm(false);
+  }, [editingEmployee, hierarchy, departments, isOpen]);
+
+  // Update team when group changes
+  useEffect(() => {
+    if (selectedGroup && availableTeams.length > 0 && !availableTeams.includes(selectedTeam)) {
+      setSelectedTeam(availableTeams[0]);
+    } else if (!selectedGroup) {
+      const directTeams = deptStructure?.directTeams || [];
+      if (directTeams.length > 0 && !directTeams.includes(selectedTeam)) {
+        setSelectedTeam(directTeams[0]);
+      } else if (directTeams.length === 0) {
+        setSelectedTeam('');
+      }
+    }
+  }, [selectedGroup, availableTeams, deptStructure]);
 
   if (!isOpen) return null;
 
@@ -39,43 +133,44 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     
-    const managerValue = formData.get('managerId') as string;
-    const dept = formData.get('dept') as string;
+    const dept = selectedDept;
     
-    // If department-level, use department name as team
-    const team = isDepartmentLevel ? dept : (formData.get('team') as string);
+    // Determine team based on level
+    let team: string;
+    let group: string | undefined;
     
-    const employeeData = {
+    if (isDepartmentLevel) {
+      team = dept; // Department level managers have dept as team
+      group = undefined;
+    } else if (isGroupLevel) {
+      team = selectedGroup || dept;
+      group = selectedGroup || undefined;
+    } else {
+      team = selectedTeam || dept;
+      group = selectedGroup || undefined;
+    }
+    
+    const employeeData: Omit<Employee, 'id'> = {
       name: formData.get('name') as string,
       dept: dept,
       team: team,
+      group: group,
       role: formData.get('role') as string,
       status: formData.get('status') as string,
       joined: formData.get('joined') as string,
       isPotential: formData.get('isPotential') === 'on',
-      managerId: managerValue ? Number(managerValue) : undefined,
+      managerId: autoManager,
+      managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
   };
 
   const deptList = Object.keys(departments);
-  const teamList = departments[selectedDept] || [];
-  
-  // Potential managers - anyone in same department or higher level
-  const potentialManagers = employees.filter(emp => 
-    emp.id !== editingEmployee?.id && 
-    (emp.dept === selectedDept || !teamList.includes(emp.team))
-  );
-
-  // Manager roles that typically don't belong to specific teams
-  const managerRoles = ['Engineering Manager', 'Product Manager', 'Architect'];
-  const selectedRole = editingEmployee?.role || ROLES[0];
-  const isManagerRole = managerRoles.includes(selectedRole);
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
-      <div className="bg-card border border-border w-full max-w-lg rounded-3xl p-8 shadow-2xl animate-slide-up">
+      <div className="bg-card border border-border w-full max-w-lg rounded-3xl p-8 shadow-2xl animate-slide-up max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-foreground">
             {editingEmployee ? 'Edit Personnel' : 'Personnel Intake'}
@@ -102,77 +197,115 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-                Department
-              </label>
-              <select 
-                name="dept" 
-                value={selectedDept}
-                onChange={(e) => {
-                  setSelectedDept(e.target.value);
-                  setSelectedTeam('');
-                }}
-                className="select-field w-full"
-              >
-                {deptList.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-                Team
-              </label>
-              {isDepartmentLevel ? (
-                <div className="input-field bg-accent/50 flex items-center gap-2 text-muted-foreground">
-                  <Building2 size={14} />
-                  <span>Department Level</span>
-                </div>
-              ) : (
-                <select 
-                  name="team" 
-                  value={selectedTeam || editingEmployee?.team || teamList[0] || ''}
-                  onChange={(e) => setSelectedTeam(e.target.value)}
-                  className="select-field w-full"
-                >
-                  {teamList.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-              )}
-            </div>
+          {/* Department */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+              Department
+            </label>
+            <select 
+              name="dept" 
+              value={selectedDept}
+              onChange={(e) => {
+                setSelectedDept(e.target.value);
+                setSelectedGroup(null);
+                setSelectedTeam('');
+              }}
+              className="select-field w-full"
+            >
+              {deptList.map(d => <option key={d} value={d}>{d}</option>)}
+            </select>
           </div>
 
-          {/* Department-level Manager Toggle */}
-          <div className="flex items-center gap-3 p-3 bg-primary/5 rounded-xl border border-primary/20">
+          {/* Department Manager Toggle */}
+          <div className="flex items-center gap-3 p-3 bg-purple-500/10 rounded-xl border border-purple-500/20">
             <input 
               type="checkbox" 
               id="isDepartmentLevel"
               checked={isDepartmentLevel}
-              onChange={(e) => setIsDepartmentLevel(e.target.checked)}
-              className="w-4 h-4 rounded border-border accent-primary"
+              onChange={(e) => {
+                setIsDepartmentLevel(e.target.checked);
+                if (e.target.checked) {
+                  setIsGroupLevel(false);
+                  setSelectedGroup(null);
+                }
+              }}
+              className="w-4 h-4 rounded border-border accent-purple-500"
             />
             <label htmlFor="isDepartmentLevel" className="text-sm text-muted-foreground cursor-pointer flex-1">
-              <span className="font-medium text-foreground">Department/Group Manager</span>
-              <p className="text-xs mt-0.5">Not assigned to a specific team (e.g., VP, Department Head, Group Manager)</p>
+              <span className="font-medium text-foreground">Department Manager</span>
+              <p className="text-xs mt-0.5">Head of the entire department</p>
             </label>
           </div>
 
-          {/* Manager Selection */}
-          <div>
+          {/* Group Selection (if not dept level) */}
+          {!isDepartmentLevel && availableGroups.length > 0 && (
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                Group
+              </label>
+              <select 
+                value={selectedGroup || ''}
+                onChange={(e) => setSelectedGroup(e.target.value || null)}
+                className="select-field w-full"
+              >
+                <option value="">-- Direct under Department --</option>
+                {availableGroups.map(g => <option key={g.name} value={g.name}>{g.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Group Manager Toggle (if group selected) */}
+          {!isDepartmentLevel && selectedGroup && (
+            <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-xl border border-blue-500/20">
+              <input 
+                type="checkbox" 
+                id="isGroupLevel"
+                checked={isGroupLevel}
+                onChange={(e) => setIsGroupLevel(e.target.checked)}
+                className="w-4 h-4 rounded border-border accent-blue-500"
+              />
+              <label htmlFor="isGroupLevel" className="text-sm text-muted-foreground cursor-pointer flex-1">
+                <span className="font-medium text-foreground">Group Manager</span>
+                <p className="text-xs mt-0.5">Manages all teams in {selectedGroup}</p>
+              </label>
+            </div>
+          )}
+
+          {/* Team Selection (if not dept or group level) */}
+          {!isDepartmentLevel && !isGroupLevel && (
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                Team
+              </label>
+              {availableTeams.length > 0 ? (
+                <select 
+                  name="team" 
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                  className="select-field w-full"
+                >
+                  {availableTeams.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              ) : (
+                <div className="input-field bg-accent/50 text-muted-foreground text-sm">
+                  No teams available. Create teams in Org Chart or Roster.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Auto-calculated Reports To (read-only display) */}
+          <div className="p-3 bg-accent/30 rounded-xl border border-border">
             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-              Reports To (Manager)
+              Reports To (Auto-assigned)
             </label>
-            <select 
-              name="managerId" 
-              defaultValue={editingEmployee?.managerId || ''}
-              className="select-field w-full"
-            >
-              <option value="">No manager (Top-level)</option>
-              {potentialManagers.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name} ({m.role}{!teamList.includes(m.team) ? ' - Dept Level' : ` - ${m.team}`})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2 text-sm text-foreground">
+              <Building2 size={14} className="text-primary" />
+              <span>{managerName}</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              Based on hierarchy: Team → Group Manager → Department Manager
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -746,7 +746,7 @@ const Index = () => {
         onSubmit={handleAddEmployee}
         onDelete={handleDeleteEmployee}
         editingEmployee={editingEmployee}
-        hierarchy={legacyHierarchy}
+        hierarchy={hierarchy}
         departments={departments}
         employees={employees}
       />
