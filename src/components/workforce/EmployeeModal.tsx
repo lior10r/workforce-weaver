@@ -1,5 +1,5 @@
-import { X, Building2, Trash2 } from 'lucide-react';
-import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, HierarchyStructure, getTeamParent } from '@/lib/workforce-data';
+import { X, Building2, Trash2, AlertTriangle } from 'lucide-react';
+import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect, useMemo } from 'react';
 
 interface EmployeeModalProps {
@@ -32,6 +32,12 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
     deptStructure?.groups || [],
     [deptStructure]
   );
+
+  // Get ALL available teams in the department
+  const allDeptTeams = useMemo(() => {
+    if (!deptStructure) return [];
+    return getAllDeptTeams(deptStructure);
+  }, [deptStructure]);
 
   // Get available teams based on selected group or direct teams
   const availableTeams = useMemo(() => {
@@ -79,6 +85,12 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
     return 'No manager (Top-level)';
   }, [autoManager, employees]);
 
+  // Check if form is valid for submission
+  const canSubmit = useMemo(() => {
+    if (isDepartmentLevel || isGroupLevel) return true;
+    return selectedTeam !== '';
+  }, [isDepartmentLevel, isGroupLevel, selectedTeam]);
+
   useEffect(() => {
     if (editingEmployee) {
       setSelectedDept(editingEmployee.dept);
@@ -99,38 +111,93 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
       setIsDepartmentLevel(isDeptMgr);
       
-      // Set team
-      const teamList = departments[editingEmployee.dept] || [];
-      const isInTeam = teamList.includes(editingEmployee.team);
+      // Set team - check if team is in the department's teams
+      const allTeams = departments[editingEmployee.dept] || [];
+      const isInTeam = allTeams.includes(editingEmployee.team);
       setSelectedTeam(isInTeam ? editingEmployee.team : '');
     } else {
-      setSelectedDept(DEPARTMENT_NAMES[0]);
+      // New employee - set sensible defaults
+      const firstDept = DEPARTMENT_NAMES[0];
+      setSelectedDept(firstDept);
       setSelectedGroup(null);
-      setSelectedTeam('');
       setIsDepartmentLevel(false);
       setIsGroupLevel(false);
+      
+      // Find first available team in the first department
+      const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
+      if (firstDeptStructure) {
+        const teams = getAllDeptTeams(firstDeptStructure);
+        if (teams.length > 0) {
+          setSelectedTeam(teams[0]);
+          // Set group if team belongs to a group
+          for (const group of firstDeptStructure.groups) {
+            if (group.teams.includes(teams[0])) {
+              setSelectedGroup(group.name);
+              break;
+            }
+          }
+        } else {
+          setSelectedTeam('');
+        }
+      }
     }
     setShowDeleteConfirm(false);
   }, [editingEmployee, hierarchy, departments, isOpen]);
 
   // Update team when group changes
   useEffect(() => {
+    if (isDepartmentLevel || isGroupLevel) return;
+    
     if (selectedGroup && availableTeams.length > 0 && !availableTeams.includes(selectedTeam)) {
       setSelectedTeam(availableTeams[0]);
     } else if (!selectedGroup) {
       const directTeams = deptStructure?.directTeams || [];
       if (directTeams.length > 0 && !directTeams.includes(selectedTeam)) {
         setSelectedTeam(directTeams[0]);
-      } else if (directTeams.length === 0) {
-        setSelectedTeam('');
+      } else if (directTeams.length === 0 && availableTeams.length === 0) {
+        // No teams available in this selection - try to find ANY team in the department
+        if (allDeptTeams.length > 0 && !allDeptTeams.includes(selectedTeam)) {
+          // Find a group that has teams
+          for (const group of (deptStructure?.groups || [])) {
+            if (group.teams.length > 0) {
+              setSelectedGroup(group.name);
+              setSelectedTeam(group.teams[0]);
+              break;
+            }
+          }
+        }
       }
     }
-  }, [selectedGroup, availableTeams, deptStructure]);
+  }, [selectedGroup, availableTeams, deptStructure, isDepartmentLevel, isGroupLevel, allDeptTeams]);
+
+  // When department changes, find first available team
+  useEffect(() => {
+    if (isDepartmentLevel || isGroupLevel) return;
+    
+    if (deptStructure && !allDeptTeams.includes(selectedTeam)) {
+      // Find first available team
+      if (deptStructure.directTeams && deptStructure.directTeams.length > 0) {
+        setSelectedGroup(null);
+        setSelectedTeam(deptStructure.directTeams[0]);
+      } else {
+        for (const group of deptStructure.groups) {
+          if (group.teams.length > 0) {
+            setSelectedGroup(group.name);
+            setSelectedTeam(group.teams[0]);
+            break;
+          }
+        }
+      }
+    }
+  }, [selectedDept, deptStructure, allDeptTeams, isDepartmentLevel, isGroupLevel]);
 
   if (!isOpen) return null;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    
+    if (!canSubmit) return;
+    
     const formData = new FormData(e.currentTarget);
     
     const dept = selectedDept;
@@ -146,7 +213,8 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
       team = selectedGroup || dept;
       group = selectedGroup || undefined;
     } else {
-      team = selectedTeam || dept;
+      // Regular team member - must have a valid team
+      team = selectedTeam;
       group = selectedGroup || undefined;
     }
     
@@ -283,12 +351,21 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
                   value={selectedTeam}
                   onChange={(e) => setSelectedTeam(e.target.value)}
                   className="select-field w-full"
+                  required
                 >
                   {availableTeams.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
+              ) : allDeptTeams.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="input-field bg-amber-500/10 text-amber-600 text-sm flex items-center gap-2">
+                    <AlertTriangle size={14} />
+                    No direct teams. Select a group above to assign to a team.
+                  </div>
+                </div>
               ) : (
-                <div className="input-field bg-accent/50 text-muted-foreground text-sm">
-                  No teams available. Create teams in Org Chart or Roster.
+                <div className="input-field bg-destructive/10 text-destructive text-sm flex items-center gap-2">
+                  <AlertTriangle size={14} />
+                  No teams in this department. Create teams first.
                 </div>
               )}
             </div>
@@ -406,7 +483,8 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
                 </button>
                 <button 
                   type="submit" 
-                  className="btn-primary flex-1 justify-center"
+                  disabled={!canSubmit}
+                  className="btn-primary flex-1 justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {editingEmployee ? 'Save Changes' : 'Confirm Hire'}
                 </button>
