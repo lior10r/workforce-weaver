@@ -667,6 +667,18 @@ const Index = () => {
                   return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
                 });
               }}
+              onBulkAssignManager={(employeeIds, managerId) => {
+                pushToHistory();
+                setMasterEmployeesDirect(prev => prev.map(emp => 
+                  employeeIds.includes(emp.id) ? { ...emp, managerId: managerId || undefined } : emp
+                ));
+              }}
+              onMoveEmployeeToTeam={(employeeId, teamName, dept, group) => {
+                pushToHistory();
+                setMasterEmployeesDirect(prev => prev.map(emp => 
+                  emp.id === employeeId ? { ...emp, team: teamName, dept, group } : emp
+                ));
+              }}
             />
           )}
 
