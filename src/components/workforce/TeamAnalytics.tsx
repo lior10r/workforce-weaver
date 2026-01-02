@@ -1,38 +1,27 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Employee, WorkforceEvent, getCapacityWeight, formatDate } from '@/lib/workforce-data';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TeamAnalyticsProps {
   employees: Employee[];
   events: WorkforceEvent[];
-  selectedTeam: string;
+  selectedTeams: string[]; // Array of selected team names from scope filter
   departments: Record<string, string[]>;
 }
 
-export const TeamAnalytics = ({ employees, events, selectedTeam: initialTeam, departments }: TeamAnalyticsProps) => {
-  // Local state for team selection
-  const [selectedTeam, setSelectedTeam] = useState(initialTeam === 'All' ? 'All' : initialTeam);
-
-  // Get all unique teams for selection
-  const allTeams = useMemo(() => {
-    const teams = new Set<string>();
-    Object.values(departments).forEach(teamList => {
-      teamList.forEach(team => teams.add(team));
-    });
-    return Array.from(teams).sort();
-  }, [departments]);
-
-  // Calculate capacity over time for the selected team
+export const TeamAnalytics = ({ employees, events, selectedTeams, departments }: TeamAnalyticsProps) => {
+  // Calculate capacity over time for all selected teams
   const capacityData = useMemo(() => {
     // Generate monthly data points from 2020 to 2030
     const dataPoints: { date: string; month: string; capacity: number; headcount: number }[] = [];
     const startDate = new Date('2020-01-01');
     const endDate = new Date('2030-12-31');
     
-    const teamEmployees = selectedTeam === 'All' 
-      ? employees 
-      : employees.filter(e => e.team === selectedTeam);
+    // Get all teams if none selected, otherwise filter by selected teams
+    const allTeams = Object.values(departments).flat();
+    const teamsToInclude = selectedTeams.length > 0 ? selectedTeams : allTeams;
+    
+    const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team));
 
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
@@ -66,14 +55,14 @@ export const TeamAnalytics = ({ employees, events, selectedTeam: initialTeam, de
     }
 
     return dataPoints;
-  }, [employees, events, selectedTeam]);
+  }, [employees, events, selectedTeams, departments]);
 
   // Calculate current team stats
   const currentStats = useMemo(() => {
     const today = new Date();
-    const teamEmployees = selectedTeam === 'All' 
-      ? employees 
-      : employees.filter(e => e.team === selectedTeam);
+    const allTeams = Object.values(departments).flat();
+    const teamsToInclude = selectedTeams.length > 0 ? selectedTeams : allTeams;
+    const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team));
     
     const activeEmployees = teamEmployees.filter(emp => {
       const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
@@ -107,7 +96,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeam: initialTeam, de
     }).length;
 
     return { totalCapacity, headcount, juniors, mids, seniors };
-  }, [employees, events, selectedTeam]);
+  }, [employees, events, selectedTeams, departments]);
 
   // Find the current month index for reference line
   const currentMonthIndex = useMemo(() => {
@@ -116,25 +105,28 @@ export const TeamAnalytics = ({ employees, events, selectedTeam: initialTeam, de
     return capacityData.findIndex(d => d.month === currentMonth);
   }, [capacityData]);
 
+  // Display label for scope
+  const scopeLabel = useMemo(() => {
+    const allTeams = Object.values(departments).flat();
+    if (selectedTeams.length === 0 || selectedTeams.length === allTeams.length) {
+      return 'All Teams';
+    } else if (selectedTeams.length === 1) {
+      return selectedTeams[0];
+    }
+    return `${selectedTeams.length} Teams`;
+  }, [selectedTeams, departments]);
+
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Team Selector */}
+      {/* Scope Display */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-bold text-foreground">Team Analytics</h3>
-          <p className="text-sm text-muted-foreground">Select a team to view capacity over time</p>
+          <p className="text-sm text-muted-foreground">Analyzing: <span className="font-medium text-foreground">{scopeLabel}</span></p>
         </div>
-        <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-          <SelectTrigger className="w-64">
-            <SelectValue placeholder="Select team" />
-          </SelectTrigger>
-          <SelectContent className="bg-popover border border-border">
-            <SelectItem value="All">All Teams</SelectItem>
-            {allTeams.map(team => (
-              <SelectItem key={team} value={team}>{team}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="text-xs text-muted-foreground p-2 bg-accent/30 rounded-lg">
+          Use the sidebar scope filter to change team selection
+        </div>
       </div>
 
       {/* Stats Overview */}

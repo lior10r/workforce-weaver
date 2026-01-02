@@ -149,6 +149,7 @@ const Index = () => {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editingTeamStructure, setEditingTeamStructure] = useState<{ teamName: string; department: string } | null>(null);
   const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
+  const [employeePrefill, setEmployeePrefill] = useState<{ dept: string; team: string; group?: string | null } | undefined>(undefined);
 
   // Update scope filter when hierarchy changes
   useEffect(() => {
@@ -736,6 +737,11 @@ const Index = () => {
                   ));
                 }
               }}
+              onHireForTeam={(prefill) => {
+                setEmployeePrefill(prefill);
+                setEditingEmployee(null);
+                setIsEmployeeModalOpen(true);
+              }}
             />
           )}
 
@@ -754,7 +760,7 @@ const Index = () => {
             <TeamAnalytics
               employees={employees}
               events={events}
-              selectedTeam={legacyHierarchy.team}
+              selectedTeams={scopeFilter.teams}
               departments={departments}
             />
           )}
@@ -811,13 +817,14 @@ const Index = () => {
       {/* Modals */}
       <EmployeeModal
         isOpen={isEmployeeModalOpen}
-        onClose={() => { setIsEmployeeModalOpen(false); setEditingEmployee(null); }}
+        onClose={() => { setIsEmployeeModalOpen(false); setEditingEmployee(null); setEmployeePrefill(undefined); }}
         onSubmit={handleAddEmployee}
         onDelete={handleDeleteEmployee}
         editingEmployee={editingEmployee}
         hierarchy={hierarchy}
         departments={departments}
         employees={employees}
+        prefill={employeePrefill}
       />
 
       <EventModal

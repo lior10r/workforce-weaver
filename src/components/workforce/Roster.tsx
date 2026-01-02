@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical } from 'lucide-react';
+import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus } from 'lucide-react';
 import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ interface RosterProps {
   onSetTeamLeader?: (teamName: string, leaderId: number | null) => void;
   onBulkAssignManager?: (employeeIds: number[], managerId: number | null) => void;
   onMoveEmployeeToTeam?: (employeeId: number, teamName: string, dept: string, group?: string) => void;
+  onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
 }
 
 const getDiffStyles = (status?: DiffStatus) => {
@@ -149,7 +150,8 @@ export const Roster = ({
   onSetGroupManager,
   onSetTeamLeader,
   onBulkAssignManager,
-  onMoveEmployeeToTeam
+  onMoveEmployeeToTeam,
+  onHireForTeam
 }: RosterProps) => {
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -617,6 +619,15 @@ export const Roster = ({
                                   )}
                                 </div>
                                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                  {onHireForTeam && (
+                                    <button
+                                      onClick={() => onHireForTeam({ dept: dept.name, team: teamName, group: null })}
+                                      className="p-1.5 hover:bg-primary/10 rounded-lg text-primary hover:text-primary"
+                                      title="Hire for this team"
+                                    >
+                                      <UserPlus size={14} />
+                                    </button>
+                                  )}
                                   {onSetTeamLeader && renderManagerSelect('Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
                                   <button
                                     onClick={() => onConfigureTeam(teamName, dept.name)}
@@ -761,6 +772,15 @@ export const Roster = ({
                                         )}
                                       </div>
                                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                        {onHireForTeam && (
+                                          <button
+                                            onClick={() => onHireForTeam({ dept: dept.name, team: teamName, group: group.name })}
+                                            className="p-1 hover:bg-primary/10 rounded text-primary hover:text-primary"
+                                            title="Hire for this team"
+                                          >
+                                            <UserPlus size={12} />
+                                          </button>
+                                        )}
                                         {onSetTeamLeader && renderManagerSelect('Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
                                         <button
                                           onClick={() => onConfigureTeam(teamName, dept.name)}

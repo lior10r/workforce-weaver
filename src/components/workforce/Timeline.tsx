@@ -118,7 +118,7 @@ export const Timeline = ({
     return missing;
   };
 
-  // Build map of employees who transferred INTO each team
+  // Build map of employees who are/were in each team (including source team for swaps)
   const getEmployeesInTeam = (teamName: string) => {
     const directMembers = employees.filter(e => e.team === teamName);
     
@@ -131,23 +131,28 @@ export const Timeline = ({
       })
       .filter((item): item is { employee: Employee; movement: WorkforceEvent } => item !== null);
     
-    // Create combined list - include transfers as regular members
+    // Create combined list
     const allTeamMembers: { 
       employee: Employee; 
       transferInfo?: TransferInfo;
       isTransfer: boolean;
+      isSourceTeam?: boolean; // True if this is the source team (bar ends at swap)
     }[] = [];
 
-    // Add direct members (not transferred out)
+    // Add direct members - including those who transferred OUT (show in source until swap date)
     directMembers.forEach(emp => {
-      const hasTransferOut = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
-      if (!hasTransferOut) {
-        allTeamMembers.push({ employee: emp, isTransfer: false });
-      }
+      const transferOutEvent = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
+      // Always add direct members - for transfers out, the bar will end at swap date
+      allTeamMembers.push({ 
+        employee: emp, 
+        isTransfer: false,
+        isSourceTeam: !!transferOutEvent // Mark as source team if there's a transfer out
+      });
     });
 
-    // Add transferred in members
+    // Add transferred in members (bar starts at transfer date)
     transfersIn.forEach(({ employee, movement }) => {
+      // Only add if not already a direct member
       if (!directMembers.some(e => e.id === employee.id)) {
         allTeamMembers.push({ 
           employee: { ...employee, team: teamName, dept: employee.dept },
@@ -169,7 +174,8 @@ export const Timeline = ({
     transferInfo?: TransferInfo,
     isTransfer = false,
     isManagerRow = false,
-    managerLevel?: 'dept' | 'group'
+    managerLevel?: 'dept' | 'group',
+    isSourceTeam = false // True when showing in source team (bar ends at swap)
   ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
@@ -181,10 +187,10 @@ export const Timeline = ({
     let barEndDate = departureEvent?.date || null;
     
     if (isTransfer && transferInfo) {
-      // For transfers, bar starts at transfer date
+      // For transfers IN, bar starts at transfer date
       barStartDate = transferInfo.transferDate;
-    } else if (teamSwapEvent) {
-      // Employee is transferring OUT - bar ends at swap date
+    } else if (isSourceTeam && teamSwapEvent) {
+      // For source team, bar ends at swap date
       barEndDate = teamSwapEvent.date;
     }
     
@@ -238,6 +244,14 @@ export const Timeline = ({
                     <ArrowRight size={10} className="text-accent-blue" />
                     <p className="text-[9px] text-accent-blue font-medium">
                       From {transferInfo.fromTeam}
+                    </p>
+                  </div>
+                )}
+                {isSourceTeam && teamSwapEvent && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <ArrowRight size={10} className="text-amber-500" />
+                    <p className="text-[9px] text-amber-500 font-medium">
+                      Transfers to {teamSwapEvent.targetTeam}
                     </p>
                   </div>
                 )}
@@ -549,8 +563,8 @@ export const Timeline = ({
           )}
         </div>
         <div className="space-y-3">
-          {teamMembers.map(({ employee, transferInfo, isTransfer }) => 
-            renderEmployeeRow(employee, transferInfo, isTransfer)
+          {teamMembers.map(({ employee, transferInfo, isTransfer, isSourceTeam }) => 
+            renderEmployeeRow(employee, transferInfo, isTransfer, false, undefined, isSourceTeam)
           )}
         </div>
       </div>
