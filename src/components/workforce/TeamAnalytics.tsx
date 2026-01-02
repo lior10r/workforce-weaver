@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Employee, WorkforceEvent, getCapacityWeight, formatDate } from '@/lib/workforce-data';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface TeamAnalyticsProps {
   employees: Employee[];
@@ -9,7 +10,19 @@ interface TeamAnalyticsProps {
   departments: Record<string, string[]>;
 }
 
-export const TeamAnalytics = ({ employees, events, selectedTeam, departments }: TeamAnalyticsProps) => {
+export const TeamAnalytics = ({ employees, events, selectedTeam: initialTeam, departments }: TeamAnalyticsProps) => {
+  // Local state for team selection
+  const [selectedTeam, setSelectedTeam] = useState(initialTeam === 'All' ? 'All' : initialTeam);
+
+  // Get all unique teams for selection
+  const allTeams = useMemo(() => {
+    const teams = new Set<string>();
+    Object.values(departments).forEach(teamList => {
+      teamList.forEach(team => teams.add(team));
+    });
+    return Array.from(teams).sort();
+  }, [departments]);
+
   // Calculate capacity over time for the selected team
   const capacityData = useMemo(() => {
     // Generate monthly data points from 2020 to 2030
@@ -54,15 +67,6 @@ export const TeamAnalytics = ({ employees, events, selectedTeam, departments }: 
 
     return dataPoints;
   }, [employees, events, selectedTeam]);
-
-  // Get all unique teams for selection
-  const allTeams = useMemo(() => {
-    const teams = new Set<string>();
-    Object.values(departments).forEach(teamList => {
-      teamList.forEach(team => teams.add(team));
-    });
-    return Array.from(teams).sort();
-  }, [departments]);
 
   // Calculate current team stats
   const currentStats = useMemo(() => {
@@ -114,6 +118,25 @@ export const TeamAnalytics = ({ employees, events, selectedTeam, departments }: 
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Team Selector */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-bold text-foreground">Team Analytics</h3>
+          <p className="text-sm text-muted-foreground">Select a team to view capacity over time</p>
+        </div>
+        <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+          <SelectTrigger className="w-64">
+            <SelectValue placeholder="Select team" />
+          </SelectTrigger>
+          <SelectContent className="bg-popover border border-border">
+            <SelectItem value="All">All Teams</SelectItem>
+            {allTeams.map(team => (
+              <SelectItem key={team} value={team}>{team}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="glass-card p-5">

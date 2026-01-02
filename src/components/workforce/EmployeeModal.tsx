@@ -20,6 +20,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
   const [selectedTeam, setSelectedTeam] = useState('');
   const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
   const [isGroupLevel, setIsGroupLevel] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Get the department structure
   const deptStructure = useMemo(() => 
@@ -91,30 +92,37 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
     return selectedTeam !== '';
   }, [isDepartmentLevel, isGroupLevel, selectedTeam]);
 
+  // Initialize form when modal opens - ONE TIME ONLY
   useEffect(() => {
+    if (!isOpen) {
+      setInitialized(false);
+      return;
+    }
+    
+    if (initialized) return;
+    
     if (editingEmployee) {
+      // Editing existing employee - use their current values
       setSelectedDept(editingEmployee.dept);
-      
-      // Determine group and team
-      if (editingEmployee.group) {
-        const isGroupMgr = hierarchy.some(d => 
-          d.groups.some(g => g.name === editingEmployee.group && g.groupManagerId === editingEmployee.id)
-        );
-        setIsGroupLevel(isGroupMgr);
-        setSelectedGroup(editingEmployee.group);
-      } else {
-        setSelectedGroup(null);
-        setIsGroupLevel(false);
-      }
       
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
       setIsDepartmentLevel(isDeptMgr);
       
-      // Set team - check if team is in the department's teams
-      const allTeams = departments[editingEmployee.dept] || [];
-      const isInTeam = allTeams.includes(editingEmployee.team);
-      setSelectedTeam(isInTeam ? editingEmployee.team : '');
+      // Set group from employee
+      if (editingEmployee.group) {
+        setSelectedGroup(editingEmployee.group);
+        const isGroupMgr = hierarchy.some(d => 
+          d.groups.some(g => g.name === editingEmployee.group && g.groupManagerId === editingEmployee.id)
+        );
+        setIsGroupLevel(isGroupMgr);
+      } else {
+        setSelectedGroup(null);
+        setIsGroupLevel(false);
+      }
+      
+      // Set team - directly from employee, don't validate against departments
+      setSelectedTeam(editingEmployee.team);
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -126,39 +134,13 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
       if (firstDeptStructure) {
-        const teams = getAllDeptTeams(firstDeptStructure);
-        if (teams.length > 0) {
-          setSelectedTeam(teams[0]);
-          // Set group if team belongs to a group
-          for (const group of firstDeptStructure.groups) {
-            if (group.teams.includes(teams[0])) {
-              setSelectedGroup(group.name);
-              break;
-            }
-          }
+        // First try direct teams
+        if (firstDeptStructure.directTeams && firstDeptStructure.directTeams.length > 0) {
+          setSelectedTeam(firstDeptStructure.directTeams[0]);
+          setSelectedGroup(null);
         } else {
-          setSelectedTeam('');
-        }
-      }
-    }
-    setShowDeleteConfirm(false);
-  }, [editingEmployee, hierarchy, departments, isOpen]);
-
-  // Update team when group changes
-  useEffect(() => {
-    if (isDepartmentLevel || isGroupLevel) return;
-    
-    if (selectedGroup && availableTeams.length > 0 && !availableTeams.includes(selectedTeam)) {
-      setSelectedTeam(availableTeams[0]);
-    } else if (!selectedGroup) {
-      const directTeams = deptStructure?.directTeams || [];
-      if (directTeams.length > 0 && !directTeams.includes(selectedTeam)) {
-        setSelectedTeam(directTeams[0]);
-      } else if (directTeams.length === 0 && availableTeams.length === 0) {
-        // No teams available in this selection - try to find ANY team in the department
-        if (allDeptTeams.length > 0 && !allDeptTeams.includes(selectedTeam)) {
-          // Find a group that has teams
-          for (const group of (deptStructure?.groups || [])) {
+          // Then try teams in groups
+          for (const group of firstDeptStructure.groups) {
             if (group.teams.length > 0) {
               setSelectedGroup(group.name);
               setSelectedTeam(group.teams[0]);
@@ -168,28 +150,57 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
         }
       }
     }
-  }, [selectedGroup, availableTeams, deptStructure, isDepartmentLevel, isGroupLevel, allDeptTeams]);
+    setShowDeleteConfirm(false);
+    setInitialized(true);
+  }, [isOpen, editingEmployee, hierarchy, initialized]);
 
-  // When department changes, find first available team
-  useEffect(() => {
+  // Only auto-select team when user MANUALLY changes group (not during init)
+  const handleGroupChange = (newGroup: string | null) => {
+    setSelectedGroup(newGroup);
+    
     if (isDepartmentLevel || isGroupLevel) return;
     
-    if (deptStructure && !allDeptTeams.includes(selectedTeam)) {
-      // Find first available team
-      if (deptStructure.directTeams && deptStructure.directTeams.length > 0) {
-        setSelectedGroup(null);
-        setSelectedTeam(deptStructure.directTeams[0]);
-      } else {
-        for (const group of deptStructure.groups) {
-          if (group.teams.length > 0) {
-            setSelectedGroup(group.name);
-            setSelectedTeam(group.teams[0]);
-            break;
-          }
+    // When group changes, update team selection
+    if (newGroup) {
+      const group = deptStructure?.groups.find(g => g.name === newGroup);
+      const groupTeams = group?.teams || [];
+      if (groupTeams.length > 0 && !groupTeams.includes(selectedTeam)) {
+        setSelectedTeam(groupTeams[0]);
+      }
+    } else {
+      // Switched to direct teams
+      const directTeams = deptStructure?.directTeams || [];
+      if (directTeams.length > 0) {
+        setSelectedTeam(directTeams[0]);
+      }
+    }
+  };
+
+  // Only auto-select when user MANUALLY changes department
+  const handleDeptChange = (newDept: string) => {
+    setSelectedDept(newDept);
+    
+    const newDeptStructure = hierarchy.find(d => d.name === newDept);
+    if (!newDeptStructure) return;
+    
+    // Reset group and team for new department
+    setSelectedGroup(null);
+    
+    if (isDepartmentLevel || isGroupLevel) return;
+    
+    // Find first available team
+    if (newDeptStructure.directTeams && newDeptStructure.directTeams.length > 0) {
+      setSelectedTeam(newDeptStructure.directTeams[0]);
+    } else {
+      for (const group of newDeptStructure.groups) {
+        if (group.teams.length > 0) {
+          setSelectedGroup(group.name);
+          setSelectedTeam(group.teams[0]);
+          break;
         }
       }
     }
-  }, [selectedDept, deptStructure, allDeptTeams, isDepartmentLevel, isGroupLevel]);
+  };
 
   if (!isOpen) return null;
 
@@ -273,11 +284,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
             <select 
               name="dept" 
               value={selectedDept}
-              onChange={(e) => {
-                setSelectedDept(e.target.value);
-                setSelectedGroup(null);
-                setSelectedTeam('');
-              }}
+              onChange={(e) => handleDeptChange(e.target.value)}
               className="select-field w-full"
             >
               {deptList.map(d => <option key={d} value={d}>{d}</option>)}
@@ -313,7 +320,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
               </label>
               <select 
                 value={selectedGroup || ''}
-                onChange={(e) => setSelectedGroup(e.target.value || null)}
+                onChange={(e) => handleGroupChange(e.target.value || null)}
                 className="select-field w-full"
               >
                 <option value="">-- Direct under Department --</option>
