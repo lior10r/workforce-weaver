@@ -668,16 +668,63 @@ const Index = () => {
                 });
               }}
               onBulkAssignManager={(employeeIds, managerId) => {
-                pushToHistory();
-                setMasterEmployeesDirect(prev => prev.map(emp => 
-                  employeeIds.includes(emp.id) ? { ...emp, managerId: managerId || undefined } : emp
-                ));
+                if (activeScenario) {
+                  setScenarios(prev => prev.map(s => {
+                    if (s.id !== activeScenarioId) return s;
+                    const updatedEmployees = [...s.proposedEmployees];
+                    employeeIds.forEach(empId => {
+                      const existing = updatedEmployees.findIndex(e => e.id === empId);
+                      const emp = employees.find(e => e.id === empId);
+                      if (emp) {
+                        const updated = { ...emp, managerId: managerId || undefined };
+                        if (existing >= 0) {
+                          updatedEmployees[existing] = updated;
+                        } else {
+                          updatedEmployees.push(updated);
+                        }
+                      }
+                    });
+                    return { ...s, proposedEmployees: updatedEmployees };
+                  }));
+                } else {
+                  pushToHistory();
+                  setMasterEmployeesDirect(prev => prev.map(emp => 
+                    employeeIds.includes(emp.id) ? { ...emp, managerId: managerId || undefined } : emp
+                  ));
+                }
               }}
               onMoveEmployeeToTeam={(employeeId, teamName, dept, group) => {
-                pushToHistory();
-                setMasterEmployeesDirect(prev => prev.map(emp => 
-                  emp.id === employeeId ? { ...emp, team: teamName, dept, group } : emp
-                ));
+                if (activeScenario) {
+                  setScenarios(prev => prev.map(s => {
+                    if (s.id !== activeScenarioId) return s;
+                    const emp = employees.find(e => e.id === employeeId);
+                    if (!emp) return s;
+                    
+                    const updated = { ...emp, team: teamName, dept, group };
+                    const existingIdx = s.proposedEmployees.findIndex(e => e.id === employeeId);
+                    
+                    let updatedEmployees: Employee[];
+                    if (existingIdx >= 0) {
+                      updatedEmployees = [...s.proposedEmployees];
+                      updatedEmployees[existingIdx] = updated;
+                    } else {
+                      updatedEmployees = [...s.proposedEmployees, updated];
+                    }
+                    
+                    return addScenarioChangelogEntry(
+                      { ...s, proposedEmployees: updatedEmployees },
+                      'employee_modified',
+                      employeeId,
+                      emp.name,
+                      `Moved from ${emp.team} to ${teamName}`
+                    );
+                  }));
+                } else {
+                  pushToHistory();
+                  setMasterEmployeesDirect(prev => prev.map(emp => 
+                    emp.id === employeeId ? { ...emp, team: teamName, dept, group } : emp
+                  ));
+                }
               }}
             />
           )}
