@@ -1,5 +1,13 @@
 import { X, Building2, Trash2, AlertTriangle } from 'lucide-react';
-import { Employee, DEPARTMENT_NAMES, ROLES, STATUSES, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
+import {
+  Employee,
+  DEPARTMENT_NAMES,
+  ROLES,
+  STATUSES,
+  HierarchyStructure,
+  getAllDeptTeams,
+  getTeamParent,
+} from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect, useMemo } from 'react';
 
 interface EmployeeModalProps {
@@ -11,9 +19,20 @@ interface EmployeeModalProps {
   hierarchy: HierarchyStructure;
   departments: Record<string, string[]>;
   employees: Employee[];
+  prefill?: { dept: string; team: string; group?: string | null };
 }
 
-export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmployee, hierarchy, departments, employees }: EmployeeModalProps) => {
+export const EmployeeModal = ({
+  isOpen,
+  onClose,
+  onSubmit,
+  onDelete,
+  editingEmployee,
+  hierarchy,
+  departments,
+  employees,
+  prefill,
+}: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDept, setSelectedDept] = useState(DEPARTMENT_NAMES[0]);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
@@ -98,31 +117,41 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
       setInitialized(false);
       return;
     }
-    
+
     if (initialized) return;
-    
+
     if (editingEmployee) {
       // Editing existing employee - use their current values
+      const parent = getTeamParent(hierarchy, editingEmployee.team);
+      const resolvedGroup = editingEmployee.group ?? parent?.group?.name ?? null;
+
       setSelectedDept(editingEmployee.dept);
-      
+
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
       setIsDepartmentLevel(isDeptMgr);
-      
-      // Set group from employee
-      if (editingEmployee.group) {
-        setSelectedGroup(editingEmployee.group);
-        const isGroupMgr = hierarchy.some(d => 
-          d.groups.some(g => g.name === editingEmployee.group && g.groupManagerId === editingEmployee.id)
+
+      // Check if group level manager
+      if (resolvedGroup) {
+        setSelectedGroup(resolvedGroup);
+        const isGroupMgr = hierarchy.some(d =>
+          d.groups.some(g => g.name === resolvedGroup && g.groupManagerId === editingEmployee.id)
         );
         setIsGroupLevel(isGroupMgr);
       } else {
         setSelectedGroup(null);
         setIsGroupLevel(false);
       }
-      
-      // Set team - directly from employee, don't validate against departments
+
+      // Set team - directly from employee
       setSelectedTeam(editingEmployee.team);
+    } else if (prefill) {
+      // New employee - prefilled from context (e.g. hire from roster)
+      setSelectedDept(prefill.dept);
+      setSelectedGroup(prefill.group ?? null);
+      setIsDepartmentLevel(false);
+      setIsGroupLevel(false);
+      setSelectedTeam(prefill.team);
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -130,7 +159,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
       setSelectedGroup(null);
       setIsDepartmentLevel(false);
       setIsGroupLevel(false);
-      
+
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
       if (firstDeptStructure) {
@@ -152,7 +181,7 @@ export const EmployeeModal = ({ isOpen, onClose, onSubmit, onDelete, editingEmpl
     }
     setShowDeleteConfirm(false);
     setInitialized(true);
-  }, [isOpen, editingEmployee, hierarchy, initialized]);
+  }, [isOpen, editingEmployee, hierarchy, initialized, prefill]);
 
   // Only auto-select team when user MANUALLY changes group (not during init)
   const handleGroupChange = (newGroup: string | null) => {
