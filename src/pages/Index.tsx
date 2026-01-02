@@ -127,10 +127,15 @@ const Index = () => {
     const allDepts = hierarchy.map(d => d.name);
     const allGroups: string[] = [];
     const allTeams: string[] = [];
-    hierarchy.forEach(d => d.groups.forEach(g => {
-      allGroups.push(g.name);
-      allTeams.push(...g.teams);
-    }));
+    hierarchy.forEach(d => {
+      d.groups.forEach(g => {
+        allGroups.push(g.name);
+        allTeams.push(...g.teams);
+      });
+      if (d.directTeams && d.directTeams.length > 0) {
+        allTeams.push(...d.directTeams);
+      }
+    });
     return { departments: allDepts, groups: allGroups, teams: allTeams };
   });
   const [view, setView] = useState('dashboard');
@@ -150,10 +155,15 @@ const Index = () => {
     const allDepts = hierarchy.map(d => d.name);
     const allGroups: string[] = [];
     const allTeams: string[] = [];
-    hierarchy.forEach(d => d.groups.forEach(g => {
-      allGroups.push(g.name);
-      allTeams.push(...g.teams);
-    }));
+    hierarchy.forEach(d => {
+      d.groups.forEach(g => {
+        allGroups.push(g.name);
+        allTeams.push(...g.teams);
+      });
+      if (d.directTeams && d.directTeams.length > 0) {
+        allTeams.push(...d.directTeams);
+      }
+    });
     setScopeFilter(prev => ({
       departments: prev.departments.filter(d => allDepts.includes(d)),
       groups: prev.groups.filter(g => allGroups.includes(g)),
