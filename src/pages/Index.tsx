@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, UserPlus, ChevronRight, Undo2, Redo2, RotateCcw } from 'lucide-react';
+import { Search, UserPlus, ChevronRight } from 'lucide-react';
 import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
@@ -13,8 +13,6 @@ import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
-import { Slider } from '@/components/ui/slider';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { 
   Employee, 
@@ -303,31 +301,107 @@ const Index = () => {
     setEditingEmployee(null);
   };
 
-  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string }) => {
+  const handleAddEvent = (eventData: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string; newRole?: string }) => {
     const newEvent = { ...eventData, id: Date.now() };
     const emp = employees.find(e => e.id === eventData.empId);
+    
+    // For promotions, also update the employee's role
+    if (eventData.type === 'Promotion' && eventData.newRole) {
+      if (activeScenario) {
+        setScenarios(prev => prev.map(s => {
+          if (s.id !== activeScenarioId) return s;
+          
+          const existingEmpIdx = s.proposedEmployees.findIndex(e => e.id === eventData.empId);
+          const empToUpdate = existingEmpIdx >= 0 ? s.proposedEmployees[existingEmpIdx] : emp;
+          
+          if (!empToUpdate) return s;
+          
+          const updatedEmp = { ...empToUpdate, role: eventData.newRole! };
+          let updatedEmployees: Employee[];
+          if (existingEmpIdx >= 0) {
+            updatedEmployees = [...s.proposedEmployees];
+            updatedEmployees[existingEmpIdx] = updatedEmp;
+          } else {
+            updatedEmployees = [...s.proposedEmployees, updatedEmp];
+          }
+          
+          const updatedScenario = { 
+            ...s, 
+            proposedEvents: [...s.proposedEvents, newEvent],
+            proposedEmployees: updatedEmployees
+          };
+          
+          return addScenarioChangelogEntry(
+            updatedScenario,
+            'event_added',
+            newEvent.id,
+            emp?.name || `Employee #${eventData.empId}`,
+            `Promoted to ${eventData.newRole}: ${eventData.details}`,
+            { Role: { before: empToUpdate.role, after: eventData.newRole! } }
+          );
+        }));
+      } else {
+        pushToHistory();
+        setMasterEmployeesDirect(prev => prev.map(e => 
+          e.id === eventData.empId ? { ...e, role: eventData.newRole! } : e
+        ));
+        setMasterEventsDirect(prev => [...prev, newEvent]);
+      }
+    } else {
+      if (activeScenario) {
+        setScenarios(prev => prev.map(s => {
+          if (s.id !== activeScenarioId) return s;
+          const updatedScenario = { 
+            ...s, 
+            proposedEvents: [...s.proposedEvents, newEvent]
+          };
+          
+          return addScenarioChangelogEntry(
+            updatedScenario,
+            'event_added',
+            newEvent.id,
+            emp?.name || `Employee #${eventData.empId}`,
+            `Added ${eventData.type}${eventData.isFlag ? ' (Flag)' : ''}: ${eventData.details}`,
+            eventData.targetTeam ? { 'Target Team': { after: eventData.targetTeam } } : undefined
+          );
+        }));
+      } else {
+        pushToHistory();
+        setMasterEventsDirect(prev => [...prev, newEvent]);
+      }
+    }
+    setIsEventModalOpen(false);
+  };
+
+  const handleDeleteEvent = (eventId: number) => {
+    const event = events.find(e => e.id === eventId);
+    const emp = event ? employees.find(e => e.id === event.empId) : null;
     
     if (activeScenario) {
       setScenarios(prev => prev.map(s => {
         if (s.id !== activeScenarioId) return s;
-        const updatedScenario = { 
-          ...s, 
-          proposedEvents: [...s.proposedEvents, newEvent]
-        };
+        
+        // Check if it's a proposed event or base event
+        const isProposed = s.proposedEvents.some(e => e.id === eventId);
+        
+        let updatedScenario = { ...s };
+        if (isProposed) {
+          updatedScenario = { ...updatedScenario, proposedEvents: s.proposedEvents.filter(e => e.id !== eventId) };
+        } else {
+          updatedScenario = { ...updatedScenario, deletedEventIds: [...s.deletedEventIds, eventId] };
+        }
         
         return addScenarioChangelogEntry(
           updatedScenario,
-          'event_added',
-          newEvent.id,
-          emp?.name || `Employee #${eventData.empId}`,
-          `Added ${eventData.type}${eventData.isFlag ? ' (Flag)' : ''}: ${eventData.details}`
+          'event_removed',
+          eventId,
+          emp?.name || 'Unknown',
+          `Removed ${event?.type || 'event'}${event?.isFlag ? ' (Flag)' : ''}`
         );
       }));
     } else {
-      pushToHistory();
-      setMasterEventsDirect(prev => [...prev, newEvent]);
+      deleteEvent(eventId);
     }
-    setIsEventModalOpen(false);
   };
 
   const openPlannerForUser = (empId: number, asFlag = false) => {
@@ -514,63 +588,6 @@ const Index = () => {
               </h2>
               
               <div className="flex gap-3 w-full lg:w-auto items-center">
-                {/* Undo/Redo Controls */}
-                <TooltipProvider>
-                  <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button 
-                          onClick={undo}
-                          disabled={!canUndo}
-                          className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <Undo2 size={16} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Undo</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button 
-                          onClick={redo}
-                          disabled={!canRedo}
-                          className="p-2 rounded-md hover:bg-secondary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        >
-                          <Redo2 size={16} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Redo</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button 
-                          onClick={resetToInitial}
-                          className="p-2 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>Reset to Initial Data</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  
-                  {/* History Slider */}
-                  {historyLength > 1 && (
-                    <div className="hidden lg:flex items-center gap-2 bg-secondary/30 rounded-lg px-3 py-2 min-w-[150px]">
-                      <span className="text-[9px] text-muted-foreground uppercase font-bold whitespace-nowrap">History</span>
-                      <Slider
-                        value={[currentHistoryIndex]}
-                        min={0}
-                        max={historyLength - 1}
-                        step={1}
-                        onValueChange={(value) => jumpToHistory(value[0])}
-                        className="w-24"
-                      />
-                      <span className="text-[10px] text-muted-foreground font-mono">{currentHistoryIndex + 1}/{historyLength}</span>
-                    </div>
-                  )}
-                </TooltipProvider>
-
                 <div className="relative flex-1 lg:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                   <input 
@@ -753,6 +770,7 @@ const Index = () => {
                 setEventPrefill({ empId: employees[0]?.id || '', isFlag: false });
                 setIsEventModalOpen(true);
               }}
+              onDeleteEvent={handleDeleteEvent}
             />
           )}
 

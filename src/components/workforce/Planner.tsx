@@ -1,13 +1,14 @@
-import { Plus, Flag } from 'lucide-react';
+import { Plus, Flag, Trash2 } from 'lucide-react';
 import { Employee, WorkforceEvent, formatDate } from '@/lib/workforce-data';
 
 interface PlannerProps {
   employees: Employee[];
   events: WorkforceEvent[];
   onAddMovement: () => void;
+  onDeleteEvent?: (eventId: number) => void;
 }
 
-export const Planner = ({ employees, events, onAddMovement }: PlannerProps) => {
+export const Planner = ({ employees, events, onAddMovement, onDeleteEvent }: PlannerProps) => {
   const sortedEvents = [...events].sort((a, b) => 
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
@@ -40,6 +41,7 @@ export const Planner = ({ employees, events, onAddMovement }: PlannerProps) => {
               <th className="px-8 py-4 font-bold">Type</th>
               <th className="px-8 py-4 font-bold">Effective Date</th>
               <th className="px-8 py-4 font-bold">Strategic Details</th>
+              <th className="px-8 py-4 font-bold w-16">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -76,6 +78,17 @@ export const Planner = ({ employees, events, onAddMovement }: PlannerProps) => {
                   </td>
                   <td className="px-8 py-5">
                     <span className="text-sm text-muted-foreground">{ev.details}</span>
+                  </td>
+                  <td className="px-8 py-5">
+                    {onDeleteEvent && (
+                      <button
+                        onClick={() => onDeleteEvent(ev.id)}
+                        className="p-2 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                        title="Delete event"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </td>
                 </tr>
               );

@@ -171,7 +171,12 @@ export const ROLE_TEXT_COLORS: Record<string, string> = {
 
 export const ROLES = Object.keys(ROLE_COLORS).filter(r => r !== 'Default');
 export const STATUSES = ['Active', 'On Course', 'Parental Leave', 'Notice Period'] as const;
+// Promotion is for role advancement within team, Decision Flag for other decisions
 export const EVENT_TYPES = ['Team Swap', 'Promotion', 'Training', 'Course', 'Departure', 'New Joiner', 'Decision Flag'] as const;
+
+// Promotion levels for automatic advancement
+export const SENIORITY_LEVELS = ['Junior Dev', 'Mid-Level Dev', 'Senior Dev', 'Team Lead'] as const;
+export type SeniorityLevel = typeof SENIORITY_LEVELS[number];
 
 // Manager level types
 export type ManagerLevel = 'department' | 'group' | 'team' | 'none';
