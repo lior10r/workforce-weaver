@@ -19,22 +19,21 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
   const [selectedEmpId, setSelectedEmpId] = useState<number | string>(prefill.empId);
   const [selectedNewRole, setSelectedNewRole] = useState<string>('');
 
-  if (!isOpen) return null;
-
   // Get selected employee's current role for promotion options
-  const selectedEmployee = employees.find(e => e.id === Number(selectedEmpId));
+  const selectedEmployee = useMemo(() => {
+    return employees.find(e => e.id === Number(selectedEmpId));
+  }, [employees, selectedEmpId]);
   
   // For promotions, determine available next roles
-  const getPromotionOptions = (currentRole?: string): string[] => {
+  const promotionOptions = useMemo(() => {
+    const currentRole = selectedEmployee?.role;
     if (!currentRole) return [...SENIORITY_LEVELS];
     const currentIdx = SENIORITY_LEVELS.indexOf(currentRole as typeof SENIORITY_LEVELS[number]);
-    if (currentIdx === -1) return [...SENIORITY_LEVELS]; // If current role not in seniority, show all
+    if (currentIdx === -1) return [...SENIORITY_LEVELS];
     return SENIORITY_LEVELS.slice(currentIdx + 1) as unknown as string[];
-  };
-
-  const promotionOptions = useMemo(() => {
-    return getPromotionOptions(selectedEmployee?.role);
   }, [selectedEmployee?.role]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
