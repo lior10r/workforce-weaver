@@ -762,6 +762,7 @@ const Index = () => {
               events={events}
               selectedTeams={scopeFilter.teams}
               departments={departments}
+              teamStructures={teamStructures}
             />
           )}
 
