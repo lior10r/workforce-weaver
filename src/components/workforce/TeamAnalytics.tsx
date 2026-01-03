@@ -1,33 +1,42 @@
 import { useMemo } from 'react';
-import { Employee, WorkforceEvent, getCapacityWeight, formatDate } from '@/lib/workforce-data';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Employee, WorkforceEvent, TeamStructure, getCapacityWeight } from '@/lib/workforce-data';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, LabelList } from 'recharts';
+import { AlertTriangle, CheckCircle2, Users } from 'lucide-react';
 
 interface TeamAnalyticsProps {
   employees: Employee[];
   events: WorkforceEvent[];
   selectedTeams: string[]; // Array of selected team names from scope filter
   departments: Record<string, string[]>;
+  teamStructures: TeamStructure[];
 }
 
-export const TeamAnalytics = ({ employees, events, selectedTeams, departments }: TeamAnalyticsProps) => {
+export const TeamAnalytics = ({ employees, events, selectedTeams, departments, teamStructures }: TeamAnalyticsProps) => {
+  // Get all teams if none selected
+  const allTeams = useMemo(() => Object.values(departments).flat(), [departments]);
+  const teamsToInclude = useMemo(() => 
+    selectedTeams.length > 0 ? selectedTeams : allTeams, 
+    [selectedTeams, allTeams]
+  );
+
   // Calculate capacity over time for all selected teams
   const capacityData = useMemo(() => {
-    // Generate monthly data points from 2020 to 2030
-    const dataPoints: { date: string; month: string; capacity: number; headcount: number }[] = [];
+    const dataPoints: { date: string; month: string; capacity: number; headcount: number; target: number }[] = [];
     const startDate = new Date('2020-01-01');
     const endDate = new Date('2030-12-31');
     
-    // Get all teams if none selected, otherwise filter by selected teams
-    const allTeams = Object.values(departments).flat();
-    const teamsToInclude = selectedTeams.length > 0 ? selectedTeams : allTeams;
-    
     const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team));
+    
+    // Sum up target sizes for selected teams
+    const totalTarget = teamsToInclude.reduce((sum, teamName) => {
+      const structure = teamStructures.find(ts => ts.teamName === teamName);
+      return sum + (structure?.targetSize || 0);
+    }, 0);
 
     const currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       const dateStr = currentDate.toISOString().split('T')[0];
       
-      // Find employees active at this date
       const activeEmployees = teamEmployees.filter(emp => {
         const joinDate = new Date(emp.joined);
         const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
@@ -36,7 +45,6 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
         return joinDate <= currentDate && currentDate <= departureDate;
       });
 
-      // Calculate total capacity (excluding team leads)
       const totalCapacity = activeEmployees.reduce((sum, emp) => {
         return sum + getCapacityWeight(emp.role, emp.joined, currentDate);
       }, 0);
@@ -47,21 +55,65 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
         date: dateStr,
         month: `${currentDate.getFullYear()}-${(currentDate.getMonth() + 1).toString().padStart(2, '0')}`,
         capacity: Math.round(totalCapacity * 10) / 10,
-        headcount
+        headcount,
+        target: totalTarget
       });
 
-      // Move to next month
       currentDate.setMonth(currentDate.getMonth() + 1);
     }
 
     return dataPoints;
-  }, [employees, events, selectedTeams, departments]);
+  }, [employees, events, teamsToInclude, teamStructures]);
 
-  // Calculate current team stats
+  // Calculate per-team capacity stats with targets
+  const teamCapacityStats = useMemo(() => {
+    const today = new Date();
+    
+    return teamsToInclude.map(teamName => {
+      const structure = teamStructures.find(ts => ts.teamName === teamName);
+      const targetSize = structure?.targetSize || 0;
+      
+      const teamEmployees = employees.filter(e => e.team === teamName);
+      const activeEmployees = teamEmployees.filter(emp => {
+        const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
+        const departureDate = departureEvent ? new Date(departureEvent.date) : new Date('2099-12-31');
+        return departureDate >= today;
+      });
+
+      const headcount = activeEmployees.filter(e => e.role !== 'Team Lead').length;
+      const capacity = activeEmployees.reduce((sum, emp) => {
+        return sum + getCapacityWeight(emp.role, emp.joined, today);
+      }, 0);
+
+      const variance = targetSize > 0 ? headcount - targetSize : 0;
+      const variancePercent = targetSize > 0 ? Math.round((variance / targetSize) * 100) : 0;
+      
+      let status: 'understaffed' | 'overstaffed' | 'on-target' | 'no-target' = 'no-target';
+      if (targetSize > 0) {
+        if (variance < -1) status = 'understaffed';
+        else if (variance > 1) status = 'overstaffed';
+        else status = 'on-target';
+      }
+
+      return {
+        teamName,
+        targetSize,
+        headcount,
+        capacity: Math.round(capacity * 10) / 10,
+        variance,
+        variancePercent,
+        status
+      };
+    }).sort((a, b) => {
+      // Sort by status priority: understaffed first, then overstaffed, then on-target, then no-target
+      const statusOrder = { understaffed: 0, overstaffed: 1, 'on-target': 2, 'no-target': 3 };
+      return statusOrder[a.status] - statusOrder[b.status];
+    });
+  }, [employees, events, teamsToInclude, teamStructures]);
+
+  // Calculate current overall stats
   const currentStats = useMemo(() => {
     const today = new Date();
-    const allTeams = Object.values(departments).flat();
-    const teamsToInclude = selectedTeams.length > 0 ? selectedTeams : allTeams;
     const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team));
     
     const activeEmployees = teamEmployees.filter(emp => {
@@ -95,8 +147,19 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
       return weight === 1.5;
     }).length;
 
-    return { totalCapacity, headcount, juniors, mids, seniors };
-  }, [employees, events, selectedTeams, departments]);
+    // Total targets
+    const totalTarget = teamsToInclude.reduce((sum, teamName) => {
+      const structure = teamStructures.find(ts => ts.teamName === teamName);
+      return sum + (structure?.targetSize || 0);
+    }, 0);
+
+    const teamsWithTargets = teamsToInclude.filter(teamName => {
+      const structure = teamStructures.find(ts => ts.teamName === teamName);
+      return structure?.targetSize && structure.targetSize > 0;
+    }).length;
+
+    return { totalCapacity, headcount, juniors, mids, seniors, totalTarget, teamsWithTargets };
+  }, [employees, events, teamsToInclude, teamStructures]);
 
   // Find the current month index for reference line
   const currentMonthIndex = useMemo(() => {
@@ -107,14 +170,40 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
 
   // Display label for scope
   const scopeLabel = useMemo(() => {
-    const allTeams = Object.values(departments).flat();
     if (selectedTeams.length === 0 || selectedTeams.length === allTeams.length) {
       return 'All Teams';
     } else if (selectedTeams.length === 1) {
       return selectedTeams[0];
     }
     return `${selectedTeams.length} Teams`;
-  }, [selectedTeams, departments]);
+  }, [selectedTeams, allTeams]);
+
+  // Summary counts
+  const staffingSummary = useMemo(() => {
+    const understaffed = teamCapacityStats.filter(t => t.status === 'understaffed').length;
+    const overstaffed = teamCapacityStats.filter(t => t.status === 'overstaffed').length;
+    const onTarget = teamCapacityStats.filter(t => t.status === 'on-target').length;
+    const noTarget = teamCapacityStats.filter(t => t.status === 'no-target').length;
+    return { understaffed, overstaffed, onTarget, noTarget };
+  }, [teamCapacityStats]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'understaffed': return 'hsl(var(--destructive))';
+      case 'overstaffed': return 'hsl(var(--chart-4))';
+      case 'on-target': return 'hsl(var(--chart-2))';
+      default: return 'hsl(var(--muted-foreground))';
+    }
+  };
+
+  const getStatusBg = (status: string) => {
+    switch (status) {
+      case 'understaffed': return 'bg-destructive/10 border-destructive/30';
+      case 'overstaffed': return 'bg-chart-4/10 border-chart-4/30';
+      case 'on-target': return 'bg-chart-2/10 border-chart-2/30';
+      default: return 'bg-muted/30 border-muted';
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -130,7 +219,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div className="glass-card p-5">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Current Capacity</p>
           <p className="text-3xl font-bold text-primary">{currentStats.totalCapacity.toFixed(1)}</p>
@@ -139,7 +228,13 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
         <div className="glass-card p-5">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Headcount</p>
           <p className="text-3xl font-bold text-foreground">{currentStats.headcount}</p>
-          <p className="text-xs text-muted-foreground mt-1">Excluding leads</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {currentStats.totalTarget > 0 ? (
+              <span className={currentStats.headcount < currentStats.totalTarget ? 'text-destructive' : currentStats.headcount > currentStats.totalTarget ? 'text-chart-4' : 'text-chart-2'}>
+                Target: {currentStats.totalTarget}
+              </span>
+            ) : 'No targets set'}
+          </p>
         </div>
         <div className="glass-card p-5">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Juniors</p>
@@ -156,7 +251,103 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
           <p className="text-3xl font-bold text-role-senior">{currentStats.seniors}</p>
           <p className="text-xs text-muted-foreground mt-1">1.5x capacity</p>
         </div>
+        <div className="glass-card p-5">
+          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Teams Tracked</p>
+          <p className="text-3xl font-bold text-foreground">{currentStats.teamsWithTargets}</p>
+          <p className="text-xs text-muted-foreground mt-1">with targets set</p>
+        </div>
       </div>
+
+      {/* Staffing Status Summary */}
+      {currentStats.teamsWithTargets > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className={`glass-card p-4 border-2 ${getStatusBg('understaffed')}`}>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              <div>
+                <p className="text-2xl font-bold text-destructive">{staffingSummary.understaffed}</p>
+                <p className="text-xs text-muted-foreground">Understaffed Teams</p>
+              </div>
+            </div>
+          </div>
+          <div className={`glass-card p-4 border-2 ${getStatusBg('overstaffed')}`}>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-chart-4" />
+              <div>
+                <p className="text-2xl font-bold text-chart-4">{staffingSummary.overstaffed}</p>
+                <p className="text-xs text-muted-foreground">Overstaffed Teams</p>
+              </div>
+            </div>
+          </div>
+          <div className={`glass-card p-4 border-2 ${getStatusBg('on-target')}`}>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-chart-2" />
+              <div>
+                <p className="text-2xl font-bold text-chart-2">{staffingSummary.onTarget}</p>
+                <p className="text-xs text-muted-foreground">On Target</p>
+              </div>
+            </div>
+          </div>
+          <div className={`glass-card p-4 border-2 ${getStatusBg('no-target')}`}>
+            <div className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-2xl font-bold text-muted-foreground">{staffingSummary.noTarget}</p>
+                <p className="text-xs text-muted-foreground">No Target Set</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Per-Team Capacity vs Target */}
+      {teamCapacityStats.some(t => t.targetSize > 0) && (
+        <div className="glass-card p-6">
+          <h4 className="font-bold text-foreground mb-4">Team Capacity vs Target</h4>
+          <div className="space-y-3 max-h-[300px] overflow-y-auto">
+            {teamCapacityStats.map(team => (
+              <div key={team.teamName} className={`p-3 rounded-lg border ${getStatusBg(team.status)}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(team.status) }} />
+                    <span className="font-medium text-foreground">{team.teamName}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="text-muted-foreground">
+                      <span className="font-bold text-foreground">{team.headcount}</span>
+                      {team.targetSize > 0 && <span> / {team.targetSize}</span>}
+                    </span>
+                    {team.targetSize > 0 && (
+                      <span className={`font-bold ${
+                        team.status === 'understaffed' ? 'text-destructive' :
+                        team.status === 'overstaffed' ? 'text-chart-4' :
+                        'text-chart-2'
+                      }`}>
+                        {team.variance > 0 ? '+' : ''}{team.variance}
+                        <span className="text-xs ml-1">({team.variancePercent > 0 ? '+' : ''}{team.variancePercent}%)</span>
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {team.capacity} FTE
+                    </span>
+                  </div>
+                </div>
+                {team.targetSize > 0 && (
+                  <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                    <div 
+                      className="h-full rounded-full transition-all"
+                      style={{ 
+                        width: `${Math.min(100, (team.headcount / team.targetSize) * 100)}%`,
+                        backgroundColor: getStatusColor(team.status)
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Capacity Over Time Chart */}
       <div className="glass-card p-8">
@@ -206,7 +397,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
                 }}
                 formatter={(value: number, name: string) => [
                   name === 'capacity' ? `${value.toFixed(1)} FTE` : value,
-                  name === 'capacity' ? 'Weighted Capacity' : 'Headcount'
+                  name === 'capacity' ? 'Weighted Capacity' : name === 'target' ? 'Target Size' : 'Headcount'
                 ]}
               />
               <Legend />
@@ -220,6 +411,19 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments }:
                   fontSize: 10
                 }}
               />
+              {currentStats.totalTarget > 0 && (
+                <ReferenceLine 
+                  y={currentStats.totalTarget} 
+                  stroke="hsl(var(--chart-4))"
+                  strokeDasharray="8 4"
+                  label={{ 
+                    value: `Target: ${currentStats.totalTarget}`, 
+                    fill: 'hsl(var(--chart-4))',
+                    fontSize: 10,
+                    position: 'right'
+                  }}
+                />
+              )}
               <Line 
                 type="monotone" 
                 dataKey="capacity" 
