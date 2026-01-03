@@ -1,6 +1,6 @@
 import { X, BookOpen, TrendingUp } from 'lucide-react';
 import { Employee, EVENT_TYPES, formatDate, SENIORITY_LEVELS } from '@/lib/workforce-data';
-import { FormEvent, useState, useMemo } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -18,6 +18,17 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
   const [endDate, setEndDate] = useState('');
   const [selectedEmpId, setSelectedEmpId] = useState<number | string>(prefill.empId);
   const [selectedNewRole, setSelectedNewRole] = useState<string>('');
+
+  // Sync modal defaults each time it opens (important for Decision Flag vs Movement)
+  useEffect(() => {
+    if (!isOpen) return;
+    setSelectedType(prefill.isFlag ? 'Decision Flag' : 'Promotion');
+    setSelectedEmpId(prefill.empId);
+    setSelectedNewRole('');
+    setStartDate('');
+    setEndDate('');
+    setSelectedDept(Object.keys(departments)[0] || '');
+  }, [isOpen, prefill.empId, prefill.isFlag, departments]);
 
   // Get selected employee's current role for promotion options
   const selectedEmployee = useMemo(() => {
