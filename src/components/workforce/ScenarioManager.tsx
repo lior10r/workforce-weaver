@@ -12,7 +12,11 @@ import {
   UserPlus,
   UserMinus,
   Edit3,
-  Calendar
+  Calendar,
+  ArrowRight,
+  Check,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { 
   Scenario, 
@@ -25,10 +29,12 @@ import {
   duplicateScenario,
   getScenarioEmployees,
   getScenarioEvents,
-  initialHierarchy
+  initialHierarchy,
+  formatDate
 } from '@/lib/workforce-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ScenarioManagerProps {
   scenarios: Scenario[];
@@ -43,7 +49,7 @@ interface ScenarioManagerProps {
   onDeleteScenario: (id: string) => void;
   onSetActiveScenario: (id: string | null) => void;
   onSetCompareScenario: (id: string | null) => void;
-  onMergeToMaster: (scenario: Scenario) => void;
+  onMergeToMaster: (scenario: Scenario, selectedChangeIds?: string[]) => void;
 }
 
 export const ScenarioManager = ({
@@ -63,14 +69,14 @@ export const ScenarioManager = ({
 }: ScenarioManagerProps) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
-  const [isMergeConfirmOpen, setIsMergeConfirmOpen] = useState(false);
-  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
+  const [isMergeSelectOpen, setIsMergeSelectOpen] = useState(false);
   const [scenarioToMerge, setScenarioToMerge] = useState<Scenario | null>(null);
   const [scenarioToDuplicate, setScenarioToDuplicate] = useState<Scenario | null>(null);
   const [newScenarioName, setNewScenarioName] = useState('');
   const [newScenarioDesc, setNewScenarioDesc] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
+  const [selectedMergeIds, setSelectedMergeIds] = useState<Set<string>>(new Set());
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
   const compareScenario = scenarios.find(s => s.id === compareScenarioId);
@@ -113,11 +119,50 @@ export const ScenarioManager = ({
 
   const handleMergeConfirm = () => {
     if (scenarioToMerge) {
-      onMergeToMaster(scenarioToMerge);
-      setIsMergeConfirmOpen(false);
+      const selected = selectedMergeIds.size > 0 ? Array.from(selectedMergeIds) : undefined;
+      onMergeToMaster(scenarioToMerge, selected);
+      setIsMergeSelectOpen(false);
       setScenarioToMerge(null);
+      setSelectedMergeIds(new Set());
       toast.success(`Merged "${scenarioToMerge.name}" to Master Plan`);
     }
+  };
+
+  const toggleMergeSelection = (id: string) => {
+    setSelectedMergeIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllForMerge = () => {
+    if (scenarioToMerge) {
+      setSelectedMergeIds(new Set(scenarioToMerge.changelog.map(c => c.id)));
+    }
+  };
+
+  const deselectAllForMerge = () => {
+    setSelectedMergeIds(new Set());
+  };
+
+  // Get enhanced description for changelog entries
+  const getEnhancedDescription = (entry: ScenarioChangelogEntry, scenario: Scenario): string => {
+    // For team swaps, add more details
+    if (entry.description.includes('Team Swap') || entry.description.includes('Moved from')) {
+      // Try to find the event for more details
+      const event = scenario.proposedEvents.find(e => 
+        e.empId === entry.entityId && e.type === 'Team Swap'
+      );
+      if (event && event.targetTeam) {
+        return `${entry.description} → ${event.targetTeam} on ${formatDate(event.date)}`;
+      }
+    }
+    return entry.description;
   };
 
   const getScenarioStats = (scenario: Scenario) => {
@@ -252,57 +297,86 @@ export const ScenarioManager = ({
         </div>
       </div>
 
-      {/* Active Scenario Info Bar */}
+      {/* Active Scenario Info Bar with Inline History */}
       {activeScenario && (
-        <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-primary/20">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Layers size={14} className="text-primary" />
-              <span className="text-sm font-semibold">{activeScenario.name}</span>
-            </div>
-            <span className="text-xs text-muted-foreground">{activeScenario.description}</span>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-2 py-0.5 bg-accent rounded">
-                {getScenarioStats(activeScenario).proposedChanges} proposed changes
-              </span>
-              {getScenarioStats(activeScenario).deletions > 0 && (
-                <span className="px-2 py-0.5 bg-destructive/10 text-destructive rounded">
-                  {getScenarioStats(activeScenario).deletions} removals
+        <div className="border-b border-primary/20">
+          <div className="flex items-center justify-between px-4 py-2 bg-primary/5">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Layers size={14} className="text-primary" />
+                <span className="text-sm font-semibold">{activeScenario.name}</span>
+              </div>
+              <span className="text-xs text-muted-foreground">{activeScenario.description}</span>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="px-2 py-0.5 bg-accent rounded">
+                  {getScenarioStats(activeScenario).proposedChanges} proposed changes
                 </span>
-              )}
+                {getScenarioStats(activeScenario).deletions > 0 && (
+                  <span className="px-2 py-0.5 bg-destructive/10 text-destructive rounded">
+                    {getScenarioStats(activeScenario).deletions} removals
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setScenarioToMerge(activeScenario);
+                  setSelectedMergeIds(new Set(activeScenario.changelog.map(c => c.id)));
+                  setIsMergeSelectOpen(true);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
+              >
+                <GitMerge size={14} />
+                Merge to Master
+              </button>
+              <button
+                onClick={() => onDeleteScenario(activeScenario.id)}
+                className="flex items-center gap-1 px-2 py-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
+              >
+                <Trash2 size={14} />
+              </button>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsChangelogOpen(true)}
-              className="flex items-center gap-1 px-2 py-1.5 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
-              title="View changelog"
-            >
-              <History size={14} />
-              <span className="hidden sm:inline">History</span>
-              {activeScenario.changelog.length > 0 && (
-                <span className="px-1 bg-primary/20 text-primary rounded text-[10px]">
-                  {activeScenario.changelog.length}
-                </span>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setScenarioToMerge(activeScenario);
-                setIsMergeConfirmOpen(true);
-              }}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
-            >
-              <GitMerge size={14} />
-              Merge to Master
-            </button>
-            <button
-              onClick={() => onDeleteScenario(activeScenario.id)}
-              className="flex items-center gap-1 px-2 py-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
-            >
-              <Trash2 size={14} />
-            </button>
+
+          {/* Inline Scenario History */}
+          <div className="bg-card/50 max-h-48 overflow-y-auto">
+            {activeScenario.changelog.length === 0 ? (
+              <div className="px-4 py-3 text-center text-muted-foreground text-xs">
+                No changes recorded yet. Changes will appear here as you modify this scenario.
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {activeScenario.changelog.slice().reverse().map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="px-4 py-2 flex items-start gap-3 hover:bg-accent/30 transition-colors"
+                  >
+                    <div className="mt-0.5">
+                      {getChangelogIcon(entry.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-medium truncate">{entry.entityName}</p>
+                        {entry.details?.['Target Team'] && (
+                          <span className="flex items-center gap-1 text-[10px] text-primary">
+                            <ArrowRight size={10} />
+                            {entry.details['Target Team'].after}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        {getEnhancedDescription(entry, activeScenario)}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {formatChangelogDate(entry.timestamp)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -474,64 +548,6 @@ export const ScenarioManager = ({
         </DialogContent>
       </Dialog>
 
-      {/* Changelog Dialog */}
-      <Dialog open={isChangelogOpen} onOpenChange={setIsChangelogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <History size={20} />
-              Scenario History
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 overflow-y-auto pt-4">
-            {activeScenario?.changelog.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <History size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No changes recorded yet</p>
-                <p className="text-xs mt-1">Changes will appear here as you modify this scenario</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {activeScenario?.changelog.slice().reverse().map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="p-3 rounded-lg border border-border bg-card/50"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5">
-                        {getChangelogIcon(entry.type)}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-medium">{entry.entityName}</p>
-                          <span className="text-[10px] text-muted-foreground">
-                            {formatChangelogDate(entry.timestamp)}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">{entry.description}</p>
-                        {entry.details && Object.keys(entry.details).length > 0 && (
-                          <div className="mt-2 space-y-1">
-                            {Object.entries(entry.details).map(([key, value]) => (
-                              <div key={key} className="text-[10px] text-muted-foreground">
-                                <span className="font-medium">{key}:</span>{' '}
-                                {value.before && <span className="text-destructive line-through">{value.before}</span>}
-                                {value.before && value.after && ' → '}
-                                {value.after && <span className="text-emerald-500">{value.after}</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* Compare Dialog */}
       <Dialog open={isCompareOpen} onOpenChange={setIsCompareOpen}>
         <DialogContent className="sm:max-w-lg">
@@ -600,9 +616,9 @@ export const ScenarioManager = ({
         </DialogContent>
       </Dialog>
 
-      {/* Merge Confirmation Dialog */}
-      <Dialog open={isMergeConfirmOpen} onOpenChange={setIsMergeConfirmOpen}>
-        <DialogContent className="sm:max-w-md">
+      {/* Selective Merge Dialog */}
+      <Dialog open={isMergeSelectOpen} onOpenChange={setIsMergeSelectOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-emerald-500">
               <GitMerge size={20} />
@@ -610,24 +626,108 @@ export const ScenarioManager = ({
             </DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 pt-4">
-            <p className="text-sm">
-              Are you sure you want to merge <strong>"{scenarioToMerge?.name}"</strong> into the Master Plan?
-            </p>
-            
+          <div className="space-y-4 pt-4 flex-1 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Select which changes from <strong>"{scenarioToMerge?.name}"</strong> to merge into the Master Plan.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={selectAllForMerge}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Select All
+                </button>
+                <span className="text-muted-foreground">|</span>
+                <button
+                  onClick={deselectAllForMerge}
+                  className="text-xs text-muted-foreground hover:underline"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+
+            <ScrollArea className="flex-1 max-h-96 border border-border rounded-xl">
+              {scenarioToMerge?.changelog.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <History size={32} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No changes to merge</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {scenarioToMerge?.changelog.slice().reverse().map((entry) => (
+                    <div
+                      key={entry.id}
+                      onClick={() => toggleMergeSelection(entry.id)}
+                      className={`p-3 flex items-start gap-3 cursor-pointer transition-colors ${
+                        selectedMergeIds.has(entry.id) 
+                          ? 'bg-emerald-500/10 hover:bg-emerald-500/15' 
+                          : 'hover:bg-accent/50'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {selectedMergeIds.has(entry.id) 
+                          ? <CheckSquare size={16} className="text-emerald-500" />
+                          : <Square size={16} className="text-muted-foreground" />
+                        }
+                      </div>
+                      <div className="mt-0.5">
+                        {getChangelogIcon(entry.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{entry.entityName}</p>
+                          {entry.details?.['Target Team'] && (
+                            <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                              <ArrowRight size={10} />
+                              {entry.details['Target Team'].after}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {getEnhancedDescription(entry, scenarioToMerge!)}
+                        </p>
+                        {entry.details && Object.keys(entry.details).length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-2">
+                            {Object.entries(entry.details).map(([key, value]) => (
+                              <span key={key} className="text-[10px] text-muted-foreground bg-accent px-1.5 py-0.5 rounded">
+                                <span className="font-medium">{key}:</span>{' '}
+                                {value.before && <span className="text-destructive line-through">{value.before}</span>}
+                                {value.before && value.after && ' → '}
+                                {value.after && <span className="text-emerald-500">{value.after}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {formatChangelogDate(entry.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+
             <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-sm text-amber-500">
-              <p className="font-medium">⚠️ This action will:</p>
-              <ul className="mt-2 space-y-1 ml-4 list-disc text-xs">
-                <li>Apply all proposed employee changes to master</li>
-                <li>Apply all proposed events & movements</li>
-                <li>Remove any deleted items from master</li>
-                <li>Delete this scenario after merge</li>
-              </ul>
+              <p className="font-medium">
+                {selectedMergeIds.size === 0 
+                  ? '⚠️ No changes selected - will merge all changes'
+                  : `✓ ${selectedMergeIds.size} change(s) selected to merge`
+                }
+              </p>
+              <p className="text-xs mt-1 text-amber-500/80">
+                The scenario will be deleted after merging.
+              </p>
             </div>
 
             <div className="flex gap-2 justify-end">
               <button
-                onClick={() => setIsMergeConfirmOpen(false)}
+                onClick={() => {
+                  setIsMergeSelectOpen(false);
+                  setSelectedMergeIds(new Set());
+                }}
                 className="px-4 py-2 text-sm bg-accent hover:bg-accent/80 rounded-lg transition-colors"
               >
                 Cancel
@@ -637,7 +737,7 @@ export const ScenarioManager = ({
                 className="px-4 py-2 text-sm bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg transition-colors flex items-center gap-2"
               >
                 <GitMerge size={16} />
-                Confirm Merge
+                {selectedMergeIds.size === 0 ? 'Merge All' : `Merge ${selectedMergeIds.size} Changes`}
               </button>
             </div>
           </div>

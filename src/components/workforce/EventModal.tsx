@@ -1,11 +1,11 @@
-import { X, BookOpen } from 'lucide-react';
-import { Employee, EVENT_TYPES, formatDate } from '@/lib/workforce-data';
-import { FormEvent, useState } from 'react';
+import { X, BookOpen, TrendingUp } from 'lucide-react';
+import { Employee, EVENT_TYPES, formatDate, SENIORITY_LEVELS } from '@/lib/workforce-data';
+import { FormEvent, useState, useMemo } from 'react';
 
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string }) => void;
+  onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string; newRole?: string }) => void;
   employees: Employee[];
   prefill: { empId: number | string; isFlag: boolean };
   departments: Record<string, string[]>;
@@ -16,8 +16,25 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
   const [selectedDept, setSelectedDept] = useState<string>(Object.keys(departments)[0] || '');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedEmpId, setSelectedEmpId] = useState<number | string>(prefill.empId);
+  const [selectedNewRole, setSelectedNewRole] = useState<string>('');
 
   if (!isOpen) return null;
+
+  // Get selected employee's current role for promotion options
+  const selectedEmployee = employees.find(e => e.id === Number(selectedEmpId));
+  
+  // For promotions, determine available next roles
+  const getPromotionOptions = (currentRole?: string): string[] => {
+    if (!currentRole) return [...SENIORITY_LEVELS];
+    const currentIdx = SENIORITY_LEVELS.indexOf(currentRole as typeof SENIORITY_LEVELS[number]);
+    if (currentIdx === -1) return [...SENIORITY_LEVELS]; // If current role not in seniority, show all
+    return SENIORITY_LEVELS.slice(currentIdx + 1) as unknown as string[];
+  };
+
+  const promotionOptions = useMemo(() => {
+    return getPromotionOptions(selectedEmployee?.role);
+  }, [selectedEmployee?.role]);
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -32,14 +49,16 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
       isFlag: type === 'Decision Flag',
       targetTeam: type === 'Team Swap' ? formData.get('targetTeam') as string : undefined,
       endDate: (type === 'Training' || type === 'Course') ? formData.get('endDate') as string : undefined,
+      newRole: type === 'Promotion' ? formData.get('newRole') as string : undefined,
     });
   };
 
   const allTeams = Object.values(departments).flat();
   const isTrainingType = selectedType === 'Training' || selectedType === 'Course';
+  const isPromotion = selectedType === 'Promotion';
 
-  // Extended event types with Training
-  const eventTypes = [...EVENT_TYPES, 'Training', 'Course'];
+  // Use EVENT_TYPES directly (no duplicates)
+  const eventTypes = [...EVENT_TYPES];
 
   return (
     <div className="fixed inset-0 bg-background/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-fade-in">
@@ -63,12 +82,13 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
             </label>
             <select 
               name="empId" 
-              defaultValue={prefill.empId} 
+              value={selectedEmpId}
+              onChange={(e) => setSelectedEmpId(e.target.value)}
               className="select-field w-full"
             >
               {employees.map(e => (
                 <option key={e.id} value={e.id}>
-                  {e.name} ({e.team})
+                  {e.name} ({e.team}) - {e.role}
                 </option>
               ))}
             </select>
@@ -158,6 +178,40 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
+              </div>
+            </div>
+          )}
+
+          {/* New Role selector for Promotion */}
+          {isPromotion && (
+            <div>
+              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+                Promote To
+              </label>
+              {promotionOptions.length > 0 ? (
+                <select 
+                  name="newRole" 
+                  required
+                  value={selectedNewRole}
+                  onChange={(e) => setSelectedNewRole(e.target.value)}
+                  className="select-field w-full"
+                >
+                  <option value="">Select new role...</option>
+                  {promotionOptions.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="p-3 bg-muted/50 rounded-xl border border-border text-sm text-muted-foreground">
+                  {selectedEmployee?.role} is already at the highest level
+                </div>
+              )}
+              <div className="flex items-start gap-3 p-3 bg-accent/50 rounded-xl border border-border mt-3">
+                <TrendingUp size={16} className="text-primary mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  Current role: <strong className="text-foreground">{selectedEmployee?.role || 'Unknown'}</strong>. 
+                  Promotions update the employee's role and are tracked in the changelog.
+                </p>
               </div>
             </div>
           )}
