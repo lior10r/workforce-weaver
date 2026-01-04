@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, TrendingUp } from 'lucide-react';
 import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -27,6 +27,14 @@ interface TrainingPeriod {
 interface TransferInfo {
   fromTeam: string;
   transferDate: string;
+}
+
+// Auto-promotion milestone
+interface AutoPromotion {
+  date: string;
+  fromRole: string;
+  toRole: string;
+  yearsRequired: number;
 }
 
 const getDiffBorderColor = (status?: DiffStatus) => {
@@ -82,6 +90,56 @@ export const Timeline = ({
         endDate: e.endDate!,
         details: e.details
       }));
+  };
+
+  // Calculate automatic tenure-based promotions for an employee
+  const getAutoPromotions = (emp: Employee): AutoPromotion[] => {
+    // Skip non-dev roles
+    const devRoles = ['Junior Dev', 'Mid-Level Dev', 'Senior Dev'];
+    if (!devRoles.includes(emp.role) && emp.role !== 'Junior Dev') {
+      // Check if they started as Junior
+      const isDevTrack = emp.role === 'Junior Dev' || emp.role === 'Mid-Level Dev' || emp.role === 'Senior Dev';
+      if (!isDevTrack) return [];
+    }
+
+    const promotions: AutoPromotion[] = [];
+    const joinDate = new Date(emp.joined);
+    
+    // 1 year: Junior → Mid-Level
+    const midLevelDate = new Date(joinDate);
+    midLevelDate.setFullYear(midLevelDate.getFullYear() + 1);
+    
+    // 3 years total: Mid-Level → Senior (2 years after becoming mid-level)
+    const seniorDate = new Date(joinDate);
+    seniorDate.setFullYear(seniorDate.getFullYear() + 3);
+
+    // Only show promotions based on starting role
+    if (emp.role === 'Junior Dev') {
+      promotions.push({
+        date: midLevelDate.toISOString().split('T')[0],
+        fromRole: 'Junior Dev',
+        toRole: 'Mid-Level Dev',
+        yearsRequired: 1
+      });
+      promotions.push({
+        date: seniorDate.toISOString().split('T')[0],
+        fromRole: 'Mid-Level Dev',
+        toRole: 'Senior Dev',
+        yearsRequired: 3
+      });
+    } else if (emp.role === 'Mid-Level Dev') {
+      // Already mid-level, only show senior promotion
+      const seniorFromMid = new Date(joinDate);
+      seniorFromMid.setFullYear(seniorFromMid.getFullYear() + 2);
+      promotions.push({
+        date: seniorFromMid.toISOString().split('T')[0],
+        fromRole: 'Mid-Level Dev',
+        toRole: 'Senior Dev',
+        yearsRequired: 2
+      });
+    }
+
+    return promotions;
   };
 
   // Get transfer info for an employee who transferred to a team
@@ -392,6 +450,48 @@ export const Timeline = ({
                     <p className="text-muted-foreground">{training.details}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(training.startDate)} - {formatDate(training.endDate)}
+                    </p>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            );
+          })}
+
+          {/* Auto-Promotion Markers */}
+          {!isPotential && getAutoPromotions(emp).map((promo, idx) => {
+            const promoPos = getTimelinePosition(promo.date);
+            const isPast = new Date(promo.date) < currentDate;
+            
+            return (
+              <Tooltip key={`promo-${idx}`}>
+                <TooltipTrigger asChild>
+                  <div 
+                    style={{ left: `${promoPos}%` }}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-15"
+                  >
+                    <div className={`p-1 rounded-full shadow-md transition-transform hover:scale-110 ${
+                      isPast ? 'bg-emerald-500/80' : 'bg-amber-500/80 ring-1 ring-amber-400'
+                    }`}>
+                      <TrendingUp size={10} className="text-white" />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+                  <div className="space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={14} className={isPast ? 'text-emerald-500' : 'text-amber-500'} />
+                      <p className="font-bold text-foreground">
+                        {isPast ? 'Completed Promotion' : 'Upcoming Promotion'}
+                      </p>
+                    </div>
+                    <p className="text-muted-foreground">
+                      {promo.fromRole} → <span className="text-primary font-medium">{promo.toRole}</span>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      After {promo.yearsRequired} year{promo.yearsRequired > 1 ? 's' : ''} of tenure
+                    </p>
+                    <p className="text-[10px] font-mono text-muted-foreground">
+                      {formatDate(promo.date)}
                     </p>
                   </div>
                 </TooltipContent>
