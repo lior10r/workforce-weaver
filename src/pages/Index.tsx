@@ -13,6 +13,7 @@ import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
+import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { 
   Employee, 
@@ -498,12 +499,29 @@ const Index = () => {
     events?: WorkforceEvent[];
     teamStructures?: TeamStructure[];
     departments?: Record<string, string[]>;
+    hierarchy?: import('@/lib/workforce-data').HierarchyStructure;
   }) => {
     if (data.employees) setMasterEmployeesDirect(data.employees);
     if (data.events) setMasterEventsDirect(data.events);
     if (data.teamStructures) setMasterTeamStructuresDirect(data.teamStructures);
-    if (data.departments) {
-      // For imports, just update scope filter - hierarchy structure preserved
+    if (data.hierarchy) {
+      setHierarchyDirect(data.hierarchy);
+      // Update scope filter to match new hierarchy
+      const allDepts = data.hierarchy.map(d => d.name);
+      const allGroups: string[] = [];
+      const allTeams: string[] = [];
+      data.hierarchy.forEach(d => {
+        d.groups.forEach(g => {
+          allGroups.push(g.name);
+          allTeams.push(...g.teams);
+        });
+        if (d.directTeams && d.directTeams.length > 0) {
+          allTeams.push(...d.directTeams);
+        }
+      });
+      setScopeFilter({ departments: allDepts, groups: allGroups, teams: allTeams });
+    } else if (data.departments) {
+      // Legacy format fallback
       const allTeams = Object.values(data.departments).flat();
       setScopeFilter({
         departments: Object.keys(data.departments),
@@ -511,6 +529,23 @@ const Index = () => {
         teams: allTeams
       });
     }
+  };
+
+  const handleImportHierarchy = (importedHierarchy: import('@/lib/workforce-data').HierarchyStructure) => {
+    setHierarchyDirect(importedHierarchy);
+    const allDepts = importedHierarchy.map(d => d.name);
+    const allGroups: string[] = [];
+    const allTeams: string[] = [];
+    importedHierarchy.forEach(d => {
+      d.groups.forEach(g => {
+        allGroups.push(g.name);
+        allTeams.push(...g.teams);
+      });
+      if (d.directTeams && d.directTeams.length > 0) {
+        allTeams.push(...d.directTeams);
+      }
+    });
+    setScopeFilter({ departments: allDepts, groups: allGroups, teams: allTeams });
   };
 
   const getViewTitle = () => {
@@ -610,10 +645,12 @@ const Index = () => {
                   events={masterEvents}
                   teamStructures={masterTeamStructures}
                   departments={departments}
+                  hierarchy={hierarchy}
                   onImportEmployees={handleImportEmployees}
                   onImportEvents={handleImportEvents}
                   onImportTeamStructures={handleImportTeamStructures}
                   onImportDepartments={handleImportDepartments}
+                  onImportHierarchy={handleImportHierarchy}
                   onImportAll={handleImportAll}
                   orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
                 />
@@ -763,15 +800,44 @@ const Index = () => {
           )}
 
           {view === 'planner' && (
-            <Planner 
-              employees={employees}
-              events={events}
-              onAddMovement={() => {
-                setEventPrefill({ empId: employees[0]?.id || '', isFlag: false });
-                setIsEventModalOpen(true);
-              }}
-              onDeleteEvent={handleDeleteEvent}
-            />
+            <div className="space-y-6">
+              <DecisionFlagsPanel
+                employees={employees}
+                events={events}
+                departments={departments}
+                onResolveFlag={(eventId) => {
+                  // Resolve by updating the event date to now (marking as done)
+                  const event = events.find(e => e.id === eventId);
+                  if (event) {
+                    const resolvedEvent = { ...event, date: new Date().toISOString().split('T')[0] };
+                    if (activeScenario) {
+                      setScenarios(prev => prev.map(s => {
+                        if (s.id !== activeScenarioId) return s;
+                        const isProposed = s.proposedEvents.some(e => e.id === eventId);
+                        if (isProposed) {
+                          return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? resolvedEvent : e) };
+                        } else {
+                          return { ...s, proposedEvents: [...s.proposedEvents, resolvedEvent] };
+                        }
+                      }));
+                    } else {
+                      pushToHistory();
+                      setMasterEventsDirect(prev => prev.map(e => e.id === eventId ? resolvedEvent : e));
+                    }
+                  }
+                }}
+                onDeleteFlag={handleDeleteEvent}
+              />
+              <Planner 
+                employees={employees}
+                events={events}
+                onAddMovement={() => {
+                  setEventPrefill({ empId: employees[0]?.id || '', isFlag: false });
+                  setIsEventModalOpen(true);
+                }}
+                onDeleteEvent={handleDeleteEvent}
+              />
+            </div>
           )}
 
           {view === 'analytics' && (

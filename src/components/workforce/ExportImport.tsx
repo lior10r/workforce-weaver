@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Download, Upload, FileJson, Users, Calendar, Building2, X, FileText, Image } from 'lucide-react';
-import { Employee, WorkforceEvent, TeamStructure, DEPARTMENTS } from '@/lib/workforce-data';
+import { Employee, WorkforceEvent, TeamStructure, HierarchyStructure, DEPARTMENTS } from '@/lib/workforce-data';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
@@ -11,15 +11,18 @@ interface ExportImportProps {
   events: WorkforceEvent[];
   teamStructures: TeamStructure[];
   departments: Record<string, string[]>;
+  hierarchy: HierarchyStructure;
   onImportEmployees: (employees: Employee[]) => void;
   onImportEvents: (events: WorkforceEvent[]) => void;
   onImportTeamStructures: (structures: TeamStructure[]) => void;
   onImportDepartments: (departments: Record<string, string[]>) => void;
+  onImportHierarchy: (hierarchy: HierarchyStructure) => void;
   onImportAll: (data: {
     employees?: Employee[];
     events?: WorkforceEvent[];
     teamStructures?: TeamStructure[];
     departments?: Record<string, string[]>;
+    hierarchy?: HierarchyStructure;
   }) => void;
   orgChartRef?: React.RefObject<HTMLDivElement>;
 }
@@ -31,6 +34,7 @@ interface FullExportData {
   events: WorkforceEvent[];
   teamStructures: TeamStructure[];
   departments: Record<string, string[]>;
+  hierarchy: HierarchyStructure;
 }
 
 interface ExportData {
@@ -40,6 +44,7 @@ interface ExportData {
   events?: WorkforceEvent[];
   teamStructures?: TeamStructure[];
   departments?: Record<string, string[]>;
+  hierarchy?: HierarchyStructure;
 }
 
 export const ExportImport = ({
@@ -47,10 +52,12 @@ export const ExportImport = ({
   events,
   teamStructures,
   departments,
+  hierarchy,
   onImportEmployees,
   onImportEvents,
   onImportTeamStructures,
   onImportDepartments,
+  onImportHierarchy,
   onImportAll,
   orgChartRef
 }: ExportImportProps) => {
@@ -140,7 +147,7 @@ export const ExportImport = ({
     const allTeamStructures = getAllTeamStructures();
     
     const data: FullExportData = {
-      version: '2.0',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       employees: employees.map(e => ({
         ...e,
@@ -153,7 +160,8 @@ export const ExportImport = ({
         endDate: e.endDate || undefined
       })),
       teamStructures: allTeamStructures,
-      departments
+      departments,
+      hierarchy
     };
     downloadJSON(data, `workforce-full-export-${new Date().toISOString().split('T')[0]}.json`);
     setIsExportOpen(false);
@@ -333,7 +341,7 @@ export const ExportImport = ({
     reader.readAsText(file);
   };
 
-  const handleImport = (type: 'all' | 'employees' | 'events' | 'teamStructures' | 'departments') => {
+  const handleImport = (type: 'all' | 'employees' | 'events' | 'teamStructures' | 'departments' | 'hierarchy') => {
     if (!importPreview) return;
 
     switch (type) {
@@ -342,7 +350,8 @@ export const ExportImport = ({
           employees: importPreview.employees,
           events: importPreview.events,
           teamStructures: importPreview.teamStructures,
-          departments: importPreview.departments
+          departments: importPreview.departments,
+          hierarchy: importPreview.hierarchy
         });
         toast.success('Imported all data successfully');
         break;
@@ -368,6 +377,12 @@ export const ExportImport = ({
         if (importPreview.departments) {
           onImportDepartments(importPreview.departments);
           toast.success('Imported departments');
+        }
+        break;
+      case 'hierarchy':
+        if (importPreview.hierarchy) {
+          onImportHierarchy(importPreview.hierarchy);
+          toast.success('Imported hierarchy structure');
         }
         break;
     }
