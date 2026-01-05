@@ -35,6 +35,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScenarioComparisonDialog } from './ScenarioComparisonDialog';
 
 interface ScenarioManagerProps {
   scenarios: Scenario[];
@@ -69,6 +70,7 @@ export const ScenarioManager = ({
 }: ScenarioManagerProps) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isDetailedCompareOpen, setIsDetailedCompareOpen] = useState(false);
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
   const [isMergeSelectOpen, setIsMergeSelectOpen] = useState(false);
   const [scenarioToMerge, setScenarioToMerge] = useState<Scenario | null>(null);
@@ -77,6 +79,7 @@ export const ScenarioManager = ({
   const [newScenarioDesc, setNewScenarioDesc] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
   const [selectedMergeIds, setSelectedMergeIds] = useState<Set<string>>(new Set());
+  const [selectedCompareScenarioId, setSelectedCompareScenarioId] = useState<string | null>(null);
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
   const compareScenario = scenarios.find(s => s.id === compareScenarioId);
@@ -297,86 +300,45 @@ export const ScenarioManager = ({
         </div>
       </div>
 
-      {/* Active Scenario Info Bar with Inline History */}
+      {/* Active Scenario Info Bar - Compact without inline history */}
       {activeScenario && (
-        <div className="border-b border-primary/20">
-          <div className="flex items-center justify-between px-4 py-2 bg-primary/5">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Layers size={14} className="text-primary" />
-                <span className="text-sm font-semibold">{activeScenario.name}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">{activeScenario.description}</span>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="px-2 py-0.5 bg-accent rounded">
-                  {getScenarioStats(activeScenario).proposedChanges} proposed changes
-                </span>
-                {getScenarioStats(activeScenario).deletions > 0 && (
-                  <span className="px-2 py-0.5 bg-destructive/10 text-destructive rounded">
-                    {getScenarioStats(activeScenario).deletions} removals
-                  </span>
-                )}
-              </div>
-            </div>
-            
+        <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-primary/20">
+          <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setScenarioToMerge(activeScenario);
-                  setSelectedMergeIds(new Set(activeScenario.changelog.map(c => c.id)));
-                  setIsMergeSelectOpen(true);
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
-              >
-                <GitMerge size={14} />
-                Merge to Master
-              </button>
-              <button
-                onClick={() => onDeleteScenario(activeScenario.id)}
-                className="flex items-center gap-1 px-2 py-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
-              >
-                <Trash2 size={14} />
-              </button>
+              <Layers size={14} className="text-primary" />
+              <span className="text-sm font-semibold">{activeScenario.name}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">{activeScenario.description}</span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2 py-0.5 bg-accent rounded">
+                {getScenarioStats(activeScenario).proposedChanges} proposed changes
+              </span>
+              {getScenarioStats(activeScenario).deletions > 0 && (
+                <span className="px-2 py-0.5 bg-destructive/10 text-destructive rounded">
+                  {getScenarioStats(activeScenario).deletions} removals
+                </span>
+              )}
             </div>
           </div>
-
-          {/* Inline Scenario History */}
-          <div className="bg-card/50 max-h-48 overflow-y-auto">
-            {activeScenario.changelog.length === 0 ? (
-              <div className="px-4 py-3 text-center text-muted-foreground text-xs">
-                No changes recorded yet. Changes will appear here as you modify this scenario.
-              </div>
-            ) : (
-              <div className="divide-y divide-border">
-                {activeScenario.changelog.slice().reverse().map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="px-4 py-2 flex items-start gap-3 hover:bg-accent/30 transition-colors"
-                  >
-                    <div className="mt-0.5">
-                      {getChangelogIcon(entry.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-medium truncate">{entry.entityName}</p>
-                        {entry.details?.['Target Team'] && (
-                          <span className="flex items-center gap-1 text-[10px] text-primary">
-                            <ArrowRight size={10} />
-                            {entry.details['Target Team'].after}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-muted-foreground truncate">
-                        {getEnhancedDescription(entry, activeScenario)}
-                      </p>
-                    </div>
-                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                      {formatChangelogDate(entry.timestamp)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
+          
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setScenarioToMerge(activeScenario);
+                setSelectedMergeIds(new Set(activeScenario.changelog.map(c => c.id)));
+                setIsMergeSelectOpen(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 rounded-lg transition-colors"
+            >
+              <GitMerge size={14} />
+              Merge to Master
+            </button>
+            <button
+              onClick={() => onDeleteScenario(activeScenario.id)}
+              className="flex items-center gap-1 px-2 py-1.5 text-xs bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
+            >
+              <Trash2 size={14} />
+            </button>
           </div>
         </div>
       )}
@@ -560,46 +522,81 @@ export const ScenarioManager = ({
           
           <div className="space-y-4 pt-4">
             <p className="text-sm text-muted-foreground">
-              Select a scenario to compare against the Master Plan. Differences will be highlighted in the roster and timeline views.
+              Select a scenario to compare against the Master Plan. You can view a detailed side-by-side comparison or enable comparison mode for inline highlights.
             </p>
             
             <div className="space-y-2">
               {scenarios.map(scenario => {
                 const stats = getScenarioStats(scenario);
                 return (
-                  <button
+                  <div
                     key={scenario.id}
-                    onClick={() => {
-                      onSetCompareScenario(scenario.id);
-                      setIsCompareOpen(false);
-                    }}
-                    className={`w-full p-4 rounded-xl border transition-all text-left ${
-                      compareScenarioId === scenario.id
+                    className={`p-4 rounded-xl border transition-all ${
+                      selectedCompareScenarioId === scenario.id
                         ? 'border-primary bg-primary/5'
                         : 'border-border hover:border-primary/50 bg-card'
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-semibold">{scenario.name}</h4>
-                        {scenario.description && (
-                          <p className="text-xs text-muted-foreground mt-1">{scenario.description}</p>
+                    <button
+                      onClick={() => setSelectedCompareScenarioId(
+                        selectedCompareScenarioId === scenario.id ? null : scenario.id
+                      )}
+                      className="w-full text-left"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-semibold">{scenario.name}</h4>
+                          {scenario.description && (
+                            <p className="text-xs text-muted-foreground mt-1">{scenario.description}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-3 mt-3 text-xs">
+                        <span className="px-2 py-0.5 bg-accent rounded">{stats.employees} employees</span>
+                        <span className="px-2 py-0.5 bg-accent rounded">{stats.events} events</span>
+                        {stats.proposedChanges > 0 && (
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
+                            {stats.proposedChanges} changes
+                          </span>
                         )}
                       </div>
-                    </div>
-                    <div className="flex gap-3 mt-3 text-xs">
-                      <span className="px-2 py-0.5 bg-accent rounded">{stats.employees} employees</span>
-                      <span className="px-2 py-0.5 bg-accent rounded">{stats.events} events</span>
-                      {stats.proposedChanges > 0 && (
-                        <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
-                          {stats.proposedChanges} changes
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                    </button>
+                    
+                    {selectedCompareScenarioId === scenario.id && (
+                      <div className="flex gap-2 mt-4 pt-3 border-t border-border">
+                        <button
+                          onClick={() => {
+                            onSetCompareScenario(scenario.id);
+                            setIsCompareOpen(false);
+                            setSelectedCompareScenarioId(null);
+                          }}
+                          className="flex-1 px-3 py-2 text-xs bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+                        >
+                          Enable Inline Highlights
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsDetailedCompareOpen(true);
+                            setIsCompareOpen(false);
+                          }}
+                          className="flex-1 px-3 py-2 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg transition-colors flex items-center justify-center gap-1"
+                        >
+                          <ArrowRightLeft size={12} />
+                          Side-by-Side View
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
+
+            {scenarios.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p className="text-sm">No scenarios to compare.</p>
+                <p className="text-xs mt-1">Create a scenario first to enable comparison.</p>
+              </div>
+            )}
 
             {compareScenarioId && (
               <button
@@ -607,7 +604,7 @@ export const ScenarioManager = ({
                   onSetCompareScenario(null);
                   setIsCompareOpen(false);
                 }}
-                className="w-full px-4 py-2 text-sm bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+                className="w-full px-4 py-2 text-sm bg-destructive/10 hover:bg-destructive/20 text-destructive rounded-lg transition-colors"
               >
                 Exit Comparison Mode
               </button>
@@ -615,6 +612,19 @@ export const ScenarioManager = ({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Detailed Side-by-Side Comparison Dialog */}
+      <ScenarioComparisonDialog
+        isOpen={isDetailedCompareOpen}
+        onClose={() => {
+          setIsDetailedCompareOpen(false);
+          setSelectedCompareScenarioId(null);
+        }}
+        scenarios={scenarios}
+        masterEmployees={masterEmployees}
+        masterEvents={masterEvents}
+        compareScenarioId={selectedCompareScenarioId}
+      />
 
       {/* Selective Merge Dialog */}
       <Dialog open={isMergeSelectOpen} onOpenChange={setIsMergeSelectOpen}>
