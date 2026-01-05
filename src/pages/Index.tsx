@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, UserPlus, ChevronRight } from 'lucide-react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { Search, UserPlus, ChevronRight, Lock } from 'lucide-react';
 import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
@@ -15,6 +15,7 @@ import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
+import { toast } from 'sonner';
 import { 
   Employee, 
   WorkforceEvent, 
@@ -27,7 +28,8 @@ import {
   getScenarioEvents,
   getEmployeeDiffs,
   getEventDiffs,
-  addScenarioChangelogEntry
+  addScenarioChangelogEntry,
+  createScenario
 } from '@/lib/workforce-data';
 
 interface ScopeFilter {
@@ -227,8 +229,29 @@ const Index = () => {
     }));
   };
 
+  // Auto-create scenario helper for Master Plan protection
+  const ensureWorkingScenario = useCallback((): string | null => {
+    if (activeScenarioId) {
+      return activeScenarioId;
+    }
+    // Create a working draft scenario automatically
+    const workingDraft = createScenario(
+      'Working Draft',
+      'Auto-created for changes',
+      masterEmployees,
+      masterEvents,
+      masterTeamStructures,
+      hierarchy
+    );
+    setScenarios(prev => [...prev, workingDraft]);
+    setActiveScenarioId(workingDraft.id);
+    toast.info('Created "Working Draft" scenario - Master Plan is read-only. Merge when ready.');
+    return workingDraft.id;
+  }, [activeScenarioId, masterEmployees, masterEvents, masterTeamStructures, hierarchy, setScenarios]);
+
   const handleDeleteEmployee = (employeeId: number) => {
-    deleteEmployee(employeeId, activeScenarioId);
+    const scenarioId = ensureWorkingScenario();
+    deleteEmployee(employeeId, scenarioId);
   };
 
   const handleAddEmployee = (employeeData: Omit<Employee, 'id'>, id?: number) => {
@@ -237,67 +260,49 @@ const Index = () => {
     const isEditing = !!id;
     const existingEmployee = isEditing ? employees.find(e => e.id === id) : null;
     
-    if (activeScenario) {
-      setScenarios(prev => prev.map(s => {
-        if (s.id !== activeScenarioId) return s;
-        
-        let updatedScenario = { ...s };
-        const existingIdx = s.proposedEmployees.findIndex(e => e.id === newId);
-        
-        if (existingIdx >= 0) {
-          const updated = [...s.proposedEmployees];
-          updated[existingIdx] = newEmployee;
-          updatedScenario = { ...updatedScenario, proposedEmployees: updated };
-        } else {
-          updatedScenario = { 
-            ...updatedScenario, 
-            proposedEmployees: [...s.proposedEmployees, newEmployee]
-          };
-        }
-        
-        const changeDetails: Record<string, { before?: string; after?: string }> = {};
-        if (isEditing && existingEmployee) {
-          if (existingEmployee.team !== newEmployee.team) {
-            changeDetails['Team'] = { before: existingEmployee.team, after: newEmployee.team };
-          }
-          if (existingEmployee.role !== newEmployee.role) {
-            changeDetails['Role'] = { before: existingEmployee.role, after: newEmployee.role };
-          }
-          if (existingEmployee.status !== newEmployee.status) {
-            changeDetails['Status'] = { before: existingEmployee.status, after: newEmployee.status };
-          }
-        }
-        
-        return addScenarioChangelogEntry(
-          updatedScenario,
-          isEditing ? 'employee_modified' : 'employee_added',
-          newId,
-          newEmployee.name,
-          isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team}`,
-          Object.keys(changeDetails).length > 0 ? changeDetails : undefined
-        );
-      }));
-    } else {
-      pushToHistory();
-      if (id) {
-        setMasterEmployeesDirect(prev => prev.map(emp => 
-          emp.id === id ? newEmployee : emp
-        ));
+    // Always work in a scenario - auto-create if needed
+    const scenarioId = ensureWorkingScenario();
+    
+    setScenarios(prev => prev.map(s => {
+      if (s.id !== scenarioId) return s;
+      
+      let updatedScenario = { ...s };
+      const existingIdx = s.proposedEmployees.findIndex(e => e.id === newId);
+      
+      if (existingIdx >= 0) {
+        const updated = [...s.proposedEmployees];
+        updated[existingIdx] = newEmployee;
+        updatedScenario = { ...updatedScenario, proposedEmployees: updated };
       } else {
-        const departureDate = new Date(employeeData.joined);
-        departureDate.setFullYear(departureDate.getFullYear() + 6);
-        
-        setMasterEmployeesDirect(prev => [...prev, newEmployee]);
-        setMasterEventsDirect(prev => [...prev, {
-          id: Date.now() + 1,
-          empId: newId,
-          type: 'Departure',
-          date: departureDate.toISOString().split('T')[0],
-          details: 'Standard 6-year rotation cycle',
-          isFlag: false
-        }]);
+        updatedScenario = { 
+          ...updatedScenario, 
+          proposedEmployees: [...s.proposedEmployees, newEmployee]
+        };
       }
-    }
+      
+      const changeDetails: Record<string, { before?: string; after?: string }> = {};
+      if (isEditing && existingEmployee) {
+        if (existingEmployee.team !== newEmployee.team) {
+          changeDetails['Team'] = { before: existingEmployee.team, after: newEmployee.team };
+        }
+        if (existingEmployee.role !== newEmployee.role) {
+          changeDetails['Role'] = { before: existingEmployee.role, after: newEmployee.role };
+        }
+        if (existingEmployee.status !== newEmployee.status) {
+          changeDetails['Status'] = { before: existingEmployee.status, after: newEmployee.status };
+        }
+      }
+      
+      return addScenarioChangelogEntry(
+        updatedScenario,
+        isEditing ? 'employee_modified' : 'employee_added',
+        newId,
+        newEmployee.name,
+        isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team}`,
+        Object.keys(changeDetails).length > 0 ? changeDetails : undefined
+      );
+    }));
+    
     setIsEmployeeModalOpen(false);
     setEditingEmployee(null);
   };
@@ -306,70 +311,60 @@ const Index = () => {
     const newEvent = { ...eventData, id: Date.now() };
     const emp = employees.find(e => e.id === eventData.empId);
     
+    // Always work in a scenario
+    const scenarioId = ensureWorkingScenario();
+    
     // For promotions, also update the employee's role
     if (eventData.type === 'Promotion' && eventData.newRole) {
-      if (activeScenario) {
-        setScenarios(prev => prev.map(s => {
-          if (s.id !== activeScenarioId) return s;
-          
-          const existingEmpIdx = s.proposedEmployees.findIndex(e => e.id === eventData.empId);
-          const empToUpdate = existingEmpIdx >= 0 ? s.proposedEmployees[existingEmpIdx] : emp;
-          
-          if (!empToUpdate) return s;
-          
-          const updatedEmp = { ...empToUpdate, role: eventData.newRole! };
-          let updatedEmployees: Employee[];
-          if (existingEmpIdx >= 0) {
-            updatedEmployees = [...s.proposedEmployees];
-            updatedEmployees[existingEmpIdx] = updatedEmp;
-          } else {
-            updatedEmployees = [...s.proposedEmployees, updatedEmp];
-          }
-          
-          const updatedScenario = { 
-            ...s, 
-            proposedEvents: [...s.proposedEvents, newEvent],
-            proposedEmployees: updatedEmployees
-          };
-          
-          return addScenarioChangelogEntry(
-            updatedScenario,
-            'event_added',
-            newEvent.id,
-            emp?.name || `Employee #${eventData.empId}`,
-            `Promoted to ${eventData.newRole}: ${eventData.details}`,
-            { Role: { before: empToUpdate.role, after: eventData.newRole! } }
-          );
-        }));
-      } else {
-        pushToHistory();
-        setMasterEmployeesDirect(prev => prev.map(e => 
-          e.id === eventData.empId ? { ...e, role: eventData.newRole! } : e
-        ));
-        setMasterEventsDirect(prev => [...prev, newEvent]);
-      }
+      setScenarios(prev => prev.map(s => {
+        if (s.id !== scenarioId) return s;
+        
+        const existingEmpIdx = s.proposedEmployees.findIndex(e => e.id === eventData.empId);
+        const empToUpdate = existingEmpIdx >= 0 ? s.proposedEmployees[existingEmpIdx] : emp;
+        
+        if (!empToUpdate) return s;
+        
+        const updatedEmp = { ...empToUpdate, role: eventData.newRole! };
+        let updatedEmployees: Employee[];
+        if (existingEmpIdx >= 0) {
+          updatedEmployees = [...s.proposedEmployees];
+          updatedEmployees[existingEmpIdx] = updatedEmp;
+        } else {
+          updatedEmployees = [...s.proposedEmployees, updatedEmp];
+        }
+        
+        const updatedScenario = { 
+          ...s, 
+          proposedEvents: [...s.proposedEvents, newEvent],
+          proposedEmployees: updatedEmployees
+        };
+        
+        return addScenarioChangelogEntry(
+          updatedScenario,
+          'event_added',
+          newEvent.id,
+          emp?.name || `Employee #${eventData.empId}`,
+          `Promoted to ${eventData.newRole}: ${eventData.details}`,
+          { Role: { before: empToUpdate.role, after: eventData.newRole! } }
+        );
+      }));
     } else {
-      if (activeScenario) {
-        setScenarios(prev => prev.map(s => {
-          if (s.id !== activeScenarioId) return s;
-          const updatedScenario = { 
-            ...s, 
-            proposedEvents: [...s.proposedEvents, newEvent]
-          };
-          
-          return addScenarioChangelogEntry(
-            updatedScenario,
-            'event_added',
-            newEvent.id,
-            emp?.name || `Employee #${eventData.empId}`,
-            `Added ${eventData.type}${eventData.isFlag ? ' (Flag)' : ''}: ${eventData.details}`,
-            eventData.targetTeam ? { 'Target Team': { after: eventData.targetTeam } } : undefined
-          );
-        }));
-      } else {
-        pushToHistory();
-        setMasterEventsDirect(prev => [...prev, newEvent]);
-      }
+      setScenarios(prev => prev.map(s => {
+        if (s.id !== scenarioId) return s;
+        const updatedScenario = { 
+          ...s, 
+          proposedEvents: [...s.proposedEvents, newEvent]
+        };
+        
+        return addScenarioChangelogEntry(
+          updatedScenario,
+          'event_added',
+          newEvent.id,
+          emp?.name || `Employee #${eventData.empId}`,
+          `Added ${eventData.type}${eventData.isFlag ? ' (Flag)' : ''}: ${eventData.details}`,
+          eventData.targetTeam ? { 'Target Team': { after: eventData.targetTeam } } : undefined
+        );
+      }));
     }
     setIsEventModalOpen(false);
   };
@@ -378,31 +373,30 @@ const Index = () => {
     const event = events.find(e => e.id === eventId);
     const emp = event ? employees.find(e => e.id === event.empId) : null;
     
-    if (activeScenario) {
-      setScenarios(prev => prev.map(s => {
-        if (s.id !== activeScenarioId) return s;
-        
-        // Check if it's a proposed event or base event
-        const isProposed = s.proposedEvents.some(e => e.id === eventId);
-        
-        let updatedScenario = { ...s };
-        if (isProposed) {
-          updatedScenario = { ...updatedScenario, proposedEvents: s.proposedEvents.filter(e => e.id !== eventId) };
-        } else {
-          updatedScenario = { ...updatedScenario, deletedEventIds: [...s.deletedEventIds, eventId] };
-        }
-        
-        return addScenarioChangelogEntry(
-          updatedScenario,
-          'event_removed',
-          eventId,
-          emp?.name || 'Unknown',
-          `Removed ${event?.type || 'event'}${event?.isFlag ? ' (Flag)' : ''}`
-        );
-      }));
-    } else {
-      deleteEvent(eventId);
-    }
+    // Always work in a scenario
+    const scenarioId = ensureWorkingScenario();
+    
+    setScenarios(prev => prev.map(s => {
+      if (s.id !== scenarioId) return s;
+      
+      // Check if it's a proposed event or base event
+      const isProposed = s.proposedEvents.some(e => e.id === eventId);
+      
+      let updatedScenario = { ...s };
+      if (isProposed) {
+        updatedScenario = { ...updatedScenario, proposedEvents: s.proposedEvents.filter(e => e.id !== eventId) };
+      } else {
+        updatedScenario = { ...updatedScenario, deletedEventIds: [...s.deletedEventIds, eventId] };
+      }
+      
+      return addScenarioChangelogEntry(
+        updatedScenario,
+        'event_removed',
+        eventId,
+        emp?.name || 'Unknown',
+        `Removed ${event?.type || 'event'}${event?.isFlag ? ' (Flag)' : ''}`
+      );
+    }));
   };
 
   const openPlannerForUser = (empId: number, asFlag = false) => {
@@ -733,63 +727,51 @@ const Index = () => {
                 });
               }}
               onBulkAssignManager={(employeeIds, managerId) => {
-                if (activeScenario) {
-                  setScenarios(prev => prev.map(s => {
-                    if (s.id !== activeScenarioId) return s;
-                    const updatedEmployees = [...s.proposedEmployees];
-                    employeeIds.forEach(empId => {
-                      const existing = updatedEmployees.findIndex(e => e.id === empId);
-                      const emp = employees.find(e => e.id === empId);
-                      if (emp) {
-                        const updated = { ...emp, managerId: managerId || undefined };
-                        if (existing >= 0) {
-                          updatedEmployees[existing] = updated;
-                        } else {
-                          updatedEmployees.push(updated);
-                        }
+                const scenarioId = ensureWorkingScenario();
+                setScenarios(prev => prev.map(s => {
+                  if (s.id !== scenarioId) return s;
+                  const updatedEmployees = [...s.proposedEmployees];
+                  employeeIds.forEach(empId => {
+                    const existing = updatedEmployees.findIndex(e => e.id === empId);
+                    const emp = employees.find(e => e.id === empId);
+                    if (emp) {
+                      const updated = { ...emp, managerId: managerId || undefined };
+                      if (existing >= 0) {
+                        updatedEmployees[existing] = updated;
+                      } else {
+                        updatedEmployees.push(updated);
                       }
-                    });
-                    return { ...s, proposedEmployees: updatedEmployees };
-                  }));
-                } else {
-                  pushToHistory();
-                  setMasterEmployeesDirect(prev => prev.map(emp => 
-                    employeeIds.includes(emp.id) ? { ...emp, managerId: managerId || undefined } : emp
-                  ));
-                }
+                    }
+                  });
+                  return { ...s, proposedEmployees: updatedEmployees };
+                }));
               }}
               onMoveEmployeeToTeam={(employeeId, teamName, dept, group) => {
-                if (activeScenario) {
-                  setScenarios(prev => prev.map(s => {
-                    if (s.id !== activeScenarioId) return s;
-                    const emp = employees.find(e => e.id === employeeId);
-                    if (!emp) return s;
-                    
-                    const updated = { ...emp, team: teamName, dept, group };
-                    const existingIdx = s.proposedEmployees.findIndex(e => e.id === employeeId);
-                    
-                    let updatedEmployees: Employee[];
-                    if (existingIdx >= 0) {
-                      updatedEmployees = [...s.proposedEmployees];
-                      updatedEmployees[existingIdx] = updated;
-                    } else {
-                      updatedEmployees = [...s.proposedEmployees, updated];
-                    }
-                    
-                    return addScenarioChangelogEntry(
-                      { ...s, proposedEmployees: updatedEmployees },
-                      'employee_modified',
-                      employeeId,
-                      emp.name,
-                      `Moved from ${emp.team} to ${teamName}`
-                    );
-                  }));
-                } else {
-                  pushToHistory();
-                  setMasterEmployeesDirect(prev => prev.map(emp => 
-                    emp.id === employeeId ? { ...emp, team: teamName, dept, group } : emp
-                  ));
-                }
+                const scenarioId = ensureWorkingScenario();
+                setScenarios(prev => prev.map(s => {
+                  if (s.id !== scenarioId) return s;
+                  const emp = employees.find(e => e.id === employeeId);
+                  if (!emp) return s;
+                  
+                  const updated = { ...emp, team: teamName, dept, group };
+                  const existingIdx = s.proposedEmployees.findIndex(e => e.id === employeeId);
+                  
+                  let updatedEmployees: Employee[];
+                  if (existingIdx >= 0) {
+                    updatedEmployees = [...s.proposedEmployees];
+                    updatedEmployees[existingIdx] = updated;
+                  } else {
+                    updatedEmployees = [...s.proposedEmployees, updated];
+                  }
+                  
+                  return addScenarioChangelogEntry(
+                    { ...s, proposedEmployees: updatedEmployees },
+                    'employee_modified',
+                    employeeId,
+                    emp.name,
+                    `Moved from ${emp.team} to ${teamName}`
+                  );
+                }));
               }}
               onHireForTeam={(prefill) => {
                 setEmployeePrefill(prefill);
@@ -810,20 +792,16 @@ const Index = () => {
                   const event = events.find(e => e.id === eventId);
                   if (event) {
                     const resolvedEvent = { ...event, date: new Date().toISOString().split('T')[0] };
-                    if (activeScenario) {
-                      setScenarios(prev => prev.map(s => {
-                        if (s.id !== activeScenarioId) return s;
-                        const isProposed = s.proposedEvents.some(e => e.id === eventId);
-                        if (isProposed) {
-                          return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? resolvedEvent : e) };
-                        } else {
-                          return { ...s, proposedEvents: [...s.proposedEvents, resolvedEvent] };
-                        }
-                      }));
-                    } else {
-                      pushToHistory();
-                      setMasterEventsDirect(prev => prev.map(e => e.id === eventId ? resolvedEvent : e));
-                    }
+                    const scenarioId = ensureWorkingScenario();
+                    setScenarios(prev => prev.map(s => {
+                      if (s.id !== scenarioId) return s;
+                      const isProposed = s.proposedEvents.some(e => e.id === eventId);
+                      if (isProposed) {
+                        return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? resolvedEvent : e) };
+                      } else {
+                        return { ...s, proposedEvents: [...s.proposedEvents, resolvedEvent] };
+                      }
+                    }));
                   }
                 }}
                 onDeleteFlag={handleDeleteEvent}
