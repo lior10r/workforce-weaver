@@ -16,7 +16,8 @@ import {
   ArrowRight,
   Check,
   CheckSquare,
-  Square
+  Square,
+  Undo2
 } from 'lucide-react';
 import { 
   Scenario, 
@@ -51,6 +52,7 @@ interface ScenarioManagerProps {
   onSetActiveScenario: (id: string | null) => void;
   onSetCompareScenario: (id: string | null) => void;
   onMergeToMaster: (scenario: Scenario, selectedChangeIds?: string[]) => void;
+  onDiscardChanges: (scenarioId: string, changeIds: string[]) => void;
 }
 
 export const ScenarioManager = ({
@@ -66,19 +68,23 @@ export const ScenarioManager = ({
   onDeleteScenario,
   onSetActiveScenario,
   onSetCompareScenario,
-  onMergeToMaster
+  onMergeToMaster,
+  onDiscardChanges
 }: ScenarioManagerProps) => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDetailedCompareOpen, setIsDetailedCompareOpen] = useState(false);
   const [isDuplicateOpen, setIsDuplicateOpen] = useState(false);
   const [isMergeSelectOpen, setIsMergeSelectOpen] = useState(false);
+  const [isDiscardSelectOpen, setIsDiscardSelectOpen] = useState(false);
   const [scenarioToMerge, setScenarioToMerge] = useState<Scenario | null>(null);
+  const [scenarioToDiscard, setScenarioToDiscard] = useState<Scenario | null>(null);
   const [scenarioToDuplicate, setScenarioToDuplicate] = useState<Scenario | null>(null);
   const [newScenarioName, setNewScenarioName] = useState('');
   const [newScenarioDesc, setNewScenarioDesc] = useState('');
   const [duplicateName, setDuplicateName] = useState('');
   const [selectedMergeIds, setSelectedMergeIds] = useState<Set<string>>(new Set());
+  const [selectedDiscardIds, setSelectedDiscardIds] = useState<Set<string>>(new Set());
   const [selectedCompareScenarioId, setSelectedCompareScenarioId] = useState<string | null>(null);
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
@@ -143,6 +149,18 @@ export const ScenarioManager = ({
     });
   };
 
+  const toggleDiscardSelection = (id: string) => {
+    setSelectedDiscardIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
   const selectAllForMerge = () => {
     if (scenarioToMerge) {
       setSelectedMergeIds(new Set(scenarioToMerge.changelog.map(c => c.id)));
@@ -151,6 +169,26 @@ export const ScenarioManager = ({
 
   const deselectAllForMerge = () => {
     setSelectedMergeIds(new Set());
+  };
+
+  const selectAllForDiscard = () => {
+    if (scenarioToDiscard) {
+      setSelectedDiscardIds(new Set(scenarioToDiscard.changelog.map(c => c.id)));
+    }
+  };
+
+  const deselectAllForDiscard = () => {
+    setSelectedDiscardIds(new Set());
+  };
+
+  const handleDiscardConfirm = () => {
+    if (scenarioToDiscard && selectedDiscardIds.size > 0) {
+      onDiscardChanges(scenarioToDiscard.id, Array.from(selectedDiscardIds));
+      setIsDiscardSelectOpen(false);
+      setScenarioToDiscard(null);
+      setSelectedDiscardIds(new Set());
+      toast.success(`Discarded ${selectedDiscardIds.size} change(s)`);
+    }
   };
 
   // Get enhanced description for changelog entries
@@ -322,6 +360,19 @@ export const ScenarioManager = ({
           </div>
           
           <div className="flex items-center gap-2">
+            {activeScenario.changelog.length > 0 && (
+              <button
+                onClick={() => {
+                  setScenarioToDiscard(activeScenario);
+                  setSelectedDiscardIds(new Set());
+                  setIsDiscardSelectOpen(true);
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 rounded-lg transition-colors"
+              >
+                <Undo2 size={14} />
+                Discard Changes
+              </button>
+            )}
             <button
               onClick={() => {
                 setScenarioToMerge(activeScenario);
@@ -748,6 +799,135 @@ export const ScenarioManager = ({
               >
                 <GitMerge size={16} />
                 {selectedMergeIds.size === 0 ? 'Merge All' : `Merge ${selectedMergeIds.size} Changes`}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Selective Discard Dialog */}
+      <Dialog open={isDiscardSelectOpen} onOpenChange={setIsDiscardSelectOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-500">
+              <Undo2 size={20} />
+              Discard Changes
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 pt-4 flex-1 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Select which changes from <strong>"{scenarioToDiscard?.name}"</strong> to discard (undo).
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={selectAllForDiscard}
+                  className="text-xs text-amber-500 hover:underline"
+                >
+                  Select All
+                </button>
+                <span className="text-muted-foreground">|</span>
+                <button
+                  onClick={deselectAllForDiscard}
+                  className="text-xs text-muted-foreground hover:underline"
+                >
+                  Deselect All
+                </button>
+              </div>
+            </div>
+
+            <ScrollArea className="flex-1 max-h-96 border border-border rounded-xl">
+              {scenarioToDiscard?.changelog.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  <History size={32} className="mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No changes to discard</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-border">
+                  {scenarioToDiscard?.changelog.slice().reverse().map((entry) => (
+                    <div
+                      key={entry.id}
+                      onClick={() => toggleDiscardSelection(entry.id)}
+                      className={`p-3 flex items-start gap-3 cursor-pointer transition-colors ${
+                        selectedDiscardIds.has(entry.id) 
+                          ? 'bg-amber-500/10 hover:bg-amber-500/15' 
+                          : 'hover:bg-accent/50'
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {selectedDiscardIds.has(entry.id) 
+                          ? <CheckSquare size={16} className="text-amber-500" />
+                          : <Square size={16} className="text-muted-foreground" />
+                        }
+                      </div>
+                      <div className="mt-0.5">
+                        {getChangelogIcon(entry.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{entry.entityName}</p>
+                          {entry.details?.['Target Team'] && (
+                            <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                              <ArrowRight size={10} />
+                              {entry.details['Target Team'].after}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {getEnhancedDescription(entry, scenarioToDiscard!)}
+                        </p>
+                        {entry.details && Object.keys(entry.details).length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-2">
+                            {Object.entries(entry.details).map(([key, value]) => (
+                              <span key={key} className="text-[10px] text-muted-foreground bg-accent px-1.5 py-0.5 rounded">
+                                <span className="font-medium">{key}:</span>{' '}
+                                {value.before && <span className="text-destructive line-through">{value.before}</span>}
+                                {value.before && value.after && ' → '}
+                                {value.after && <span className="text-emerald-500">{value.after}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                        {formatChangelogDate(entry.timestamp)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+
+            <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-sm text-amber-500">
+              <p className="font-medium">
+                {selectedDiscardIds.size === 0 
+                  ? '⚠️ Select changes to discard'
+                  : `🗑️ ${selectedDiscardIds.size} change(s) will be discarded`
+                }
+              </p>
+              <p className="text-xs mt-1 text-amber-500/80">
+                Discarded changes will be reverted to the original state.
+              </p>
+            </div>
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setIsDiscardSelectOpen(false);
+                  setSelectedDiscardIds(new Set());
+                }}
+                className="px-4 py-2 text-sm bg-accent hover:bg-accent/80 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDiscardConfirm}
+                disabled={selectedDiscardIds.size === 0}
+                className="px-4 py-2 text-sm bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors flex items-center gap-2"
+              >
+                <Undo2 size={16} />
+                Discard {selectedDiscardIds.size} Change(s)
               </button>
             </div>
           </div>

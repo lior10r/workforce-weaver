@@ -1,9 +1,11 @@
-import { X, Building2, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Building2, Trash2, AlertTriangle, Clock } from 'lucide-react';
 import {
   Employee,
   DEPARTMENT_NAMES,
   ROLES,
   STATUSES,
+  WORK_TYPES,
+  WorkType,
   HierarchyStructure,
   getAllDeptTeams,
   getTeamParent,
@@ -39,6 +41,7 @@ export const EmployeeModal = ({
   const [selectedTeam, setSelectedTeam] = useState('');
   const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
   const [isGroupLevel, setIsGroupLevel] = useState(false);
+  const [selectedWorkType, setSelectedWorkType] = useState<WorkType>('Full-Time');
   const [initialized, setInitialized] = useState(false);
 
   // Get the department structure
@@ -126,6 +129,7 @@ export const EmployeeModal = ({
       const resolvedGroup = editingEmployee.group ?? parent?.group?.name ?? null;
 
       setSelectedDept(editingEmployee.dept);
+      setSelectedWorkType(editingEmployee.workType || 'Full-Time');
 
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
@@ -152,6 +156,7 @@ export const EmployeeModal = ({
       setIsDepartmentLevel(false);
       setIsGroupLevel(false);
       setSelectedTeam(prefill.team);
+      setSelectedWorkType('Full-Time');
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -159,6 +164,7 @@ export const EmployeeModal = ({
       setSelectedGroup(null);
       setIsDepartmentLevel(false);
       setIsGroupLevel(false);
+      setSelectedWorkType('Full-Time');
 
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
@@ -269,6 +275,7 @@ export const EmployeeModal = ({
       isPotential: formData.get('isPotential') === 'on',
       managerId: autoManager,
       managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
+      workType: selectedWorkType,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -459,6 +466,41 @@ export const EmployeeModal = ({
               defaultValue={editingEmployee?.joined} 
               className="input-field" 
             />
+          </div>
+
+          {/* Work Type */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+              Work Type
+            </label>
+            <div className="flex gap-3">
+              {WORK_TYPES.map(wt => (
+                <label 
+                  key={wt}
+                  className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
+                    selectedWorkType === wt 
+                      ? wt === 'Part-Time' 
+                        ? 'bg-amber-500/10 border-amber-500 text-amber-500' 
+                        : 'bg-primary/10 border-primary text-primary'
+                      : 'bg-card border-border hover:border-muted-foreground'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="workType"
+                    value={wt}
+                    checked={selectedWorkType === wt}
+                    onChange={() => setSelectedWorkType(wt)}
+                    className="sr-only"
+                  />
+                  <Clock size={16} />
+                  <span className="text-sm font-medium">{wt}</span>
+                  {wt === 'Part-Time' && (
+                    <span className="text-xs opacity-70">(0.5x)</span>
+                  )}
+                </label>
+              ))}
+            </div>
           </div>
 
           <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-xl border border-border">

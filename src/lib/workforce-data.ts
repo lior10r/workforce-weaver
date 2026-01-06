@@ -195,6 +195,10 @@ export interface TeamStructure {
   targetSize?: number; // Optional target team size
 }
 
+// Work types for capacity calculation
+export const WORK_TYPES = ['Full-Time', 'Part-Time'] as const;
+export type WorkType = typeof WORK_TYPES[number];
+
 // Types
 export interface Employee {
   id: number;
@@ -208,6 +212,7 @@ export interface Employee {
   isPotential?: boolean; // Uncertain hire - for planning purposes
   managerId?: number; // Direct manager
   managerLevel?: ManagerLevel; // What level of management is this person
+  workType?: WorkType; // Full-Time (default) or Part-Time (0.5x capacity)
 }
 
 export interface WorkforceEvent {
@@ -469,17 +474,20 @@ export const formatDate = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
-// Calculate capacity weight based on tenure and role
-export const getCapacityWeight = (role: string, joined: string, asOfDate: Date = new Date()): number => {
+// Calculate capacity weight based on tenure, role, and work type
+export const getCapacityWeight = (role: string, joined: string, asOfDate: Date = new Date(), workType: WorkType = 'Full-Time'): number => {
   if (role === 'Team Lead') return 0; // Team leads don't count
   
   const joinDate = new Date(joined);
   const yearsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
   
   // Junior: 0.7x, Mid-level (after 1 year): 1x, Senior (after 3 years total): 1.5x
-  if (yearsOfExperience >= 3) return 1.5; // Senior
-  if (yearsOfExperience >= 1) return 1.0; // Mid-level
-  return 0.7; // Junior
+  let baseWeight = 0.7; // Junior
+  if (yearsOfExperience >= 3) baseWeight = 1.5; // Senior
+  else if (yearsOfExperience >= 1) baseWeight = 1.0; // Mid-level
+  
+  // Part-time employees contribute 50% capacity
+  return workType === 'Part-Time' ? baseWeight * 0.5 : baseWeight;
 };
 
 // Get effective role based on tenure

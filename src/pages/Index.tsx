@@ -463,6 +463,67 @@ const Index = () => {
     handleDeleteScenario(scenario.id);
   };
 
+  // Handle discarding specific changes from a scenario
+  const handleDiscardChanges = (scenarioId: string, changeIds: string[]) => {
+    setScenarios(prev => prev.map(s => {
+      if (s.id !== scenarioId) return s;
+      
+      // Find which changelog entries are being discarded
+      const discardedEntries = s.changelog.filter(c => changeIds.includes(c.id));
+      
+      let updatedScenario = { ...s };
+      
+      discardedEntries.forEach(entry => {
+        switch (entry.type) {
+          case 'employee_added':
+            // Remove from proposedEmployees
+            updatedScenario = {
+              ...updatedScenario,
+              proposedEmployees: updatedScenario.proposedEmployees.filter(e => e.id !== entry.entityId)
+            };
+            break;
+          case 'employee_removed':
+            // Remove from deletedEmployeeIds
+            updatedScenario = {
+              ...updatedScenario,
+              deletedEmployeeIds: updatedScenario.deletedEmployeeIds.filter(id => id !== entry.entityId)
+            };
+            break;
+          case 'employee_modified':
+            // Remove from proposedEmployees (will fall back to base)
+            updatedScenario = {
+              ...updatedScenario,
+              proposedEmployees: updatedScenario.proposedEmployees.filter(e => e.id !== entry.entityId)
+            };
+            break;
+          case 'event_added':
+            // Remove from proposedEvents
+            updatedScenario = {
+              ...updatedScenario,
+              proposedEvents: updatedScenario.proposedEvents.filter(e => e.id !== entry.entityId)
+            };
+            break;
+          case 'event_removed':
+            // Remove from deletedEventIds
+            updatedScenario = {
+              ...updatedScenario,
+              deletedEventIds: updatedScenario.deletedEventIds.filter(id => id !== entry.entityId)
+            };
+            break;
+        }
+      });
+      
+      // Remove the discarded changelog entries
+      updatedScenario = {
+        ...updatedScenario,
+        changelog: updatedScenario.changelog.filter(c => !changeIds.includes(c.id)),
+        updatedAt: new Date().toISOString()
+      };
+      
+      return updatedScenario;
+    }));
+  };
+
   // Import handlers (always affect master)
   const handleImportEmployees = (importedEmployees: Employee[]) => {
     setMasterEmployeesDirect(importedEmployees);
@@ -596,6 +657,7 @@ const Index = () => {
           onSetActiveScenario={setActiveScenarioId}
           onSetCompareScenario={setCompareScenarioId}
           onMergeToMaster={handleMergeToMaster}
+          onDiscardChanges={handleDiscardChanges}
         />
 
         <main className="flex-1 overflow-y-auto scrollbar-thin p-8 lg:p-10">
