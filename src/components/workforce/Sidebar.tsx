@@ -27,12 +27,19 @@ interface ScopeFilter {
   teams: string[];
 }
 
+interface PermissionScope {
+  departments: string[];
+  groups: string[];
+  teams: string[];
+}
+
 interface SidebarProps {
   view: string;
   setView: (view: string) => void;
   scopeFilter: ScopeFilter;
   setScopeFilter: (filter: ScopeFilter | ((prev: ScopeFilter) => ScopeFilter)) => void;
   hierarchy: HierarchyStructure;
+  permissionScope?: PermissionScope | null;
 }
 
 export const Sidebar = ({ 
@@ -40,7 +47,8 @@ export const Sidebar = ({
   setView, 
   scopeFilter, 
   setScopeFilter,
-  hierarchy
+  hierarchy,
+  permissionScope
 }: SidebarProps) => {
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
@@ -258,20 +266,25 @@ export const Sidebar = ({
             const deptTeams = getDeptTeams(dept);
             const someTeamsChecked = deptTeams.some(t => scopeFilter.teams.includes(t));
             const isIndeterminate = someTeamsChecked && !isDeptChecked;
+            
+            // Permission check: disable if outside permission scope
+            const isDeptAllowed = !permissionScope || permissionScope.departments.includes(dept.name);
 
             return (
               <div key={dept.name} className="space-y-1">
                 {/* Department Row */}
-                <div className="flex items-center gap-2 py-1 px-1 hover:bg-accent/50 rounded-lg transition-colors">
+                <div className={`flex items-center gap-2 py-1 px-1 hover:bg-accent/50 rounded-lg transition-colors ${!isDeptAllowed ? 'opacity-40 pointer-events-none' : ''}`}>
                   <button
                     onClick={() => toggleDeptExpanded(dept.name)}
                     className="p-0.5 hover:bg-accent rounded transition-colors"
+                    disabled={!isDeptAllowed}
                   >
                     {isDeptExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </button>
                   <Checkbox 
                     id={`dept-${dept.name}`}
                     checked={isDeptChecked}
+                    disabled={!isDeptAllowed}
                     data-state={isIndeterminate ? 'indeterminate' : isDeptChecked ? 'checked' : 'unchecked'}
                     onCheckedChange={(checked) => handleDeptCheckbox(dept.name, checked as boolean)}
                     className="h-3.5 w-3.5"
