@@ -14,9 +14,7 @@ import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
-import { UserSwitcher } from '@/components/workforce/UserSwitcher';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
-import { usePermissionScope, getAllManagers, CurrentUser } from '@/hooks/use-permission-scope';
 import { toast } from 'sonner';
 import { 
   Employee, 
@@ -81,9 +79,6 @@ const Index = () => {
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>(null);
 
-  // Permission/View As State
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
 
@@ -108,10 +103,6 @@ const Index = () => {
     }
     return masterTeamStructures;
   }, [activeScenario, masterTeamStructures]);
-
-  // Permission system: get available managers and filtered data
-  const availableManagers = useMemo(() => getAllManagers(employees, hierarchy), [employees, hierarchy]);
-  const { permissionScope, filteredEmployees: permissionFilteredEmployees, isAdmin } = usePermissionScope(currentUser, employees, hierarchy);
 
   // Compute diff maps when in comparison mode
   const compareScenario = scenarios.find(s => s.id === compareScenarioId);
@@ -203,35 +194,25 @@ const Index = () => {
     return { dept: 'All', team: 'All' };
   }, [scopeFilter, departments]);
 
-  // Filtered employees based on scope filter AND permission scope
+  // Filtered employees based on scope filter
   const allTeamsList = Object.values(departments).flat();
   const filteredEmployees = useMemo(() => {
-    // First apply permission filter (what the current user can see)
-    const baseEmployees = isAdmin ? employees : permissionFilteredEmployees;
-    
-    // Then apply scope filter (UI selection) within permission bounds
-    return baseEmployees.filter(e => {
+    return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchTeam = scopeFilter.teams.includes(e.team);
       const isDeptLevel = !allTeamsList.includes(e.team);
       const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
       return matchSearch && (matchTeam || matchDeptLevel);
     });
-  }, [employees, permissionFilteredEmployees, isAdmin, searchQuery, scopeFilter, allTeamsList]);
+  }, [employees, searchQuery, scopeFilter, allTeamsList]);
 
-  // Filtered events based on permission scope (only show events for visible employees)
-  const filteredEvents = useMemo(() => {
-    const visibleEmpIds = new Set(filteredEmployees.map(e => e.id));
-    return events.filter(ev => visibleEmpIds.has(ev.empId));
-  }, [events, filteredEmployees]);
-
-  // Stats (use filtered events for permission-aware counts)
+  // Stats
   const stats = useMemo(() => ({
     total: filteredEmployees.length,
     onCourse: filteredEmployees.filter(e => e.status === 'On Course' || e.status === 'Parental Leave').length,
-    flags: filteredEvents.filter(ev => ev.isFlag).length,
-    upcomingChanges: filteredEvents.filter(e => new Date(e.date) > new Date()).length
-  }), [filteredEmployees, filteredEvents]);
+    flags: events.filter(ev => ev.isFlag).length,
+    upcomingChanges: events.filter(e => new Date(e.date) > new Date()).length
+  }), [filteredEmployees, events]);
 
   // Handlers
   const handleAddDepartment = (name: string) => {
@@ -657,7 +638,6 @@ const Index = () => {
         scopeFilter={scopeFilter}
         setScopeFilter={setScopeFilter}
         hierarchy={hierarchy}
-        permissionScope={permissionScope}
       />
 
       {/* Main Content */}
@@ -698,14 +678,7 @@ const Index = () => {
                 {getViewTitle()}
               </h2>
               
-              <div className="flex gap-3 w-full lg:w-auto items-center flex-wrap">
-                {/* User/Permission Switcher */}
-                <UserSwitcher
-                  currentUser={currentUser}
-                  availableManagers={availableManagers}
-                  onUserChange={setCurrentUser}
-                />
-                
+              <div className="flex gap-3 w-full lg:w-auto items-center">
                 <div className="relative flex-1 lg:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                   <input 
@@ -748,7 +721,7 @@ const Index = () => {
           {view === 'dashboard' && (
             <Dashboard 
               employees={filteredEmployees} 
-              events={filteredEvents} 
+              events={events} 
               hierarchy={legacyHierarchy}
               setHierarchy={() => {}}
               departments={departments}
@@ -758,9 +731,9 @@ const Index = () => {
           {view === 'timeline' && (
             <Timeline 
               employees={filteredEmployees} 
-              events={filteredEvents}
+              events={events}
               openPlannerForUser={openPlannerForUser}
-              allEmployees={isAdmin ? employees : permissionFilteredEmployees}
+              allEmployees={employees}
               selectedTeam={legacyHierarchy.team}
               selectedDept={legacyHierarchy.dept}
               teamStructures={teamStructures}
@@ -873,8 +846,8 @@ const Index = () => {
           {view === 'planner' && (
             <div className="space-y-6">
               <DecisionFlagsPanel
-                employees={isAdmin ? employees : permissionFilteredEmployees}
-                events={filteredEvents}
+                employees={employees}
+                events={events}
                 departments={departments}
                 onResolveFlag={(eventId) => {
                   // Resolve by updating the event date to now (marking as done)
@@ -896,11 +869,10 @@ const Index = () => {
                 onDeleteFlag={handleDeleteEvent}
               />
               <Planner 
-                employees={isAdmin ? employees : permissionFilteredEmployees}
-                events={filteredEvents}
+                employees={employees}
+                events={events}
                 onAddMovement={() => {
-                  const visibleEmployees = isAdmin ? employees : permissionFilteredEmployees;
-                  setEventPrefill({ empId: visibleEmployees[0]?.id || '', isFlag: false });
+                  setEventPrefill({ empId: employees[0]?.id || '', isFlag: false });
                   setIsEventModalOpen(true);
                 }}
                 onDeleteEvent={handleDeleteEvent}
@@ -910,8 +882,8 @@ const Index = () => {
 
           {view === 'analytics' && (
             <TeamAnalytics
-              employees={isAdmin ? employees : permissionFilteredEmployees}
-              events={filteredEvents}
+              employees={employees}
+              events={events}
               selectedTeams={scopeFilter.teams}
               departments={departments}
               teamStructures={teamStructures}
