@@ -42,6 +42,7 @@ export const EmployeeModal = ({
   const [isDepartmentLevel, setIsDepartmentLevel] = useState(false);
   const [isGroupLevel, setIsGroupLevel] = useState(false);
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType>('Full-Time');
+  const [partTimePercentage, setPartTimePercentage] = useState(50);
   const [initialized, setInitialized] = useState(false);
 
   // Get the department structure
@@ -130,6 +131,7 @@ export const EmployeeModal = ({
 
       setSelectedDept(editingEmployee.dept);
       setSelectedWorkType(editingEmployee.workType || 'Full-Time');
+      setPartTimePercentage(editingEmployee.partTimePercentage || 50);
 
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
@@ -157,6 +159,7 @@ export const EmployeeModal = ({
       setIsGroupLevel(false);
       setSelectedTeam(prefill.team);
       setSelectedWorkType('Full-Time');
+      setPartTimePercentage(50);
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -165,6 +168,7 @@ export const EmployeeModal = ({
       setIsDepartmentLevel(false);
       setIsGroupLevel(false);
       setSelectedWorkType('Full-Time');
+      setPartTimePercentage(50);
 
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
@@ -276,6 +280,7 @@ export const EmployeeModal = ({
       managerId: autoManager,
       managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
       workType: selectedWorkType,
+      partTimePercentage: selectedWorkType === 'Part-Time' ? partTimePercentage : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -495,13 +500,36 @@ export const EmployeeModal = ({
                   />
                   <Clock size={16} />
                   <span className="text-sm font-medium">{wt}</span>
-                  {wt === 'Part-Time' && (
-                    <span className="text-xs opacity-70">(0.5x)</span>
-                  )}
                 </label>
               ))}
             </div>
           </div>
+
+          {/* Part-Time Percentage Slider */}
+          {selectedWorkType === 'Part-Time' && (
+            <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/30">
+              <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-2 tracking-wider">
+                Work Percentage
+              </label>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="10"
+                  max="90"
+                  step="10"
+                  value={partTimePercentage}
+                  onChange={(e) => setPartTimePercentage(Number(e.target.value))}
+                  className="flex-1 h-2 bg-amber-500/20 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                />
+                <span className="text-lg font-bold text-amber-500 w-14 text-right">
+                  {partTimePercentage}%
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Capacity contribution: {partTimePercentage}% of full-time equivalent
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-xl border border-border">
             <input 
