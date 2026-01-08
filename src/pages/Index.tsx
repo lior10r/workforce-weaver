@@ -280,6 +280,28 @@ const Index = () => {
         };
       }
       
+      // For new employees (not editing), add a 6-month training event
+      if (!isEditing) {
+        const joinDate = new Date(newEmployee.joined);
+        const trainingEndDate = new Date(joinDate);
+        trainingEndDate.setMonth(trainingEndDate.getMonth() + 6);
+        
+        const trainingEvent = {
+          id: Date.now() + 1,
+          empId: newId,
+          type: 'Training',
+          date: newEmployee.joined,
+          endDate: trainingEndDate.toISOString().split('T')[0],
+          details: 'Onboarding & Training Period (6 months)',
+          isFlag: false
+        };
+        
+        updatedScenario = {
+          ...updatedScenario,
+          proposedEvents: [...updatedScenario.proposedEvents, trainingEvent]
+        };
+      }
+      
       const changeDetails: Record<string, { before?: string; after?: string }> = {};
       if (isEditing && existingEmployee) {
         if (existingEmployee.team !== newEmployee.team) {
@@ -298,7 +320,7 @@ const Index = () => {
         isEditing ? 'employee_modified' : 'employee_added',
         newId,
         newEmployee.name,
-        isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team}`,
+        isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team} (with 6-month training)`,
         Object.keys(changeDetails).length > 0 ? changeDetails : undefined
       );
     }));

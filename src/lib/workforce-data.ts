@@ -212,7 +212,8 @@ export interface Employee {
   isPotential?: boolean; // Uncertain hire - for planning purposes
   managerId?: number; // Direct manager
   managerLevel?: ManagerLevel; // What level of management is this person
-  workType?: WorkType; // Full-Time (default) or Part-Time (0.5x capacity)
+  workType?: WorkType; // Full-Time (default) or Part-Time
+  partTimePercentage?: number; // 10-90% for part-time employees (default 50)
 }
 
 export interface WorkforceEvent {
@@ -475,19 +476,34 @@ export const formatDate = (dateStr: string): string => {
 };
 
 // Calculate capacity weight based on tenure, role, and work type
-export const getCapacityWeight = (role: string, joined: string, asOfDate: Date = new Date(), workType: WorkType = 'Full-Time'): number => {
+export const getCapacityWeight = (
+  role: string, 
+  joined: string, 
+  asOfDate: Date = new Date(), 
+  workType: WorkType = 'Full-Time',
+  partTimePercentage: number = 50
+): number => {
   if (role === 'Team Lead') return 0; // Team leads don't count
   
   const joinDate = new Date(joined);
-  const yearsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+  const monthsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
+  const yearsOfExperience = monthsOfExperience / 12;
   
-  // Junior: 0.7x, Mid-level (after 1 year): 1x, Senior (after 3 years total): 1.5x
-  let baseWeight = 0.7; // Junior
-  if (yearsOfExperience >= 3) baseWeight = 1.5; // Senior
-  else if (yearsOfExperience >= 1) baseWeight = 1.0; // Mid-level
+  // First 6 months: training period (0.3x capacity)
+  // Junior (6mo-1yr): 0.7x, Mid-level (after 1 year): 1x, Senior (after 3 years total): 1.5x
+  let baseWeight = 0.3; // Training period
+  if (monthsOfExperience >= 6) {
+    baseWeight = 0.7; // Junior
+    if (yearsOfExperience >= 3) baseWeight = 1.5; // Senior
+    else if (yearsOfExperience >= 1) baseWeight = 1.0; // Mid-level
+  }
   
-  // Part-time employees contribute 50% capacity
-  return workType === 'Part-Time' ? baseWeight * 0.5 : baseWeight;
+  // Part-time employees contribute based on their configured percentage
+  if (workType === 'Part-Time') {
+    const percentage = Math.max(10, Math.min(90, partTimePercentage)) / 100;
+    return baseWeight * percentage;
+  }
+  return baseWeight;
 };
 
 // Get effective role based on tenure

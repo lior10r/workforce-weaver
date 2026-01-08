@@ -598,6 +598,11 @@ export const Roster = ({
                         const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
                         const eligibleLeaders = getEligibleManagers(dept.name, undefined, teamName);
 
+                        // Filter out department managers from direct team lists
+                        const filteredTeamMembers = teamMembers.filter(e => 
+                          e.managerLevel !== 'department' && e.managerLevel !== 'group'
+                        );
+
                         return (
                           <DroppableTeam key={teamName} teamName={teamName} dept={dept.name}>
                             <div className="border border-border rounded-xl overflow-hidden">
@@ -611,7 +616,7 @@ export const Roster = ({
                                   </button>
                                   <Users size={14} className="text-green-500" />
                                   <span className="font-medium">{teamName}</span>
-                                  <span className="text-xs text-muted-foreground">({teamMembers.length})</span>
+                                  <span className="text-xs text-muted-foreground">({filteredTeamMembers.length})</span>
                                   {teamLeader && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                                       • <Crown size={10} className="text-green-500" /> {teamLeader.name}
@@ -652,8 +657,8 @@ export const Roster = ({
                               </div>
                               {isTeamExpanded && (
                                 <div className="divide-y divide-border">
-                                  {teamMembers.length > 0 ? (
-                                    teamMembers.map(emp => renderEmployeeRow(emp, emp.id === structure?.teamLeader))
+                                  {filteredTeamMembers.length > 0 ? (
+                                    filteredTeamMembers.map(emp => renderEmployeeRow(emp, emp.id === structure?.teamLeader))
                                   ) : (
                                     <p className="p-4 text-sm text-muted-foreground italic">No team members - drag employees here</p>
                                   )}
@@ -746,7 +751,12 @@ export const Roster = ({
                             {/* Teams */}
                             {group.teams.map(teamName => {
                               const isTeamExpanded = expandedTeams.has(teamName);
-                              const teamMembers = employees.filter(e => e.team === teamName);
+                              // Filter out group/department managers from team lists - they're shown separately
+                              const teamMembers = employees.filter(e => 
+                                e.team === teamName && 
+                                e.managerLevel !== 'group' && 
+                                e.managerLevel !== 'department'
+                              );
                               const structure = teamStructures.find(s => s.teamName === teamName);
                               const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
                               const eligibleLeaders = getEligibleManagers(dept.name, group.teams, teamName);

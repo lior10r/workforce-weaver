@@ -46,7 +46,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
       });
 
       const totalCapacity = activeEmployees.reduce((sum, emp) => {
-        return sum + getCapacityWeight(emp.role, emp.joined, currentDate);
+        return sum + getCapacityWeight(emp.role, emp.joined, currentDate, emp.workType, emp.partTimePercentage);
       }, 0);
 
       const headcount = activeEmployees.filter(e => e.role !== 'Team Lead').length;
@@ -82,7 +82,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
 
       const headcount = activeEmployees.filter(e => e.role !== 'Team Lead').length;
       const capacity = activeEmployees.reduce((sum, emp) => {
-        return sum + getCapacityWeight(emp.role, emp.joined, today);
+        return sum + getCapacityWeight(emp.role, emp.joined, today, emp.workType, emp.partTimePercentage);
       }, 0);
 
       const variance = targetSize > 0 ? headcount - targetSize : 0;
@@ -123,28 +123,35 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
     });
 
     const totalCapacity = activeEmployees.reduce((sum, emp) => {
-      return sum + getCapacityWeight(emp.role, emp.joined, today);
+      return sum + getCapacityWeight(emp.role, emp.joined, today, emp.workType, emp.partTimePercentage);
     }, 0);
 
     const headcount = activeEmployees.filter(e => e.role !== 'Team Lead').length;
 
-    // Count by effective level
+    // Count by effective level based on weight ranges
+    // Training (0.3), Junior (0.7), Mid (1.0), Senior (1.5)
+    const trainees = activeEmployees.filter(emp => {
+      if (emp.role === 'Team Lead') return false;
+      const weight = getCapacityWeight(emp.role, emp.joined, today, 'Full-Time', 100);
+      return weight <= 0.3;
+    }).length;
+
     const juniors = activeEmployees.filter(emp => {
       if (emp.role === 'Team Lead') return false;
-      const weight = getCapacityWeight(emp.role, emp.joined, today);
-      return weight === 0.7;
+      const weight = getCapacityWeight(emp.role, emp.joined, today, 'Full-Time', 100);
+      return weight > 0.3 && weight <= 0.7;
     }).length;
 
     const mids = activeEmployees.filter(emp => {
       if (emp.role === 'Team Lead') return false;
-      const weight = getCapacityWeight(emp.role, emp.joined, today);
+      const weight = getCapacityWeight(emp.role, emp.joined, today, 'Full-Time', 100);
       return weight === 1.0;
     }).length;
 
     const seniors = activeEmployees.filter(emp => {
       if (emp.role === 'Team Lead') return false;
-      const weight = getCapacityWeight(emp.role, emp.joined, today);
-      return weight === 1.5;
+      const weight = getCapacityWeight(emp.role, emp.joined, today, 'Full-Time', 100);
+      return weight >= 1.5;
     }).length;
 
     // Total targets
@@ -158,7 +165,7 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
       return structure?.targetSize && structure.targetSize > 0;
     }).length;
 
-    return { totalCapacity, headcount, juniors, mids, seniors, totalTarget, teamsWithTargets };
+    return { totalCapacity, headcount, trainees, juniors, mids, seniors, totalTarget, teamsWithTargets };
   }, [employees, events, teamsToInclude, teamStructures]);
 
   // Find the current month index for reference line
@@ -235,6 +242,11 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
               </span>
             ) : 'No targets set'}
           </p>
+        </div>
+        <div className="glass-card p-5">
+          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">In Training</p>
+          <p className="text-3xl font-bold text-amber-500">{currentStats.trainees}</p>
+          <p className="text-xs text-muted-foreground mt-1">0.3x capacity (first 6mo)</p>
         </div>
         <div className="glass-card p-5">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Juniors</p>
