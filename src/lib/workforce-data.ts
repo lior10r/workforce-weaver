@@ -225,6 +225,8 @@ export interface WorkforceEvent {
   isFlag: boolean;
   targetTeam?: string; // For Team Swap events
   endDate?: string; // For Training/Course events
+  isResolved?: boolean; // For decision flags - whether it's been resolved
+  resolutionNote?: string; // Short description of the decision/resolution
 }
 
 export interface Hierarchy {

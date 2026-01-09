@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Employee, WorkforceEvent, TeamStructure, getCapacityWeight } from '@/lib/workforce-data';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, BarChart, Bar, Cell, LabelList } from 'recharts';
 import { AlertTriangle, CheckCircle2, Users } from 'lucide-react';
+import { CapacityTooltip } from './CapacityTooltip';
 
 interface TeamAnalyticsProps {
   employees: Employee[];
@@ -227,11 +228,16 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-        <div className="glass-card p-5">
-          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Current Capacity</p>
-          <p className="text-3xl font-bold text-primary">{currentStats.totalCapacity.toFixed(1)}</p>
-          <p className="text-xs text-muted-foreground mt-1">Weighted FTE</p>
-        </div>
+        <CapacityTooltip 
+          employees={employees.filter(e => teamsToInclude.includes(e.team))} 
+          events={events}
+        >
+          <div className="glass-card p-5 cursor-help hover:ring-2 hover:ring-primary/30 transition-all">
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Current Capacity</p>
+            <p className="text-3xl font-bold text-primary">{currentStats.totalCapacity.toFixed(1)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Weighted FTE (hover for details)</p>
+          </div>
+        </CapacityTooltip>
         <div className="glass-card p-5">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mb-2">Headcount</p>
           <p className="text-3xl font-bold text-foreground">{currentStats.headcount}</p>
@@ -317,46 +323,51 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
         <div className="glass-card p-6">
           <h4 className="font-bold text-foreground mb-4">Team Capacity vs Target</h4>
           <div className="space-y-3 max-h-[300px] overflow-y-auto">
-            {teamCapacityStats.map(team => (
-              <div key={team.teamName} className={`p-3 rounded-lg border ${getStatusBg(team.status)}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(team.status) }} />
-                    <span className="font-medium text-foreground">{team.teamName}</span>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-muted-foreground">
-                      <span className="font-bold text-foreground">{team.headcount}</span>
-                      {team.targetSize > 0 && <span> / {team.targetSize}</span>}
-                    </span>
-                    {team.targetSize > 0 && (
-                      <span className={`font-bold ${
-                        team.status === 'understaffed' ? 'text-destructive' :
-                        team.status === 'overstaffed' ? 'text-chart-4' :
-                        'text-chart-2'
-                      }`}>
-                        {team.variance > 0 ? '+' : ''}{team.variance}
-                        <span className="text-xs ml-1">({team.variancePercent > 0 ? '+' : ''}{team.variancePercent}%)</span>
+            {teamCapacityStats.map(team => {
+              const teamEmployees = employees.filter(e => e.team === team.teamName);
+              return (
+                <div key={team.teamName} className={`p-3 rounded-lg border ${getStatusBg(team.status)}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getStatusColor(team.status) }} />
+                      <span className="font-medium text-foreground">{team.teamName}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-muted-foreground">
+                        <span className="font-bold text-foreground">{team.headcount}</span>
+                        {team.targetSize > 0 && <span> / {team.targetSize}</span>}
                       </span>
-                    )}
-                    <span className="text-xs text-muted-foreground">
-                      {team.capacity} FTE
-                    </span>
+                      {team.targetSize > 0 && (
+                        <span className={`font-bold ${
+                          team.status === 'understaffed' ? 'text-destructive' :
+                          team.status === 'overstaffed' ? 'text-chart-4' :
+                          'text-chart-2'
+                        }`}>
+                          {team.variance > 0 ? '+' : ''}{team.variance}
+                          <span className="text-xs ml-1">({team.variancePercent > 0 ? '+' : ''}{team.variancePercent}%)</span>
+                        </span>
+                      )}
+                      <CapacityTooltip employees={teamEmployees} events={events}>
+                        <span className="text-xs text-primary cursor-help hover:underline">
+                          {team.capacity} FTE
+                        </span>
+                      </CapacityTooltip>
+                    </div>
                   </div>
+                  {team.targetSize > 0 && (
+                    <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all"
+                        style={{ 
+                          width: `${Math.min(100, (team.headcount / team.targetSize) * 100)}%`,
+                          backgroundColor: getStatusColor(team.status)
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
-                {team.targetSize > 0 && (
-                  <div className="mt-2 h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all"
-                      style={{ 
-                        width: `${Math.min(100, (team.headcount / team.targetSize) * 100)}%`,
-                        backgroundColor: getStatusColor(team.status)
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
