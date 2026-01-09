@@ -768,6 +768,7 @@ const Index = () => {
           {view === 'roster' && (
             <Roster 
               employees={filteredEmployees}
+              events={events}
               openPlannerForUser={openPlannerForUser}
               onEditEmployee={handleEditEmployee}
               teamStructures={teamStructures}
@@ -871,11 +872,15 @@ const Index = () => {
                 employees={employees}
                 events={events}
                 departments={departments}
-                onResolveFlag={(eventId) => {
-                  // Resolve by updating the event date to now (marking as done)
+                onResolveFlag={(eventId, resolutionNote) => {
+                  // Resolve flag with note
                   const event = events.find(e => e.id === eventId);
                   if (event) {
-                    const resolvedEvent = { ...event, date: new Date().toISOString().split('T')[0] };
+                    const resolvedEvent = { 
+                      ...event, 
+                      isResolved: true, 
+                      resolutionNote 
+                    };
                     const scenarioId = ensureWorkingScenario();
                     setScenarios(prev => prev.map(s => {
                       if (s.id !== scenarioId) return s;

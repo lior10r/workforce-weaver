@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus } from 'lucide-react';
-import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams } from '@/lib/workforce-data';
+import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap } from 'lucide-react';
+import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight } from '@/lib/workforce-data';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ import { BulkActions } from './BulkActions';
 
 interface RosterProps {
   employees: Employee[];
+  events: WorkforceEvent[];
   openPlannerForUser: (empId: number, asFlag?: boolean) => void;
   onEditEmployee: (employee: Employee) => void;
   teamStructures: TeamStructure[];
@@ -134,6 +136,7 @@ const DroppableTeam = ({ teamName, dept, group, children, isOver }: {
 
 export const Roster = ({ 
   employees, 
+  events,
   openPlannerForUser, 
   onEditEmployee,
   teamStructures,
@@ -326,6 +329,19 @@ export const Roster = ({
     const diffInfo = employeeDiffMap?.get(emp.id);
     const diffStatus = diffInfo?.status;
     const isSelected = selectedIds.has(emp.id);
+    
+    // Calculate if employee is in training period (first 6 months)
+    const today = new Date();
+    const joinDate = new Date(emp.joined);
+    const monthsOfExperience = (today.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
+    const isInTraining = monthsOfExperience < 6 && emp.role !== 'Team Lead';
+    
+    // Check if part-time
+    const isPartTime = emp.workType === 'Part-Time';
+    const partTimePercent = emp.partTimePercentage || 50;
+    
+    // Get capacity for tooltip
+    const capacity = getCapacityWeight(emp.role, emp.joined, today, emp.workType, emp.partTimePercentage);
 
     const content = (
       <div 
@@ -357,11 +373,16 @@ export const Roster = ({
                 <span className="text-[8px] text-white font-bold">?</span>
               </div>
             )}
+            {isInTraining && !emp.isPotential && (
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center">
+                <GraduationCap size={8} className="text-white" />
+              </div>
+            )}
           </div>
 
           {/* Info */}
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-semibold text-foreground">{emp.name}</h4>
               {isLeader && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-500 uppercase">
@@ -372,6 +393,36 @@ export const Roster = ({
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-potential-color/20 text-potential-color uppercase">
                   Potential
                 </span>
+              )}
+              {isInTraining && !emp.isPotential && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                        <GraduationCap size={10} />
+                        Training
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">In training period (first 6 months) - 0.3x capacity</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {isPartTime && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-chart-4/20 text-chart-4 uppercase flex items-center gap-1 cursor-help">
+                        <Clock size={10} />
+                        {partTimePercent}%
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs">Part-time ({partTimePercent}% FTE) - Capacity: {capacity.toFixed(2)}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
               {getDiffBadge(diffStatus, diffInfo?.changes)}
             </div>
