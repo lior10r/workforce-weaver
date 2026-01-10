@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
 import { Timeline } from '@/components/workforce/Timeline';
+import { SeniorityProgressionTimeline } from '@/components/workforce/SeniorityProgressionTimeline';
 import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
@@ -751,18 +752,42 @@ const Index = () => {
           )}
 
           {view === 'timeline' && (
-            <Timeline 
-              employees={filteredEmployees} 
-              events={events}
-              openPlannerForUser={openPlannerForUser}
-              allEmployees={employees}
-              selectedTeam={legacyHierarchy.team}
-              selectedDept={legacyHierarchy.dept}
-              teamStructures={teamStructures}
-              employeeDiffMap={employeeDiffMap}
-              eventDiffMap={eventDiffMap}
-              hierarchy={hierarchy}
-            />
+            <div className="space-y-6">
+              <SeniorityProgressionTimeline employees={filteredEmployees} />
+              <Timeline 
+                employees={filteredEmployees} 
+                events={events}
+                openPlannerForUser={openPlannerForUser}
+                allEmployees={employees}
+                selectedTeam={legacyHierarchy.team}
+                selectedDept={legacyHierarchy.dept}
+                teamStructures={teamStructures}
+                employeeDiffMap={employeeDiffMap}
+                eventDiffMap={eventDiffMap}
+                hierarchy={hierarchy}
+                onResolveFlag={(eventId, resolutionNote) => {
+                  const event = events.find(e => e.id === eventId);
+                  if (event) {
+                    const resolvedEvent = { 
+                      ...event, 
+                      isResolved: true, 
+                      resolutionNote 
+                    };
+                    const scenarioId = ensureWorkingScenario();
+                    setScenarios(prev => prev.map(s => {
+                      if (s.id !== scenarioId) return s;
+                      const isProposed = s.proposedEvents.some(e => e.id === eventId);
+                      if (isProposed) {
+                        return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? resolvedEvent : e) };
+                      } else {
+                        return { ...s, proposedEvents: [...s.proposedEvents, resolvedEvent] };
+                      }
+                    }));
+                  }
+                }}
+                onDeleteEvent={handleDeleteEvent}
+              />
+            </div>
           )}
 
           {view === 'roster' && (

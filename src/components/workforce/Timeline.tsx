@@ -1,5 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, TrendingUp } from 'lucide-react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, TrendingUp, Check, X, MessageSquare, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -16,6 +19,8 @@ interface TimelineProps {
   employeeDiffMap?: Map<number, { status: DiffStatus; changes?: string[] }>;
   eventDiffMap?: Map<number, { status: DiffStatus }>;
   hierarchy?: HierarchyStructure;
+  onResolveFlag?: (eventId: number, resolutionNote: string) => void;
+  onDeleteEvent?: (eventId: number) => void;
 }
 
 interface TrainingPeriod {
@@ -65,10 +70,16 @@ export const Timeline = ({
   teamStructures = [],
   employeeDiffMap,
   eventDiffMap,
-  hierarchy = []
+  hierarchy = [],
+  onResolveFlag,
+  onDeleteEvent
 }: TimelineProps) => {
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
+  
+  // Resolution dialog state
+  const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
   
   const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
   const currentDate = new Date();
@@ -506,6 +517,7 @@ export const Timeline = ({
 
             const isTeamSwap = ev.type === 'Team Swap';
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
+            const isResolved = ev.isResolved;
 
             return (
               <div 
@@ -514,30 +526,47 @@ export const Timeline = ({
                 className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group/marker z-20"
               >
                 <div className={`p-1.5 rounded-full cursor-help shadow-lg transition-transform hover:scale-110
-                  ${ev.isFlag ? 'bg-flag' : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
+                  ${ev.isFlag 
+                    ? (isResolved ? 'bg-emerald-500' : 'bg-flag') 
+                    : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
                   ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
                   ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
                 `}
                 >
                   {ev.isFlag 
-                    ? <Flag size={10} className="text-foreground" /> 
+                    ? (isResolved 
+                        ? <Check size={10} className="text-white" />
+                        : <Flag size={10} className="text-foreground" />)
                     : isTeamSwap
                     ? <ArrowRight size={10} className="text-foreground" />
                     : <Clock size={10} className="text-background" />
                   }
                 </div>
                 
-                {/* Tooltip */}
+                {/* Tooltip with actions */}
                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/marker:block 
-                  w-52 bg-popover border border-border p-3 rounded-xl text-xs shadow-xl z-50">
-                  <p className={`font-bold uppercase mb-1.5 ${ev.isFlag ? 'text-flag' : isTeamSwap ? 'text-accent-blue' : 'text-primary'}`}>
-                    {ev.type}
+                  w-64 bg-popover border border-border p-3 rounded-xl text-xs shadow-xl z-50">
+                  <p className={`font-bold uppercase mb-1.5 ${
+                    ev.isFlag 
+                      ? (isResolved ? 'text-emerald-500' : 'text-flag')
+                      : isTeamSwap ? 'text-accent-blue' : 'text-primary'
+                  }`}>
+                    {ev.type} {isResolved && '✓ Resolved'}
                   </p>
                   <p className="text-foreground font-medium">{ev.details}</p>
                   {isTeamSwap && ev.targetTeam && (
                     <p className="text-accent-blue mt-1 flex items-center gap-1">
                       <ArrowRight size={12} /> {ev.targetTeam}
                     </p>
+                  )}
+                  {/* Show resolution note for resolved flags */}
+                  {isResolved && ev.resolutionNote && (
+                    <div className="mt-2 p-2 bg-emerald-500/10 rounded-lg">
+                      <p className="text-emerald-600 text-[10px] font-medium flex items-center gap-1">
+                        <MessageSquare size={10} /> Resolution:
+                      </p>
+                      <p className="text-foreground text-[10px] mt-0.5">{ev.resolutionNote}</p>
+                    </div>
                   )}
                   <p className="text-muted-foreground mt-1.5 font-mono text-[10px]">{formatDate(ev.date)}</p>
                   {evDiffStatus && evDiffStatus !== 'unchanged' && (
@@ -547,6 +576,39 @@ export const Timeline = ({
                       {evDiffStatus === 'added' ? '+ New in scenario' : '~ Modified'}
                     </p>
                   )}
+                  
+                  {/* Action buttons */}
+                  <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
+                    {ev.isFlag && onResolveFlag && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResolvingEventId(ev.id);
+                          setResolutionNote(ev.resolutionNote || '');
+                        }}
+                        className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                          isResolved 
+                            ? 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+                            : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                        }`}
+                      >
+                        {isResolved ? <MessageSquare size={10} /> : <Check size={10} />}
+                        {isResolved ? 'Edit' : 'Resolve'}
+                      </button>
+                    )}
+                    {onDeleteEvent && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteEvent(ev.id);
+                        }}
+                        className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                      >
+                        <Trash2 size={10} />
+                        Remove
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -907,6 +969,12 @@ export const Timeline = ({
             <span className="text-muted-foreground">Decision Flag</span>
           </div>
           <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center">
+              <Check size={8} className="text-white" />
+            </div>
+            <span className="text-muted-foreground">Resolved Flag</span>
+          </div>
+          <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full bg-accent-blue" />
             <span className="text-muted-foreground">Team Transfer</span>
           </div>
@@ -953,6 +1021,71 @@ export const Timeline = ({
           )}
         </div>
       </div>
+      
+      {/* Resolution Dialog */}
+      <Dialog open={resolvingEventId !== null} onOpenChange={(open) => {
+        if (!open) {
+          setResolvingEventId(null);
+          setResolutionNote('');
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Check className="h-5 w-5 text-emerald-500" />
+              Resolve Decision Flag
+            </DialogTitle>
+            <DialogDescription>
+              Add a short description of the decision or resolution.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {resolvingEventId && (() => {
+              const flag = events.find(e => e.id === resolvingEventId);
+              const emp = flag ? employees.find(e => e.id === flag.empId) : null;
+              return flag && emp ? (
+                <div className="p-3 rounded-lg bg-accent/50">
+                  <p className="font-medium text-sm">{emp.name}</p>
+                  <p className="text-xs text-muted-foreground">{flag.details}</p>
+                </div>
+              ) : null;
+            })()}
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Resolution Note</label>
+              <Textarea
+                placeholder="Describe the decision made..."
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setResolvingEventId(null);
+              setResolutionNote('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => {
+                if (resolvingEventId && onResolveFlag) {
+                  onResolveFlag(resolvingEventId, resolutionNote);
+                  setResolvingEventId(null);
+                  setResolutionNote('');
+                }
+              }} 
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Check size={16} className="mr-2" />
+              {events.find(e => e.id === resolvingEventId)?.isResolved ? 'Update' : 'Resolve'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
