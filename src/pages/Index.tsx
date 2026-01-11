@@ -4,7 +4,7 @@ import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
 import { Timeline } from '@/components/workforce/Timeline';
-import { SeniorityProgressionTimeline } from '@/components/workforce/SeniorityProgressionTimeline';
+
 import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
@@ -752,9 +752,7 @@ const Index = () => {
           )}
 
           {view === 'timeline' && (
-            <div className="space-y-6">
-              <SeniorityProgressionTimeline employees={filteredEmployees} />
-              <Timeline 
+            <Timeline
                 employees={filteredEmployees} 
                 events={events}
                 openPlannerForUser={openPlannerForUser}
@@ -787,7 +785,6 @@ const Index = () => {
                 }}
                 onDeleteEvent={handleDeleteEvent}
               />
-            </div>
           )}
 
           {view === 'roster' && (

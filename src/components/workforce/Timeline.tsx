@@ -3,6 +3,7 @@ import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTrian
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -40,6 +41,14 @@ interface AutoPromotion {
   fromRole: string;
   toRole: string;
   yearsRequired: number;
+}
+
+// Progression segment for color-coded timeline bars
+interface ProgressionSegment {
+  startPos: number;
+  endPos: number;
+  level: 'training' | 'junior' | 'mid' | 'senior';
+  color: string;
 }
 
 const getDiffBorderColor = (status?: DiffStatus) => {
@@ -101,6 +110,57 @@ export const Timeline = ({
         endDate: e.endDate!,
         details: e.details
       }));
+  };
+
+  // Calculate progression segments for color-coded timeline bar
+  const getProgressionSegments = (emp: Employee, barStartDate: string, barEndDate: string | null): ProgressionSegment[] => {
+    const segments: ProgressionSegment[] = [];
+    const joinDate = new Date(emp.joined);
+    const startDate = new Date(barStartDate);
+    const endDate = barEndDate ? new Date(barEndDate) : new Date('2030-12-31');
+    
+    // Training period: first 6 months
+    const trainingEndDate = new Date(joinDate);
+    trainingEndDate.setMonth(trainingEndDate.getMonth() + 6);
+    
+    // Junior: from 6 months to 1 year
+    const juniorEndDate = new Date(joinDate);
+    juniorEndDate.setFullYear(juniorEndDate.getFullYear() + 1);
+    
+    // Mid: from 1 year to 3 years
+    const midEndDate = new Date(joinDate);
+    midEndDate.setFullYear(midEndDate.getFullYear() + 3);
+    
+    // Define periods
+    const periods = [
+      { level: 'training' as const, start: startDate, end: trainingEndDate, color: 'bg-amber-500' },
+      { level: 'junior' as const, start: trainingEndDate, end: juniorEndDate, color: 'bg-role-junior' },
+      { level: 'mid' as const, start: juniorEndDate, end: midEndDate, color: 'bg-role-mid' },
+      { level: 'senior' as const, start: midEndDate, end: endDate, color: 'bg-role-senior' },
+    ];
+    
+    for (const period of periods) {
+      // Skip if period ends before bar starts or starts after bar ends
+      if (period.end <= startDate || period.start >= endDate) continue;
+      
+      // Clamp to bar boundaries
+      const segStart = period.start < startDate ? startDate : period.start;
+      const segEnd = period.end > endDate ? endDate : period.end;
+      
+      const startPos = getTimelinePosition(segStart.toISOString().split('T')[0]);
+      const endPos = getTimelinePosition(segEnd.toISOString().split('T')[0]);
+      
+      if (endPos > startPos) {
+        segments.push({
+          startPos,
+          endPos,
+          level: period.level,
+          color: period.color
+        });
+      }
+    }
+    
+    return segments;
   };
 
   // Calculate automatic tenure-based promotions for an employee
@@ -398,45 +458,72 @@ export const Timeline = ({
             className="absolute inset-y-0 w-0.5 bg-destructive z-30"
           />
 
-          {/* The Tenure Bar */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div 
-                style={{ left: `${joinedPos}%`, width: `${durationWidth}%` }}
-                className={`absolute inset-y-2 rounded-md cursor-help ${
-                  isPotential 
-                    ? 'potential-stripe' 
-                    : `${getRoleColor(emp.role)} opacity-40 border border-foreground/10`
-                }`}
-              />
-            </TooltipTrigger>
-            <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
-              <div className="space-y-1 text-sm">
-                <p className="font-bold text-foreground">{emp.name}</p>
-                {isPotential && (
+          {/* The Tenure Bar with Progression Colors */}
+          {isPotential ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div 
+                  style={{ left: `${joinedPos}%`, width: `${durationWidth}%` }}
+                  className="absolute inset-y-2 rounded-md cursor-help potential-stripe"
+                />
+              </TooltipTrigger>
+              <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+                <div className="space-y-1 text-sm">
+                  <p className="font-bold text-foreground">{emp.name}</p>
                   <p className="text-potential text-xs font-medium">Potential / Uncertain</p>
-                )}
-                <p className="text-muted-foreground">
-                  <span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}
-                </p>
-                {isTransfer && transferInfo && (
                   <p className="text-muted-foreground">
-                    <span className="text-accent-blue font-medium">Joined team:</span> {formatDate(transferInfo.transferDate)}
+                    <span className="text-primary font-medium">Planned start:</span> {formatDate(emp.joined)}
                   </p>
-                )}
-                {teamSwapEvent && !isTransfer && (
-                  <p className="text-muted-foreground">
-                    <span className="text-accent-blue font-medium">Transfer out:</span> {formatDate(teamSwapEvent.date)}
-                  </p>
-                )}
-                {departureEvent && (
-                  <p className="text-muted-foreground">
-                    <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
-                  </p>
-                )}
-              </div>
-            </TooltipContent>
-          </Tooltip>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <>
+              {/* Progression segments */}
+              {getProgressionSegments(emp, barStartDate, barEndDate).map((segment, idx) => (
+                <Tooltip key={`segment-${idx}`}>
+                  <TooltipTrigger asChild>
+                    <div 
+                      style={{ 
+                        left: `${segment.startPos}%`, 
+                        width: `${segment.endPos - segment.startPos}%` 
+                      }}
+                      className={`absolute inset-y-2 cursor-help ${segment.color} opacity-60 border-y border-foreground/10 ${
+                        idx === 0 ? 'rounded-l-md border-l' : ''
+                      } ${idx === getProgressionSegments(emp, barStartDate, barEndDate).length - 1 ? 'rounded-r-md border-r' : ''}`}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+                    <div className="space-y-1 text-sm">
+                      <p className="font-bold text-foreground">{emp.name}</p>
+                      <div className="flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded ${segment.color}`} />
+                        <span className="capitalize font-medium text-primary">{segment.level}</span>
+                      </div>
+                      <p className="text-muted-foreground">
+                        <span className="text-primary font-medium">Hired:</span> {formatDate(emp.joined)}
+                      </p>
+                      {isTransfer && transferInfo && (
+                        <p className="text-muted-foreground">
+                          <span className="text-accent-blue font-medium">Joined team:</span> {formatDate(transferInfo.transferDate)}
+                        </p>
+                      )}
+                      {teamSwapEvent && !isTransfer && (
+                        <p className="text-muted-foreground">
+                          <span className="text-accent-blue font-medium">Transfer out:</span> {formatDate(teamSwapEvent.date)}
+                        </p>
+                      )}
+                      {departureEvent && (
+                        <p className="text-muted-foreground">
+                          <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
+                        </p>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </>
+          )}
 
           {/* Training Period Overlays */}
           {!isPotential && trainingPeriods.map((training, idx) => {
@@ -520,32 +607,37 @@ export const Timeline = ({
             const isResolved = ev.isResolved;
 
             return (
-              <div 
-                key={ev.id}
-                style={{ left: `${pos}%` }}
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 group/marker z-20"
-              >
-                <div className={`p-1.5 rounded-full cursor-help shadow-lg transition-transform hover:scale-110
-                  ${ev.isFlag 
-                    ? (isResolved ? 'bg-emerald-500' : 'bg-flag') 
-                    : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
-                  ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
-                  ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
-                `}
+              <Popover key={ev.id}>
+                <PopoverTrigger asChild>
+                  <div 
+                    style={{ left: `${pos}%` }}
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                  >
+                    <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110
+                      ${ev.isFlag 
+                        ? (isResolved ? 'bg-emerald-500' : 'bg-flag') 
+                        : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
+                      ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
+                      ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
+                    `}
+                    >
+                      {ev.isFlag 
+                        ? (isResolved 
+                            ? <Check size={10} className="text-white" />
+                            : <Flag size={10} className="text-foreground" />)
+                        : isTeamSwap
+                        ? <ArrowRight size={10} className="text-foreground" />
+                        : <Clock size={10} className="text-background" />
+                      }
+                    </div>
+                  </div>
+                </PopoverTrigger>
+                <PopoverContent 
+                  side="top" 
+                  align="center" 
+                  className="w-64 p-3 text-xs"
+                  sideOffset={8}
                 >
-                  {ev.isFlag 
-                    ? (isResolved 
-                        ? <Check size={10} className="text-white" />
-                        : <Flag size={10} className="text-foreground" />)
-                    : isTeamSwap
-                    ? <ArrowRight size={10} className="text-foreground" />
-                    : <Clock size={10} className="text-background" />
-                  }
-                </div>
-                
-                {/* Tooltip with actions */}
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 hidden group-hover/marker:block 
-                  w-64 bg-popover border border-border p-3 rounded-xl text-xs shadow-xl z-50">
                   <p className={`font-bold uppercase mb-1.5 ${
                     ev.isFlag 
                       ? (isResolved ? 'text-emerald-500' : 'text-flag')
@@ -581,8 +673,7 @@ export const Timeline = ({
                   <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
                     {ev.isFlag && onResolveFlag && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
+                        onClick={() => {
                           setResolvingEventId(ev.id);
                           setResolutionNote(ev.resolutionNote || '');
                         }}
@@ -598,10 +689,7 @@ export const Timeline = ({
                     )}
                     {onDeleteEvent && (
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteEvent(ev.id);
-                        }}
+                        onClick={() => onDeleteEvent(ev.id)}
                         className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                       >
                         <Trash2 size={10} />
@@ -609,8 +697,8 @@ export const Timeline = ({
                       </button>
                     )}
                   </div>
-                </div>
-              </div>
+                </PopoverContent>
+              </Popover>
             );
           })}
 
@@ -982,14 +1070,25 @@ export const Timeline = ({
             <div className="w-3 h-3 rounded-full bg-foreground" />
             <span className="text-muted-foreground">Other Event</span>
           </div>
+          <div className="w-px h-4 bg-border" />
+          <span className="text-muted-foreground font-medium">Progression:</span>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-2 bg-role-senior/40 rounded" />
-            <span className="text-muted-foreground">Tenure Period</span>
+            <div className="w-6 h-2 bg-amber-500 opacity-60 rounded" />
+            <span className="text-muted-foreground">Training</span>
           </div>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-2 training-stripe rounded" />
-            <span className="text-muted-foreground">Training Period</span>
+            <div className="w-6 h-2 bg-role-junior opacity-60 rounded" />
+            <span className="text-muted-foreground">Junior</span>
           </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-2 bg-role-mid opacity-60 rounded" />
+            <span className="text-muted-foreground">Mid</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-2 bg-role-senior opacity-60 rounded" />
+            <span className="text-muted-foreground">Senior</span>
+          </div>
+          <div className="w-px h-4 bg-border" />
           <div className="flex items-center gap-2">
             <div className="w-8 h-2 potential-stripe rounded" />
             <span className="text-muted-foreground">Potential Hire</span>
