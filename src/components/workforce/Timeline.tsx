@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, TrendingUp, Check, X, MessageSquare, Trash2 } from 'lucide-react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, TrendingUp, Check, X, MessageSquare, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ProgressionMilestones, DEFAULT_MILESTONES } from './ProgressionSettings';
 
 type GroupingMode = 'team' | 'hierarchy';
 
@@ -22,6 +23,8 @@ interface TimelineProps {
   hierarchy?: HierarchyStructure;
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
+  onEditEmployee?: (employee: Employee) => void;
+  progressionMilestones?: ProgressionMilestones;
 }
 
 interface TrainingPeriod {
@@ -81,7 +84,9 @@ export const Timeline = ({
   eventDiffMap,
   hierarchy = [],
   onResolveFlag,
-  onDeleteEvent
+  onDeleteEvent,
+  onEditEmployee,
+  progressionMilestones = DEFAULT_MILESTONES
 }: TimelineProps) => {
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
@@ -119,17 +124,17 @@ export const Timeline = ({
     const startDate = new Date(barStartDate);
     const endDate = barEndDate ? new Date(barEndDate) : new Date('2030-12-31');
     
-    // Training period: first 6 months
+    // Training period: based on milestones
     const trainingEndDate = new Date(joinDate);
-    trainingEndDate.setMonth(trainingEndDate.getMonth() + 6);
+    trainingEndDate.setMonth(trainingEndDate.getMonth() + progressionMilestones.trainingMonths);
     
-    // Junior: from 6 months to 1 year
+    // Junior: from training end to juniorToMidYears
     const juniorEndDate = new Date(joinDate);
-    juniorEndDate.setFullYear(juniorEndDate.getFullYear() + 1);
+    juniorEndDate.setMonth(juniorEndDate.getMonth() + progressionMilestones.juniorToMidYears * 12);
     
-    // Mid: from 1 year to 3 years
+    // Mid: from junior end to midToSeniorYears
     const midEndDate = new Date(joinDate);
-    midEndDate.setFullYear(midEndDate.getFullYear() + 3);
+    midEndDate.setMonth(midEndDate.getMonth() + progressionMilestones.midToSeniorYears * 12);
     
     // Define periods
     const periods = [
@@ -176,13 +181,12 @@ export const Timeline = ({
     const promotions: AutoPromotion[] = [];
     const joinDate = new Date(emp.joined);
     
-    // 1 year: Junior → Mid-Level
+    // Use milestones for promotion dates
     const midLevelDate = new Date(joinDate);
-    midLevelDate.setFullYear(midLevelDate.getFullYear() + 1);
+    midLevelDate.setMonth(midLevelDate.getMonth() + progressionMilestones.juniorToMidYears * 12);
     
-    // 3 years total: Mid-Level → Senior (2 years after becoming mid-level)
     const seniorDate = new Date(joinDate);
-    seniorDate.setFullYear(seniorDate.getFullYear() + 3);
+    seniorDate.setMonth(seniorDate.getMonth() + progressionMilestones.midToSeniorYears * 12);
 
     // Only show promotions based on starting role
     if (emp.role === 'Junior Dev') {
@@ -190,23 +194,24 @@ export const Timeline = ({
         date: midLevelDate.toISOString().split('T')[0],
         fromRole: 'Junior Dev',
         toRole: 'Mid-Level Dev',
-        yearsRequired: 1
+        yearsRequired: progressionMilestones.juniorToMidYears
       });
       promotions.push({
         date: seniorDate.toISOString().split('T')[0],
         fromRole: 'Mid-Level Dev',
         toRole: 'Senior Dev',
-        yearsRequired: 3
+        yearsRequired: progressionMilestones.midToSeniorYears
       });
     } else if (emp.role === 'Mid-Level Dev') {
       // Already mid-level, only show senior promotion
+      const yearsToSenior = progressionMilestones.midToSeniorYears - progressionMilestones.juniorToMidYears;
       const seniorFromMid = new Date(joinDate);
-      seniorFromMid.setFullYear(seniorFromMid.getFullYear() + 2);
+      seniorFromMid.setMonth(seniorFromMid.getMonth() + yearsToSenior * 12);
       promotions.push({
         date: seniorFromMid.toISOString().split('T')[0],
         fromRole: 'Mid-Level Dev',
         toRole: 'Senior Dev',
-        yearsRequired: 2
+        yearsRequired: yearsToSenior
       });
     }
 
@@ -420,6 +425,15 @@ export const Timeline = ({
           </Tooltip>
           {!isPotential && (
             <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-opacity">
+              {onEditEmployee && (
+                <button 
+                  onClick={() => onEditEmployee(emp)}
+                  title="Edit Employee"
+                  className="p-1.5 bg-accent text-foreground hover:bg-accent/80 rounded-lg transition-all"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
               <button 
                 onClick={() => openPlannerForUser(emp.id, true)}
                 title="Add Decision Flag"

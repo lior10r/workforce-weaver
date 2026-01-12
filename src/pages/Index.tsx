@@ -15,6 +15,8 @@ import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
 import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
+import { ProgressionSettings, ProgressionMilestones, DEFAULT_MILESTONES } from '@/components/workforce/ProgressionSettings';
+import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { toast } from 'sonner';
 import { 
@@ -79,6 +81,9 @@ const Index = () => {
   // Scenario State
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>(null);
+  
+  // Progression milestones state
+  const [progressionMilestones, setProgressionMilestones] = useState<ProgressionMilestones>(DEFAULT_MILESTONES);
 
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
@@ -752,7 +757,19 @@ const Index = () => {
           )}
 
           {view === 'timeline' && (
-            <Timeline
+            <div className="space-y-6">
+              <div className="flex flex-wrap gap-3 justify-between items-center">
+                <ProgressionSettings 
+                  milestones={progressionMilestones} 
+                  onUpdate={setProgressionMilestones} 
+                />
+                <MissingRolesForecast 
+                  employees={employees}
+                  events={events}
+                  teamStructures={teamStructures}
+                />
+              </div>
+              <Timeline
                 employees={filteredEmployees} 
                 events={events}
                 openPlannerForUser={openPlannerForUser}
@@ -784,7 +801,10 @@ const Index = () => {
                   }
                 }}
                 onDeleteEvent={handleDeleteEvent}
+                onEditEmployee={handleEditEmployee}
+                progressionMilestones={progressionMilestones}
               />
+            </div>
           )}
 
           {view === 'roster' && (
