@@ -117,9 +117,29 @@ export const Timeline = ({
       }));
   };
 
+// Check if role is a developer role (eligible for progression)
+  const isDeveloperRole = (role: string): boolean => {
+    const devRoles = ['Junior Dev', 'Mid-Level Dev', 'Senior Dev'];
+    return devRoles.includes(role);
+  };
+
   // Calculate progression segments for color-coded timeline bar
   const getProgressionSegments = (emp: Employee, barStartDate: string, barEndDate: string | null): ProgressionSegment[] => {
     const segments: ProgressionSegment[] = [];
+    
+    // Skip progression for non-developers - show single color bar based on role
+    if (!isDeveloperRole(emp.role)) {
+      const startPos = getTimelinePosition(barStartDate);
+      const endPos = getTimelinePosition(barEndDate || '2030-12-31');
+      segments.push({
+        startPos,
+        endPos,
+        level: 'senior', // Use senior level for styling consistency
+        color: `bg-${getRoleColor(emp.role)}` // Use role-specific color
+      });
+      return segments;
+    }
+    
     const joinDate = new Date(emp.joined);
     const startDate = new Date(barStartDate);
     const endDate = barEndDate ? new Date(barEndDate) : new Date('2030-12-31');
@@ -170,13 +190,8 @@ export const Timeline = ({
 
   // Calculate automatic tenure-based promotions for an employee
   const getAutoPromotions = (emp: Employee): AutoPromotion[] => {
-    // Skip non-dev roles
-    const devRoles = ['Junior Dev', 'Mid-Level Dev', 'Senior Dev'];
-    if (!devRoles.includes(emp.role) && emp.role !== 'Junior Dev') {
-      // Check if they started as Junior
-      const isDevTrack = emp.role === 'Junior Dev' || emp.role === 'Mid-Level Dev' || emp.role === 'Senior Dev';
-      if (!isDevTrack) return [];
-    }
+    // Skip non-dev roles - no automatic progression for non-developers
+    if (!isDeveloperRole(emp.role)) return [];
 
     const promotions: AutoPromotion[] = [];
     const joinDate = new Date(emp.joined);

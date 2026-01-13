@@ -477,6 +477,12 @@ export const formatDate = (dateStr: string): string => {
   return `${day}/${month}/${year}`;
 };
 
+// Check if role is a developer role (eligible for progression-based capacity)
+export const isDeveloperRole = (role: string): boolean => {
+  const devRoles = ['Junior Dev', 'Mid-Level Dev', 'Senior Dev'];
+  return devRoles.includes(role);
+};
+
 // Calculate capacity weight based on tenure, role, and work type
 export const getCapacityWeight = (
   role: string, 
@@ -486,6 +492,12 @@ export const getCapacityWeight = (
   partTimePercentage: number = 50
 ): number => {
   if (role === 'Team Lead') return 0; // Team leads don't count
+  
+  // Non-developers get full capacity (1.0) - no training period or progression
+  if (!isDeveloperRole(role)) {
+    const workTypeMultiplier = workType === 'Part-Time' ? (partTimePercentage / 100) : 1;
+    return 1.0 * workTypeMultiplier;
+  }
   
   const joinDate = new Date(joined);
   const monthsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
