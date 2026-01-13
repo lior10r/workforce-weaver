@@ -7,6 +7,7 @@ import {
   WORK_TYPES,
   WorkType,
   HierarchyStructure,
+  TeamStructure,
   getAllDeptTeams,
   getTeamParent,
 } from '@/lib/workforce-data';
@@ -21,6 +22,7 @@ interface EmployeeModalProps {
   hierarchy: HierarchyStructure;
   departments: Record<string, string[]>;
   employees: Employee[];
+  teamStructures: TeamStructure[];
   prefill?: { dept: string; team: string; group?: string | null };
 }
 
@@ -33,6 +35,7 @@ export const EmployeeModal = ({
   hierarchy,
   departments,
   employees,
+  teamStructures,
   prefill,
 }: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -74,7 +77,15 @@ export const EmployeeModal = ({
     return deptStructure.directTeams || [];
   }, [deptStructure, selectedGroup]);
 
+  // Check if editing employee is the team leader for the selected team
+  const isTeamLeader = useMemo(() => {
+    if (!editingEmployee || !selectedTeam) return false;
+    const teamStructure = teamStructures.find(ts => ts.teamName === selectedTeam);
+    return teamStructure?.teamLeader === editingEmployee.id;
+  }, [editingEmployee, selectedTeam, teamStructures]);
+
   // Auto-calculate manager based on hierarchy
+  // Reporting chain: Team Member → Team Leader → Group Manager → Department Manager
   const autoManager = useMemo(() => {
     if (isDepartmentLevel) {
       // Department manager reports to no one
@@ -86,19 +97,33 @@ export const EmployeeModal = ({
       return deptStructure?.departmentManagerId;
     }
     
-    if (selectedTeam && selectedGroup) {
-      // Team member reports to group manager if exists, else department manager
+    // Check if this employee IS the team leader - they report to group/dept manager
+    if (isTeamLeader && selectedTeam) {
       const group = deptStructure?.groups.find(g => g.name === selectedGroup);
       return group?.groupManagerId || deptStructure?.departmentManagerId;
     }
     
-    if (selectedTeam && !selectedGroup) {
-      // Direct team member reports to department manager
+    // Regular team member - check if there's a team leader first
+    if (selectedTeam) {
+      const teamStructure = teamStructures.find(ts => ts.teamName === selectedTeam);
+      
+      // If team has a leader and it's not the current employee, report to leader
+      if (teamStructure?.teamLeader && teamStructure.teamLeader !== editingEmployee?.id) {
+        return teamStructure.teamLeader;
+      }
+      
+      // No team leader, fall back to group manager or department manager
+      if (selectedGroup) {
+        const group = deptStructure?.groups.find(g => g.name === selectedGroup);
+        return group?.groupManagerId || deptStructure?.departmentManagerId;
+      }
+      
+      // Direct team under department
       return deptStructure?.departmentManagerId;
     }
     
     return undefined;
-  }, [isDepartmentLevel, isGroupLevel, selectedDept, selectedGroup, selectedTeam, deptStructure]);
+  }, [isDepartmentLevel, isGroupLevel, isTeamLeader, selectedDept, selectedGroup, selectedTeam, deptStructure, teamStructures, editingEmployee]);
 
   // Get manager name for display
   const managerName = useMemo(() => {
