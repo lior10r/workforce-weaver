@@ -37,23 +37,35 @@ interface UndoRedoState {
 }
 
 export const useWorkforceData = () => {
-  // Load initial data from localStorage or use defaults
-  const loadInitialData = (): WorkforceData => {
+  // Load initial data from localStorage or use defaults - ONLY ONCE
+  const [initialData] = useState<WorkforceData>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        return {
-          masterEmployees: parsed.masterEmployees || initialEmployees,
-          masterEvents: parsed.masterEvents || initialEvents,
-          masterTeamStructures: parsed.masterTeamStructures || initialTeamStructures,
-          hierarchy: parsed.hierarchy || initialHierarchy,
-          scenarios: parsed.scenarios || [],
-        };
+        // Validate that we have actual data (not empty arrays)
+        const hasEmployees = parsed.masterEmployees && parsed.masterEmployees.length > 0;
+        const hasHierarchy = parsed.hierarchy && parsed.hierarchy.length > 0;
+        
+        if (hasEmployees || hasHierarchy) {
+          console.log('Loaded workforce data from localStorage:', {
+            employees: parsed.masterEmployees?.length || 0,
+            events: parsed.masterEvents?.length || 0,
+            teams: parsed.masterTeamStructures?.length || 0,
+          });
+          return {
+            masterEmployees: parsed.masterEmployees || initialEmployees,
+            masterEvents: parsed.masterEvents || initialEvents,
+            masterTeamStructures: parsed.masterTeamStructures || initialTeamStructures,
+            hierarchy: parsed.hierarchy || initialHierarchy,
+            scenarios: parsed.scenarios || [],
+          };
+        }
       }
     } catch (e) {
       console.error('Failed to load workforce data from localStorage:', e);
     }
+    console.log('Using initial default workforce data');
     return {
       masterEmployees: initialEmployees,
       masterEvents: initialEvents,
@@ -61,13 +73,13 @@ export const useWorkforceData = () => {
       hierarchy: initialHierarchy,
       scenarios: [],
     };
-  };
+  });
 
-  const [masterEmployees, setMasterEmployees] = useState<Employee[]>(() => loadInitialData().masterEmployees);
-  const [masterEvents, setMasterEvents] = useState<WorkforceEvent[]>(() => loadInitialData().masterEvents);
-  const [masterTeamStructures, setMasterTeamStructures] = useState<TeamStructure[]>(() => loadInitialData().masterTeamStructures);
-  const [hierarchy, setHierarchy] = useState<HierarchyStructure>(() => loadInitialData().hierarchy);
-  const [scenarios, setScenarios] = useState<Scenario[]>(() => loadInitialData().scenarios);
+  const [masterEmployees, setMasterEmployees] = useState<Employee[]>(initialData.masterEmployees);
+  const [masterEvents, setMasterEvents] = useState<WorkforceEvent[]>(initialData.masterEvents);
+  const [masterTeamStructures, setMasterTeamStructures] = useState<TeamStructure[]>(initialData.masterTeamStructures);
+  const [hierarchy, setHierarchy] = useState<HierarchyStructure>(initialData.hierarchy);
+  const [scenarios, setScenarios] = useState<Scenario[]>(initialData.scenarios);
 
   // Derived flat departments for backwards compatibility
   const departments = useMemo(() => getDepartmentsFlat(hierarchy), [hierarchy]);
