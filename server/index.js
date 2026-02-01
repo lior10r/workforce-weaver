@@ -24,14 +24,14 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api', workforceRoutes);
-
-// Health check
+// Health check (public - no auth required)
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Protected routes
+app.use('/api/auth', authRoutes);
+app.use('/api', workforceRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
