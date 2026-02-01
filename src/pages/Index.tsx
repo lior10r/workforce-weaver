@@ -56,7 +56,7 @@ interface ScopeFilter {
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, logout, isAdmin, isBackendAvailable, linkedEmployee } = useAuth();
+  const { user, logout, isAdmin, isBackendAvailable, linkedEmployee, isAuthenticated } = useAuth();
   // Use the workforce data hook for persistence and undo/redo
   const {
     masterEmployees,
@@ -754,8 +754,24 @@ const Index = () => {
                   orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
                 />
                 
-                {/* User Menu */}
-                {isBackendAvailable && user && (
+                {/* Backend/Auth Status */}
+                {!isBackendAvailable && (
+                  <Badge variant="outline" className="gap-1 text-muted-foreground">
+                    <Lock className="w-3 h-3" />
+                    Offline Mode
+                  </Badge>
+                )}
+                
+                {/* Login Button - show when backend is available but not authenticated */}
+                {isBackendAvailable && !isAuthenticated && (
+                  <Button variant="outline" size="sm" onClick={() => navigate('/login')}>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Sign In
+                  </Button>
+                )}
+                
+                {/* User Menu - show when authenticated */}
+                {isBackendAvailable && isAuthenticated && user && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" className="relative h-9 w-9 rounded-full">
