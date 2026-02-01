@@ -1,9 +1,10 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HierarchyStructure, GroupStructure } from '@/lib/workforce-data';
-
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
@@ -42,6 +43,8 @@ export const Sidebar = ({
   setScopeFilter,
   hierarchy
 }: SidebarProps) => {
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
@@ -228,6 +231,18 @@ export const Sidebar = ({
           active={view === 'analytics'} 
           onClick={() => setView('analytics')} 
         />
+        
+        {/* Admin-only: User Management */}
+        {isAdmin && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <SidebarItem 
+              icon={Settings} 
+              label="User Management" 
+              active={false} 
+              onClick={() => navigate('/users')} 
+            />
+          </div>
+        )}
       </nav>
 
       {/* Scope Filter - 3-Level Hierarchy */}
