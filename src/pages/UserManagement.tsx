@@ -64,7 +64,9 @@ const UserManagement: React.FC = () => {
     password: '',
     name: '',
     role: 'viewer' as 'admin' | 'manager' | 'viewer',
-    employeeId: '' as string,
+    // NOTE: Radix SelectItem cannot use an empty string value.
+    // We use a sentinel for "no link".
+    employeeId: 'none' as string,
   });
 
   // Load users and employees
@@ -119,7 +121,7 @@ const UserManagement: React.FC = () => {
       password: '',
       name: '',
       role: 'viewer',
-      employeeId: '',
+      employeeId: 'none',
     });
     setIsDialogOpen(true);
   };
@@ -131,7 +133,7 @@ const UserManagement: React.FC = () => {
       password: '', // Don't pre-fill password
       name: user.name,
       role: user.role,
-      employeeId: user.employeeId?.toString() || '',
+      employeeId: user.employeeId ? user.employeeId.toString() : 'none',
     });
     setIsDialogOpen(true);
   };
@@ -146,7 +148,7 @@ const UserManagement: React.FC = () => {
         email: formData.email,
         name: formData.name,
         role: formData.role,
-        employeeId: formData.employeeId ? parseInt(formData.employeeId) : null,
+        employeeId: formData.employeeId !== 'none' ? parseInt(formData.employeeId, 10) : null,
         ...(formData.password ? { password: formData.password } : {}),
       };
 
@@ -364,7 +366,7 @@ const UserManagement: React.FC = () => {
                     <SelectValue placeholder="Select employee (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">No employee link</SelectItem>
+                    <SelectItem value="none">No employee link</SelectItem>
                     {employees.map(emp => (
                       <SelectItem key={emp.id} value={emp.id.toString()}>
                         {emp.name} - {emp.role} ({emp.team})
