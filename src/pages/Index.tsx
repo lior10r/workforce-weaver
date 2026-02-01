@@ -1,5 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, UserPlus, ChevronRight, Lock } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Lock, LogOut, Users, Shield } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/workforce/Sidebar';
 import { StatsCards } from '@/components/workforce/StatsCards';
 import { Dashboard } from '@/components/workforce/Dashboard';
@@ -19,6 +21,17 @@ import { ProgressionSettings, ProgressionMilestones, DEFAULT_MILESTONES } from '
 import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Employee, 
   WorkforceEvent, 
@@ -42,6 +55,8 @@ interface ScopeFilter {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, logout, isAdmin, isBackendAvailable, linkedEmployee } = useAuth();
   // Use the workforce data hook for persistence and undo/redo
   const {
     masterEmployees,
@@ -738,6 +753,52 @@ const Index = () => {
                   onImportAll={handleImportAll}
                   orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
                 />
+                
+                {/* User Menu */}
+                {isBackendAvailable && user && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="relative h-9 w-9 rounded-full">
+                        <Avatar className="h-9 w-9">
+                          <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                            {user.name?.charAt(0).toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium">{user.name}</p>
+                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          <Badge variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'default' : 'secondary'} className="w-fit mt-1">
+                            {user.role === 'admin' && <Shield className="w-3 h-3 mr-1" />}
+                            {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                          </Badge>
+                        </div>
+                      </DropdownMenuLabel>
+                      {linkedEmployee && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel className="font-normal text-xs text-muted-foreground">
+                            Linked to: {linkedEmployee.name} ({linkedEmployee.team})
+                          </DropdownMenuLabel>
+                        </>
+                      )}
+                      <DropdownMenuSeparator />
+                      {isAdmin && (
+                        <DropdownMenuItem onClick={() => navigate('/users')}>
+                          <Users className="mr-2 h-4 w-4" />
+                          Manage Users
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={logout} className="text-destructive focus:text-destructive">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
           </header>

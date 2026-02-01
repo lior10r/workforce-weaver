@@ -1,239 +1,123 @@
-
 # Backend Implementation Plan: Node.js Express API with Hierarchical Permissions
 
-## Overview
+## ✅ IMPLEMENTATION COMPLETE
 
-This plan adds a local Node.js Express backend to your workforce planner with:
-- Persistent data storage (JSON file-based or SQLite)
-- User authentication (login/logout)
-- Hierarchical permissions (managers see their team + all teams below them in the org structure)
+The backend has been implemented. See setup instructions below.
+
+---
+
+## Quick Start
+
+### 1. Install backend dependencies
+```bash
+cd server
+npm install
+```
+
+### 2. Start the backend server
+```bash
+npm start
+```
+The API runs on `http://localhost:3001`
+
+### 3. Default Admin Credentials
+- **Email:** admin@company.com
+- **Password:** admin123
+
+⚠️ Change this password in production!
+
+---
 
 ## Architecture
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│                        Frontend (React)                          │
-│  ┌─────────────────────────────────────────────────────────────┐ │
-│  │  Auth Context → API Client → useWorkforceData hook          │ │
-│  └─────────────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   Express API (localhost:3001)                   │
-│  ┌────────────┐  ┌────────────┐  ┌────────────────────────────┐ │
-│  │   Auth     │  │   CRUD     │  │   Permission Middleware    │ │
-│  │  Routes    │  │  Routes    │  │   (hierarchical filter)    │ │
-│  └────────────┘  └────────────┘  └────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Data Storage (JSON files)                     │
-│  data/employees.json  data/events.json  data/users.json         │
-│  data/hierarchy.json  data/team-structures.json                  │
-└─────────────────────────────────────────────────────────────────┘
+```
+Frontend (React)
+    ↓
+Express API (localhost:3001)
+    ↓
+JSON Data Storage (server/data/)
 ```
 
-## Hierarchical Permission Logic
+## Files Created
 
-Based on your org structure (Department → Group → Team), users will see data according to their position:
+### Backend (`server/`)
+- `index.js` - Main Express server
+- `routes/auth.js` - Authentication routes (login, logout, register, user CRUD)
+- `routes/workforce.js` - Data CRUD routes (employees, events, hierarchy, etc.)
+- `middleware/auth.js` - JWT authentication middleware
+- `middleware/permissions.js` - Hierarchical permission filtering
+- `utils/data.js` - JSON file read/write utilities
+- `package.json` - Backend dependencies
+- `README.md` - API documentation
 
-| User Level | Can See |
-|------------|---------|
-| **Department Manager** | All employees in their department (all groups and teams) |
-| **Group Manager** | All employees in their group (all teams in the group) |
+### Frontend (`src/`)
+- `lib/api-client.ts` - API client with auth headers
+- `contexts/AuthContext.tsx` - Auth state management
+- `pages/Login.tsx` - Login page
+- `pages/UserManagement.tsx` - Admin user management
+- `App.tsx` - Updated with auth routes
+
+---
+
+## Hierarchical Permissions
+
+| Level | Can See |
+|-------|---------|
+| **Admin** | Everything |
+| **Department Manager** | All employees in their department |
+| **Group Manager** | All employees in their group |
 | **Team Lead** | All employees in their team |
-| **Regular Employee** | Only themselves + their team members |
-| **Admin** | Everything (all departments, all employees) |
+| **Regular Employee** | Team members only |
 
-## Implementation Steps
+Permission is determined by linking a user account to an employee record.
 
-### Phase 1: Backend Server Setup
+---
 
-**New Files to Create:**
+## API Endpoints
 
-1. **`server/index.js`** - Main Express server entry point
-   - CORS configuration for frontend
-   - JSON body parsing
-   - Route mounting
-   - Runs on port 3001
+### Auth
+- `POST /api/auth/login` - Login
+- `POST /api/auth/logout` - Logout
+- `GET /api/auth/me` - Current user info
+- `POST /api/auth/register` - Create user (admin only)
+- `GET /api/auth/users` - List users (admin only)
+- `PUT /api/auth/users/:id` - Update user (admin only)
+- `DELETE /api/auth/users/:id` - Delete user (admin only)
 
-2. **`server/routes/auth.js`** - Authentication routes
-   - `POST /api/auth/login` - Login with email/password
-   - `POST /api/auth/logout` - Logout (clear session)
-   - `GET /api/auth/me` - Get current user info
-   - `POST /api/auth/register` - Admin-only user creation
+### Data
+- `GET /api/employees` - Get employees (filtered by permission)
+- `POST /api/employees` - Create employee
+- `PUT /api/employees/:id` - Update employee
+- `DELETE /api/employees/:id` - Delete employee
+- `GET /api/events` - Get events
+- `POST /api/events` - Create event
+- `PUT /api/events/:id` - Update event
+- `DELETE /api/events/:id` - Delete event
+- `GET /api/hierarchy` - Get org structure
+- `PUT /api/hierarchy` - Update hierarchy
+- `GET /api/team-structures` - Get team configs
+- `PUT /api/team-structures` - Update team configs
+- `GET /api/data` - Get all data at once
+- `PUT /api/data` - Update all data at once
 
-3. **`server/routes/workforce.js`** - Data CRUD routes
-   - `GET /api/employees` - Get employees (filtered by permission)
-   - `POST /api/employees` - Create employee
-   - `PUT /api/employees/:id` - Update employee
-   - `DELETE /api/employees/:id` - Delete employee
-   - Similar routes for events, hierarchy, team structures
+---
 
-4. **`server/middleware/auth.js`** - JWT authentication middleware
-   - Verify JWT tokens
-   - Attach user to request
+## Data Storage
 
-5. **`server/middleware/permissions.js`** - Hierarchical permission filter
-   - Determine user's scope based on their manager level
-   - Filter query results to only show accessible data
+JSON files in `server/data/`:
+- `users.json` - User accounts (hashed passwords)
+- `employees.json` - Employee data
+- `events.json` - Workforce events
+- `hierarchy.json` - Org structure
+- `team-structures.json` - Team configs
+- `scenarios.json` - Planning scenarios
 
-6. **`server/data/`** - JSON data files directory
-   - `users.json` - User accounts with hashed passwords
-   - `employees.json` - Employee data (migrated from localStorage)
-   - `events.json` - Workforce events
-   - `hierarchy.json` - Department/Group/Team structure
-   - `team-structures.json` - Team configuration
+---
 
-### Phase 2: Frontend Integration
-
-**Files to Modify:**
-
-1. **`src/lib/api-client.ts`** (new)
-   - Axios/fetch wrapper with auth headers
-   - Base URL configuration
-   - Error handling
-
-2. **`src/contexts/AuthContext.tsx`** (new)
-   - Login/logout state management
-   - User session persistence
-   - Permission checking utilities
-
-3. **`src/hooks/use-workforce-data.ts`** (modify)
-   - Replace localStorage with API calls
-   - Add loading/error states
-   - Sync data with backend
-
-4. **`src/pages/Login.tsx`** (new)
-   - Login form with email/password
-   - Error handling for invalid credentials
-
-5. **`src/App.tsx`** (modify)
-   - Add AuthProvider wrapper
-   - Add protected routes
-   - Add Login route
-
-6. **`src/pages/Index.tsx`** (modify)
-   - Show user info in header
-   - Add logout button
-   - Filter UI based on permissions
-
-### Phase 3: User Management
-
-**Admin Features:**
-
-1. **`src/pages/UserManagement.tsx`** (new)
-   - Create/edit/delete users (admin only)
-   - Assign users to employees (link user account to employee record)
-   - Set user roles (Admin, Manager, Viewer)
-
-2. **User-Employee Linking:**
-   - Each user account links to an Employee record
-   - User's permissions derived from their employee's manager level and position in hierarchy
-
-## Data Model Changes
-
-### New: User Model
-
-```text
-User {
-  id: string
-  email: string
-  passwordHash: string
-  employeeId: number (links to Employee record)
-  role: 'admin' | 'manager' | 'viewer'
-  createdAt: string
-}
-```
-
-### Modified: Employee Model
-
-```text
-Employee {
-  ...existing fields...
-  userId?: string (optional link to User for login)
-}
-```
-
-## Running the Backend
-
-Add to `package.json`:
-
-```json
-"scripts": {
-  "server": "node server/index.js",
-  "dev:full": "concurrently \"npm run dev\" \"npm run server\""
-}
-```
-
-**To run locally:**
-1. `npm install` (installs new backend dependencies)
-2. `npm run server` (starts API on port 3001)
-3. `npm run dev` (starts frontend on port 5173)
-
-Or run both together: `npm run dev:full`
-
-## New Dependencies
-
-**Backend (server/):**
-- `express` - Web server framework
-- `cors` - Cross-origin resource sharing
-- `jsonwebtoken` - JWT token handling
-- `bcryptjs` - Password hashing
-- `uuid` - Generate unique IDs
-
-**Frontend:**
-- No new dependencies (uses existing fetch/React Query)
-
-## Technical Details
-
-### Permission Filtering Algorithm
-
-When a user requests employees:
-
-```text
-1. Get user's linked employee record
-2. Determine user's position in hierarchy:
-   - Department? → Get department name
-   - Group? → Get group name
-   - Team? → Get team name
-3. Query all employees
-4. Filter to only those in user's scope:
-   - Admin: Return all
-   - Dept Manager: Return where dept matches
-   - Group Manager: Return where dept + group matches
-   - Team Lead: Return where dept + group + team matches
-   - Regular: Return where team matches
-```
-
-### Session Management
-
-- JWT tokens stored in httpOnly cookies (most secure)
-- Token expiry: 24 hours
-- Refresh token rotation for long sessions
-
-## Migration Path
-
-1. Export current data from localStorage using existing Export feature
-2. Start backend server (auto-creates data files)
-3. Import data via API or manually copy to `server/data/` folder
-4. Create initial admin user via command line script
-5. Users log in and see data based on their permissions
-
-## Security Considerations
+## Security Notes
 
 - Passwords hashed with bcrypt (12 rounds)
-- JWT secret stored in environment variable
-- CORS restricted to localhost in development
-- Input validation on all API endpoints
-- No raw SQL (JSON file storage)
-
-## Future Enhancements (Not in This Plan)
-
-- Move to SQLite/PostgreSQL for larger datasets
-- Deploy to cloud (Railway, Render, or your server)
-- Add audit logging for all changes
-- Email-based password reset
-- Two-factor authentication
+- JWT tokens for authentication
+- Tokens stored in httpOnly cookies
+- CORS configured for localhost
+- Permission filtering on all data queries
