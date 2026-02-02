@@ -15,10 +15,23 @@ The server runs on `http://localhost:3001`.
 ## Default Admin Account
 
 On first run, a default admin user is created:
-- **Email:** admin@company.com
+- **Username:** admin
 - **Password:** admin123
 
 ⚠️ **Change this password immediately in production!**
+
+## Initial Data
+
+The server initializes with data from `server/data/initial-data.js`. This file contains:
+- **Employees** - All employee records with hierarchy
+- **Events** - Workforce events (promotions, departures, decision flags, etc.)
+- **Hierarchy** - Department → Group → Team structure
+- **Team Structures** - Team configurations with required roles
+- **Scenarios** - Empty by default (created by users)
+
+**To sync with frontend data:** Edit `server/data/initial-data.js` to match the data in `src/lib/workforce-data.ts`.
+
+**To reset data to initial state:** Delete the JSON files in `server/data/` (except `initial-data.js`) and restart the server.
 
 ## API Endpoints
 
@@ -26,7 +39,7 @@ On first run, a default admin user is created:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/login` | Login with email/password |
+| POST | `/api/auth/login` | Login with username/password |
 | POST | `/api/auth/logout` | Logout (clear session) |
 | GET | `/api/auth/me` | Get current user info |
 | POST | `/api/auth/register` | Create new user (admin only) |
@@ -78,6 +91,7 @@ Data is stored in JSON files in the `data/` directory:
 - `hierarchy.json` - Org structure
 - `team-structures.json` - Team configurations
 - `scenarios.json` - Planning scenarios
+- `initial-data.js` - Initial seed data (not modified at runtime)
 
 ## Environment Variables
 
