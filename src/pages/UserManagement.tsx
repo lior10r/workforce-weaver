@@ -60,7 +60,7 @@ const UserManagement: React.FC = () => {
   
   // Form state
   const [formData, setFormData] = useState({
-    email: '',
+    username: '',
     password: '',
     name: '',
     role: 'viewer' as 'admin' | 'manager' | 'viewer',
@@ -117,7 +117,7 @@ const UserManagement: React.FC = () => {
   const openCreateDialog = () => {
     setEditingUser(null);
     setFormData({
-      email: '',
+      username: '',
       password: '',
       name: '',
       role: 'viewer',
@@ -129,7 +129,7 @@ const UserManagement: React.FC = () => {
   const openEditDialog = (user: User) => {
     setEditingUser(user);
     setFormData({
-      email: user.email,
+      username: user.username,
       password: '', // Don't pre-fill password
       name: user.name,
       role: user.role,
@@ -145,7 +145,7 @@ const UserManagement: React.FC = () => {
 
     try {
       const userData = {
-        email: formData.email,
+        username: formData.username,
         name: formData.name,
         role: formData.role,
         employeeId: formData.employeeId !== 'none' ? parseInt(formData.employeeId, 10) : null,
@@ -245,7 +245,7 @@ const UserManagement: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Linked Employee</TableHead>
                   <TableHead>Created</TableHead>
@@ -256,7 +256,7 @@ const UserManagement: React.FC = () => {
                 {users.map(user => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell>{user.username}</TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
                     <TableCell>{getLinkedEmployeeName(user.employeeId)}</TableCell>
                     <TableCell className="text-muted-foreground">
@@ -312,12 +312,11 @@ const UserManagement: React.FC = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  id="username"
+                  value={formData.username}
+                  onChange={e => setFormData(prev => ({ ...prev, username: e.target.value }))}
                   required
                 />
               </div>

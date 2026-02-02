@@ -12,7 +12,7 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login, isLoading, isBackendAvailable } = useAuth();
   
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,7 +23,7 @@ const Login: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
@@ -101,15 +101,15 @@ const Login: React.FC = () => {
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="admin@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="username"
+                type="text"
+                placeholder="admin"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
-                autoComplete="email"
+                autoComplete="username"
                 autoFocus
               />
             </div>
@@ -144,7 +144,7 @@ const Login: React.FC = () => {
 
             <div className="text-center text-sm text-muted-foreground">
               <p>Default credentials:</p>
-              <p className="font-mono text-xs mt-1">admin@company.com / admin123</p>
+              <p className="font-mono text-xs mt-1">admin / admin123</p>
             </div>
           </form>
         </CardContent>

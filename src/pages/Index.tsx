@@ -786,7 +786,7 @@ const Index = () => {
                       <DropdownMenuLabel>
                         <div className="flex flex-col space-y-1">
                           <p className="text-sm font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                          <p className="text-xs text-muted-foreground">{user.username}</p>
                           <Badge variant={user.role === 'admin' ? 'destructive' : user.role === 'manager' ? 'default' : 'secondary'} className="w-fit mt-1">
                             {user.role === 'admin' && <Shield className="w-3 h-3 mr-1" />}
                             {user.role.charAt(0).toUpperCase() + user.role.slice(1)}

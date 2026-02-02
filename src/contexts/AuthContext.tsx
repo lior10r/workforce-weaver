@@ -11,7 +11,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   isAdmin: boolean;
@@ -99,8 +99,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [checkBackend]);
 
   // Login
-  const login = useCallback(async (email: string, password: string) => {
-    const { user } = await apiClient.login(email, password);
+  const login = useCallback(async (username: string, password: string) => {
+    const { user } = await apiClient.login(username, password);
     const { linkedEmployee } = await apiClient.getCurrentUser();
     setState({
       user,

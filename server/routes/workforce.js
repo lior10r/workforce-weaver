@@ -11,10 +11,14 @@ router.use(authenticateToken);
 
 // ============== EMPLOYEES ==============
 
-// Get all employees (filtered by permission)
+// Get all employees (filtered by permission, except admin gets all for user management)
 router.get('/employees', (req, res) => {
   try {
     const employees = readData('employees') || [];
+    // Admin users get all employees (needed for user management linking)
+    if (req.user.role === 'admin') {
+      return res.json(employees);
+    }
     const filteredEmployees = filterByPermission(req.user, employees, 'employees');
     res.json(filteredEmployees);
   } catch (error) {
