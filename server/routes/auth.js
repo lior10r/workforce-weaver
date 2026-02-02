@@ -16,7 +16,7 @@ const initializeDefaultAdmin = () => {
   if (users.length === 0) {
     const adminUser = {
       id: uuidv4(),
-      email: 'admin@company.com',
+      username: 'admin',
       passwordHash: bcrypt.hashSync('admin123', 12),
       employeeId: null,
       role: 'admin',
@@ -24,7 +24,7 @@ const initializeDefaultAdmin = () => {
       createdAt: new Date().toISOString()
     };
     writeData('users', [adminUser]);
-    console.log('✅ Default admin user created: admin@company.com / admin123');
+    console.log('✅ Default admin user created: admin / admin123');
   }
 };
 
@@ -34,14 +34,14 @@ initializeDefaultAdmin();
 // Login
 router.post('/login', (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
     
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
 
     const users = readData('users') || [];
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
 
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
@@ -54,7 +54,7 @@ router.post('/login', (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      { userId: user.id, username: user.username, role: user.role },
       JWT_SECRET,
       { expiresIn: TOKEN_EXPIRY }
     );
@@ -114,22 +114,22 @@ router.get('/me', authenticateToken, (req, res) => {
 // Register new user (admin only)
 router.post('/register', authenticateToken, isAdmin, (req, res) => {
   try {
-    const { email, password, name, role, employeeId } = req.body;
+    const { username, password, name, role, employeeId } = req.body;
 
-    if (!email || !password || !name) {
-      return res.status(400).json({ error: 'Email, password, and name are required' });
+    if (!username || !password || !name) {
+      return res.status(400).json({ error: 'Username, password, and name are required' });
     }
 
     const users = readData('users') || [];
     
-    // Check if email already exists
-    if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-      return res.status(400).json({ error: 'Email already registered' });
+    // Check if username already exists
+    if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+      return res.status(400).json({ error: 'Username already registered' });
     }
 
     const newUser = {
       id: uuidv4(),
-      email: email.toLowerCase(),
+      username: username.toLowerCase(),
       passwordHash: bcrypt.hashSync(password, 12),
       name,
       role: role || 'viewer',
@@ -164,7 +164,7 @@ router.get('/users', authenticateToken, isAdmin, (req, res) => {
 router.put('/users/:id', authenticateToken, isAdmin, (req, res) => {
   try {
     const { id } = req.params;
-    const { email, password, name, role, employeeId } = req.body;
+    const { username, password, name, role, employeeId } = req.body;
 
     const users = readData('users') || [];
     const userIndex = users.findIndex(u => u.id === id);
@@ -173,15 +173,15 @@ router.put('/users/:id', authenticateToken, isAdmin, (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    // Check email uniqueness if changing
-    if (email && email.toLowerCase() !== users[userIndex].email.toLowerCase()) {
-      if (users.some(u => u.email.toLowerCase() === email.toLowerCase())) {
-        return res.status(400).json({ error: 'Email already in use' });
+    // Check username uniqueness if changing
+    if (username && username.toLowerCase() !== users[userIndex].username.toLowerCase()) {
+      if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
+        return res.status(400).json({ error: 'Username already in use' });
       }
     }
 
     // Update fields
-    if (email) users[userIndex].email = email.toLowerCase();
+    if (username) users[userIndex].username = username.toLowerCase();
     if (password) users[userIndex].passwordHash = bcrypt.hashSync(password, 12);
     if (name) users[userIndex].name = name;
     if (role) users[userIndex].role = role;

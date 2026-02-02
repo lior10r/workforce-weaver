@@ -67,10 +67,10 @@ class ApiClient {
   }
 
   // Auth endpoints
-  async login(email: string, password: string) {
+  async login(username: string, password: string) {
     const data = await this.request<{ user: User; token: string }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ username, password }),
     });
     this.setToken(data.token);
     return data;
@@ -88,7 +88,7 @@ class ApiClient {
     return this.request<{ user: User; linkedEmployee: Employee | null }>('/auth/me');
   }
 
-  async register(userData: { email: string; password: string; name: string; role?: string; employeeId?: number }) {
+  async register(userData: { username: string; password: string; name: string; role?: string; employeeId?: number }) {
     return this.request<{ user: User }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
@@ -253,7 +253,7 @@ import type {
 
 export interface User {
   id: string;
-  email: string;
+  username: string;
   name: string;
   role: 'admin' | 'manager' | 'viewer';
   employeeId: number | null;
