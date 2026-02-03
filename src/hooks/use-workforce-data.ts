@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api-client';
 import {
@@ -38,6 +38,10 @@ export const useWorkforceData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Refs to track current values for sync
+  const dataRef = useRef({ masterEmployees, masterEvents, masterTeamStructures, hierarchy, scenarios });
+  dataRef.current = { masterEmployees, masterEvents, masterTeamStructures, hierarchy, scenarios };
 
   // Derived flat departments for backwards compatibility
   const departments = useMemo(() => getDepartmentsFlat(hierarchy), [hierarchy]);
@@ -86,7 +90,7 @@ export const useWorkforceData = () => {
     loadData();
   }, []);
 
-  // Sync data to server (debounced save)
+  // Sync data to server
   const syncToServer = useCallback(async (data: {
     employees?: Employee[];
     events?: WorkforceEvent[];
@@ -101,7 +105,6 @@ export const useWorkforceData = () => {
       const message = err instanceof Error ? err.message : 'Failed to save data';
       console.error('Failed to sync data to server:', err);
       toast.error('Failed to save changes', { description: message });
-      throw err;
     } finally {
       setIsSyncing(false);
     }
@@ -109,86 +112,84 @@ export const useWorkforceData = () => {
 
   // Create a snapshot of current state
   const createSnapshot = useCallback((): HistoryState => ({
-    employees: JSON.parse(JSON.stringify(masterEmployees)),
-    events: JSON.parse(JSON.stringify(masterEvents)),
-    teamStructures: JSON.parse(JSON.stringify(masterTeamStructures)),
-    scenarios: JSON.parse(JSON.stringify(scenarios)),
-    hierarchy: JSON.parse(JSON.stringify(hierarchy)),
-  }), [masterEmployees, masterEvents, masterTeamStructures, scenarios, hierarchy]);
+    employees: JSON.parse(JSON.stringify(dataRef.current.masterEmployees)),
+    events: JSON.parse(JSON.stringify(dataRef.current.masterEvents)),
+    teamStructures: JSON.parse(JSON.stringify(dataRef.current.masterTeamStructures)),
+    scenarios: JSON.parse(JSON.stringify(dataRef.current.scenarios)),
+    hierarchy: JSON.parse(JSON.stringify(dataRef.current.hierarchy)),
+  }), []);
 
   // Push to history (call before making changes)
   const pushToHistory = useCallback(() => {
     const snapshot = createSnapshot();
     setUndoRedo(prev => ({
       past: [...prev.past, snapshot],
-      future: [], // Clear future when new action is taken
+      future: [],
       currentIndex: prev.past.length,
     }));
   }, [createSnapshot]);
 
   // Undo
   const undo = useCallback(() => {
-    setUndoRedo(prev => {
-      if (prev.past.length === 0) return prev;
-      
-      const currentSnapshot = createSnapshot();
-      const previousState = prev.past[prev.past.length - 1];
-      
-      // Restore previous state
-      setMasterEmployees(previousState.employees);
-      setMasterEvents(previousState.events);
-      setMasterTeamStructures(previousState.teamStructures);
-      setScenarios(previousState.scenarios);
-      setHierarchy(previousState.hierarchy);
-      
-      // Sync to server
-      syncToServer({
-        employees: previousState.employees,
-        events: previousState.events,
-        teamStructures: previousState.teamStructures,
-        scenarios: previousState.scenarios,
-        hierarchy: previousState.hierarchy,
-      });
-      
-      return {
-        past: prev.past.slice(0, -1),
-        future: [currentSnapshot, ...prev.future],
-        currentIndex: prev.currentIndex - 1,
-      };
+    const currentPast = undoRedo.past;
+    if (currentPast.length === 0) return;
+    
+    const currentSnapshot = createSnapshot();
+    const previousState = currentPast[currentPast.length - 1];
+    
+    // Restore previous state
+    setMasterEmployees(previousState.employees);
+    setMasterEvents(previousState.events);
+    setMasterTeamStructures(previousState.teamStructures);
+    setScenarios(previousState.scenarios);
+    setHierarchy(previousState.hierarchy);
+    
+    setUndoRedo(prev => ({
+      past: prev.past.slice(0, -1),
+      future: [currentSnapshot, ...prev.future],
+      currentIndex: prev.currentIndex - 1,
+    }));
+    
+    // Sync to server
+    syncToServer({
+      employees: previousState.employees,
+      events: previousState.events,
+      teamStructures: previousState.teamStructures,
+      scenarios: previousState.scenarios,
+      hierarchy: previousState.hierarchy,
     });
-  }, [createSnapshot, syncToServer]);
+  }, [undoRedo.past, createSnapshot, syncToServer]);
 
   // Redo
   const redo = useCallback(() => {
-    setUndoRedo(prev => {
-      if (prev.future.length === 0) return prev;
-      
-      const currentSnapshot = createSnapshot();
-      const nextState = prev.future[0];
-      
-      // Restore next state
-      setMasterEmployees(nextState.employees);
-      setMasterEvents(nextState.events);
-      setMasterTeamStructures(nextState.teamStructures);
-      setScenarios(nextState.scenarios);
-      setHierarchy(nextState.hierarchy);
-      
-      // Sync to server
-      syncToServer({
-        employees: nextState.employees,
-        events: nextState.events,
-        teamStructures: nextState.teamStructures,
-        scenarios: nextState.scenarios,
-        hierarchy: nextState.hierarchy,
-      });
-      
-      return {
-        past: [...prev.past, currentSnapshot],
-        future: prev.future.slice(1),
-        currentIndex: prev.currentIndex + 1,
-      };
+    const currentFuture = undoRedo.future;
+    if (currentFuture.length === 0) return;
+    
+    const currentSnapshot = createSnapshot();
+    const nextState = currentFuture[0];
+    
+    // Restore next state
+    setMasterEmployees(nextState.employees);
+    setMasterEvents(nextState.events);
+    setMasterTeamStructures(nextState.teamStructures);
+    setScenarios(nextState.scenarios);
+    setHierarchy(nextState.hierarchy);
+    
+    setUndoRedo(prev => ({
+      past: [...prev.past, currentSnapshot],
+      future: prev.future.slice(1),
+      currentIndex: prev.currentIndex + 1,
+    }));
+    
+    // Sync to server
+    syncToServer({
+      employees: nextState.employees,
+      events: nextState.events,
+      teamStructures: nextState.teamStructures,
+      scenarios: nextState.scenarios,
+      hierarchy: nextState.hierarchy,
     });
-  }, [createSnapshot, syncToServer]);
+  }, [undoRedo.future, createSnapshot, syncToServer]);
 
   // Jump to specific history index
   const jumpToHistory = useCallback((index: number) => {
@@ -203,6 +204,12 @@ export const useWorkforceData = () => {
     setScenarios(targetState.scenarios);
     setHierarchy(targetState.hierarchy);
     
+    setUndoRedo({
+      past: allHistory.slice(0, index),
+      future: allHistory.slice(index + 1),
+      currentIndex: index,
+    });
+    
     // Sync to server
     syncToServer({
       employees: targetState.employees,
@@ -211,115 +218,91 @@ export const useWorkforceData = () => {
       scenarios: targetState.scenarios,
       hierarchy: targetState.hierarchy,
     });
-    
-    setUndoRedo({
-      past: allHistory.slice(0, index),
-      future: allHistory.slice(index + 1),
-      currentIndex: index,
-    });
   }, [undoRedo, createSnapshot, syncToServer]);
 
   // Delete employee
-  const deleteEmployee = useCallback(async (employeeId: number, activeScenarioId?: string | null) => {
+  const deleteEmployee = useCallback((employeeId: number, activeScenarioId?: string | null) => {
     pushToHistory();
+    
     if (activeScenarioId) {
-      setScenarios(prev => {
-        const updated = prev.map(s => {
-          if (s.id !== activeScenarioId) return s;
-          return {
-            ...s,
-            deletedEmployeeIds: [...s.deletedEmployeeIds, employeeId],
-            proposedEmployees: s.proposedEmployees.filter(e => e.id !== employeeId),
-          };
-        });
-        syncToServer({ scenarios: updated });
-        return updated;
+      const updatedScenarios = dataRef.current.scenarios.map(s => {
+        if (s.id !== activeScenarioId) return s;
+        return {
+          ...s,
+          deletedEmployeeIds: [...s.deletedEmployeeIds, employeeId],
+          proposedEmployees: s.proposedEmployees.filter(e => e.id !== employeeId),
+        };
       });
+      setScenarios(updatedScenarios);
+      syncToServer({ scenarios: updatedScenarios });
     } else {
-      setMasterEmployees(prev => {
-        const updated = prev.filter(e => e.id !== employeeId);
-        syncToServer({ employees: updated });
-        return updated;
-      });
-      // Also delete related events
-      setMasterEvents(prev => {
-        const updated = prev.filter(e => e.empId !== employeeId);
-        syncToServer({ events: updated });
-        return updated;
-      });
+      const updatedEmployees = dataRef.current.masterEmployees.filter(e => e.id !== employeeId);
+      const updatedEvents = dataRef.current.masterEvents.filter(e => e.empId !== employeeId);
+      setMasterEmployees(updatedEmployees);
+      setMasterEvents(updatedEvents);
+      syncToServer({ employees: updatedEmployees, events: updatedEvents });
     }
   }, [pushToHistory, syncToServer]);
 
   // Delete event
-  const deleteEvent = useCallback(async (eventId: number, activeScenarioId?: string | null) => {
+  const deleteEvent = useCallback((eventId: number, activeScenarioId?: string | null) => {
     pushToHistory();
+    
     if (activeScenarioId) {
-      setScenarios(prev => {
-        const updated = prev.map(s => {
-          if (s.id !== activeScenarioId) return s;
-          return {
-            ...s,
-            deletedEventIds: [...s.deletedEventIds, eventId],
-            proposedEvents: s.proposedEvents.filter(e => e.id !== eventId),
-          };
-        });
-        syncToServer({ scenarios: updated });
-        return updated;
+      const updatedScenarios = dataRef.current.scenarios.map(s => {
+        if (s.id !== activeScenarioId) return s;
+        return {
+          ...s,
+          deletedEventIds: [...s.deletedEventIds, eventId],
+          proposedEvents: s.proposedEvents.filter(e => e.id !== eventId),
+        };
       });
+      setScenarios(updatedScenarios);
+      syncToServer({ scenarios: updatedScenarios });
     } else {
-      setMasterEvents(prev => {
-        const updated = prev.filter(e => e.id !== eventId);
-        syncToServer({ events: updated });
-        return updated;
-      });
+      const updatedEvents = dataRef.current.masterEvents.filter(e => e.id !== eventId);
+      setMasterEvents(updatedEvents);
+      syncToServer({ events: updatedEvents });
     }
   }, [pushToHistory, syncToServer]);
 
   // Delete team (from group or direct)
-  const deleteTeam = useCallback(async (dept: string, groupName: string | null, teamName: string) => {
+  const deleteTeam = useCallback((dept: string, groupName: string | null, teamName: string) => {
     pushToHistory();
     
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = prev.map(d => {
-        if (d.name !== dept) return d;
-        
-        if (groupName === null) {
-          return {
-            ...d,
-            directTeams: (d.directTeams || []).filter(t => t !== teamName)
-          };
-        }
-        
+    const updatedHierarchy = dataRef.current.hierarchy.map(d => {
+      if (d.name !== dept) return d;
+      
+      if (groupName === null) {
         return {
           ...d,
-          groups: d.groups.map(g => {
-            if (g.name !== groupName) return g;
-            return {
-              ...g,
-              teams: g.teams.filter(t => t !== teamName)
-            };
-          }).filter(g => g.teams.length > 0)
+          directTeams: (d.directTeams || []).filter(t => t !== teamName)
         };
-      });
-      return updatedHierarchy;
+      }
+      
+      return {
+        ...d,
+        groups: d.groups.map(g => {
+          if (g.name !== groupName) return g;
+          return {
+            ...g,
+            teams: g.teams.filter(t => t !== teamName)
+          };
+        }).filter(g => g.teams.length > 0)
+      };
     });
     
-    let updatedEmployees: Employee[] = [];
-    setMasterEmployees(prev => {
-      updatedEmployees = prev.map(e => 
-        e.team === teamName ? { ...e, team: groupName || dept } : e
-      );
-      return updatedEmployees;
-    });
+    const updatedEmployees = dataRef.current.masterEmployees.map(e => 
+      e.team === teamName ? { ...e, team: groupName || dept } : e
+    );
     
-    let updatedTeamStructures: TeamStructure[] = [];
-    setMasterTeamStructures(prev => {
-      updatedTeamStructures = prev.filter(t => t.teamName !== teamName);
-      return updatedTeamStructures;
-    });
+    const updatedTeamStructures = dataRef.current.masterTeamStructures.filter(t => t.teamName !== teamName);
     
-    await syncToServer({
+    setHierarchy(updatedHierarchy);
+    setMasterEmployees(updatedEmployees);
+    setMasterTeamStructures(updatedTeamStructures);
+    
+    syncToServer({
       hierarchy: updatedHierarchy,
       employees: updatedEmployees,
       teamStructures: updatedTeamStructures,
@@ -327,148 +310,116 @@ export const useWorkforceData = () => {
   }, [pushToHistory, syncToServer]);
 
   // Delete group
-  const deleteGroup = useCallback(async (dept: string, groupName: string) => {
+  const deleteGroup = useCallback((dept: string, groupName: string) => {
     pushToHistory();
     
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = prev.map(d => {
-        if (d.name !== dept) return d;
-        return {
-          ...d,
-          groups: d.groups.filter(g => g.name !== groupName)
-        };
-      });
-      return updatedHierarchy;
+    const updatedHierarchy = dataRef.current.hierarchy.map(d => {
+      if (d.name !== dept) return d;
+      return {
+        ...d,
+        groups: d.groups.filter(g => g.name !== groupName)
+      };
     });
     
-    let updatedEmployees: Employee[] = [];
-    setMasterEmployees(prev => {
-      updatedEmployees = prev.filter(e => e.group !== groupName);
-      return updatedEmployees;
-    });
+    const updatedEmployees = dataRef.current.masterEmployees.filter(e => e.group !== groupName);
     
-    const group = hierarchy.find(d => d.name === dept)?.groups.find(g => g.name === groupName);
-    let updatedTeamStructures: TeamStructure[] = [];
-    setMasterTeamStructures(prev => {
-      updatedTeamStructures = prev.filter(t => !group?.teams.includes(t.teamName));
-      return updatedTeamStructures;
-    });
+    const group = dataRef.current.hierarchy.find(d => d.name === dept)?.groups.find(g => g.name === groupName);
+    const updatedTeamStructures = dataRef.current.masterTeamStructures.filter(t => !group?.teams.includes(t.teamName));
     
-    await syncToServer({
+    setHierarchy(updatedHierarchy);
+    setMasterEmployees(updatedEmployees);
+    setMasterTeamStructures(updatedTeamStructures);
+    
+    syncToServer({
       hierarchy: updatedHierarchy,
       employees: updatedEmployees,
       teamStructures: updatedTeamStructures,
     });
-  }, [pushToHistory, hierarchy, syncToServer]);
+  }, [pushToHistory, syncToServer]);
 
   // Delete department
-  const deleteDepartment = useCallback(async (dept: string) => {
+  const deleteDepartment = useCallback((dept: string) => {
     pushToHistory();
     
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = prev.filter(d => d.name !== dept);
-      return updatedHierarchy;
-    });
+    const updatedHierarchy = dataRef.current.hierarchy.filter(d => d.name !== dept);
+    const deptEmployeeIds = dataRef.current.masterEmployees.filter(e => e.dept === dept).map(e => e.id);
+    const updatedEmployees = dataRef.current.masterEmployees.filter(e => e.dept !== dept);
+    const updatedEvents = dataRef.current.masterEvents.filter(e => !deptEmployeeIds.includes(e.empId));
+    const updatedTeamStructures = dataRef.current.masterTeamStructures.filter(t => t.department !== dept);
     
-    const deptEmployeeIds = masterEmployees.filter(e => e.dept === dept).map(e => e.id);
+    setHierarchy(updatedHierarchy);
+    setMasterEmployees(updatedEmployees);
+    setMasterEvents(updatedEvents);
+    setMasterTeamStructures(updatedTeamStructures);
     
-    let updatedEmployees: Employee[] = [];
-    setMasterEmployees(prev => {
-      updatedEmployees = prev.filter(e => e.dept !== dept);
-      return updatedEmployees;
-    });
-    
-    let updatedEvents: WorkforceEvent[] = [];
-    setMasterEvents(prev => {
-      updatedEvents = prev.filter(e => !deptEmployeeIds.includes(e.empId));
-      return updatedEvents;
-    });
-    
-    let updatedTeamStructures: TeamStructure[] = [];
-    setMasterTeamStructures(prev => {
-      updatedTeamStructures = prev.filter(t => t.department !== dept);
-      return updatedTeamStructures;
-    });
-    
-    await syncToServer({
+    syncToServer({
       hierarchy: updatedHierarchy,
       employees: updatedEmployees,
       events: updatedEvents,
       teamStructures: updatedTeamStructures,
     });
-  }, [pushToHistory, masterEmployees, syncToServer]);
+  }, [pushToHistory, syncToServer]);
 
   // Add department
-  const addDepartment = useCallback(async (name: string) => {
+  const addDepartment = useCallback((name: string) => {
     pushToHistory();
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = [...prev, { name, groups: [], directTeams: [] }];
-      return updatedHierarchy;
-    });
-    await syncToServer({ hierarchy: updatedHierarchy });
+    const updatedHierarchy = [...dataRef.current.hierarchy, { name, groups: [], directTeams: [] }];
+    setHierarchy(updatedHierarchy);
+    syncToServer({ hierarchy: updatedHierarchy });
   }, [pushToHistory, syncToServer]);
 
   // Add group to department
-  const addGroup = useCallback(async (dept: string, groupName: string) => {
+  const addGroup = useCallback((dept: string, groupName: string) => {
     pushToHistory();
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = prev.map(d => {
-        if (d.name !== dept) return d;
-        if (d.groups.some(g => g.name === groupName)) return d;
-        return {
-          ...d,
-          groups: [...d.groups, { name: groupName, teams: [] }]
-        };
-      });
-      return updatedHierarchy;
+    const updatedHierarchy = dataRef.current.hierarchy.map(d => {
+      if (d.name !== dept) return d;
+      if (d.groups.some(g => g.name === groupName)) return d;
+      return {
+        ...d,
+        groups: [...d.groups, { name: groupName, teams: [] }]
+      };
     });
-    await syncToServer({ hierarchy: updatedHierarchy });
+    setHierarchy(updatedHierarchy);
+    syncToServer({ hierarchy: updatedHierarchy });
   }, [pushToHistory, syncToServer]);
 
   // Add team to group
-  const addTeam = useCallback(async (dept: string, groupName: string | null, teamName: string) => {
+  const addTeam = useCallback((dept: string, groupName: string | null, teamName: string) => {
     pushToHistory();
-    let updatedHierarchy: HierarchyStructure = [];
-    setHierarchy(prev => {
-      updatedHierarchy = prev.map(d => {
-        if (d.name !== dept) return d;
-        
-        if (groupName === null) {
-          if ((d.directTeams || []).includes(teamName)) return d;
-          return {
-            ...d,
-            directTeams: [...(d.directTeams || []), teamName]
-          };
-        }
-        
+    const updatedHierarchy = dataRef.current.hierarchy.map(d => {
+      if (d.name !== dept) return d;
+      
+      if (groupName === null) {
+        if ((d.directTeams || []).includes(teamName)) return d;
         return {
           ...d,
-          groups: d.groups.map(g => {
-            if (g.name !== groupName) return g;
-            if (g.teams.includes(teamName)) return g;
-            return {
-              ...g,
-              teams: [...g.teams, teamName]
-            };
-          })
+          directTeams: [...(d.directTeams || []), teamName]
         };
-      });
-      return updatedHierarchy;
+      }
+      
+      return {
+        ...d,
+        groups: d.groups.map(g => {
+          if (g.name !== groupName) return g;
+          if (g.teams.includes(teamName)) return g;
+          return {
+            ...g,
+            teams: [...g.teams, teamName]
+          };
+        })
+      };
     });
-    await syncToServer({ hierarchy: updatedHierarchy });
+    setHierarchy(updatedHierarchy);
+    syncToServer({ hierarchy: updatedHierarchy });
   }, [pushToHistory, syncToServer]);
 
   // Add direct team to department (convenience method)
-  const addDirectTeam = useCallback(async (dept: string, teamName: string) => {
-    await addTeam(dept, null, teamName);
+  const addDirectTeam = useCallback((dept: string, teamName: string) => {
+    addTeam(dept, null, teamName);
   }, [addTeam]);
 
   // Clear all data and reset to initial
-  const resetToInitial = useCallback(async () => {
+  const resetToInitial = useCallback(() => {
     pushToHistory();
     setMasterEmployees(initialEmployees);
     setMasterEvents(initialEvents);
@@ -476,7 +427,7 @@ export const useWorkforceData = () => {
     setHierarchy(initialHierarchy);
     setScenarios([]);
     
-    await syncToServer({
+    syncToServer({
       employees: initialEmployees,
       events: initialEvents,
       teamStructures: initialTeamStructures,
@@ -488,46 +439,36 @@ export const useWorkforceData = () => {
   // Wrapped setters that sync to server
   const setMasterEmployeesWithSync = useCallback((updater: Employee[] | ((prev: Employee[]) => Employee[])) => {
     pushToHistory();
-    setMasterEmployees(prev => {
-      const updated = typeof updater === 'function' ? updater(prev) : updater;
-      syncToServer({ employees: updated });
-      return updated;
-    });
+    const updated = typeof updater === 'function' ? updater(dataRef.current.masterEmployees) : updater;
+    setMasterEmployees(updated);
+    syncToServer({ employees: updated });
   }, [pushToHistory, syncToServer]);
 
   const setMasterEventsWithSync = useCallback((updater: WorkforceEvent[] | ((prev: WorkforceEvent[]) => WorkforceEvent[])) => {
     pushToHistory();
-    setMasterEvents(prev => {
-      const updated = typeof updater === 'function' ? updater(prev) : updater;
-      syncToServer({ events: updated });
-      return updated;
-    });
+    const updated = typeof updater === 'function' ? updater(dataRef.current.masterEvents) : updater;
+    setMasterEvents(updated);
+    syncToServer({ events: updated });
   }, [pushToHistory, syncToServer]);
 
   const setMasterTeamStructuresWithSync = useCallback((updater: TeamStructure[] | ((prev: TeamStructure[]) => TeamStructure[])) => {
     pushToHistory();
-    setMasterTeamStructures(prev => {
-      const updated = typeof updater === 'function' ? updater(prev) : updater;
-      syncToServer({ teamStructures: updated });
-      return updated;
-    });
+    const updated = typeof updater === 'function' ? updater(dataRef.current.masterTeamStructures) : updater;
+    setMasterTeamStructures(updated);
+    syncToServer({ teamStructures: updated });
   }, [pushToHistory, syncToServer]);
 
   const setHierarchyWithSync = useCallback((updater: HierarchyStructure | ((prev: HierarchyStructure) => HierarchyStructure)) => {
     pushToHistory();
-    setHierarchy(prev => {
-      const updated = typeof updater === 'function' ? updater(prev) : updater;
-      syncToServer({ hierarchy: updated });
-      return updated;
-    });
+    const updated = typeof updater === 'function' ? updater(dataRef.current.hierarchy) : updater;
+    setHierarchy(updated);
+    syncToServer({ hierarchy: updated });
   }, [pushToHistory, syncToServer]);
 
   const setScenariosWithSync = useCallback((updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) => {
-    setScenarios(prev => {
-      const updated = typeof updater === 'function' ? updater(prev) : updater;
-      syncToServer({ scenarios: updated });
-      return updated;
-    });
+    const updated = typeof updater === 'function' ? updater(dataRef.current.scenarios) : updater;
+    setScenarios(updated);
+    syncToServer({ scenarios: updated });
   }, [syncToServer]);
 
   // Direct setters that also sync (for bulk imports)
@@ -555,6 +496,25 @@ export const useWorkforceData = () => {
   const canRedo = undoRedo.future.length > 0;
   const historyLength = undoRedo.past.length + 1 + undoRedo.future.length;
 
+  // Refresh from server
+  const refreshFromServer = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await apiClient.getAllData();
+      setMasterEmployees(data.employees || []);
+      setMasterEvents(data.events || []);
+      setMasterTeamStructures(data.teamStructures || []);
+      setHierarchy(data.hierarchy || []);
+      setScenarios(data.scenarios || []);
+      toast.success('Data refreshed from server');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to refresh data';
+      toast.error('Failed to refresh', { description: message });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   return {
     // Loading/error state
     isLoading,
@@ -565,7 +525,7 @@ export const useWorkforceData = () => {
     masterEvents,
     masterTeamStructures,
     hierarchy,
-    departments, // Derived flat structure for backwards compat
+    departments,
     scenarios,
     // Setters with history and sync
     setMasterEmployees: setMasterEmployeesWithSync,
@@ -600,22 +560,6 @@ export const useWorkforceData = () => {
     // Reset
     resetToInitial,
     // Refresh from server
-    refreshFromServer: async () => {
-      setIsLoading(true);
-      try {
-        const data = await apiClient.getAllData();
-        setMasterEmployees(data.employees || []);
-        setMasterEvents(data.events || []);
-        setMasterTeamStructures(data.teamStructures || []);
-        setHierarchy(data.hierarchy || []);
-        setScenarios(data.scenarios || []);
-        toast.success('Data refreshed from server');
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to refresh data';
-        toast.error('Failed to refresh', { description: message });
-      } finally {
-        setIsLoading(false);
-      }
-    },
+    refreshFromServer,
   };
 };
