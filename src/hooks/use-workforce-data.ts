@@ -28,7 +28,13 @@ interface UndoRedoState {
   currentIndex: number;
 }
 
-export const useWorkforceData = () => {
+interface UseWorkforceDataOptions {
+  isAuthenticated?: boolean;
+}
+
+export const useWorkforceData = (options: UseWorkforceDataOptions = {}) => {
+  const { isAuthenticated = false } = options;
+  
   const [masterEmployees, setMasterEmployees] = useState<Employee[]>([]);
   const [masterEvents, setMasterEvents] = useState<WorkforceEvent[]>([]);
   const [masterTeamStructures, setMasterTeamStructures] = useState<TeamStructure[]>([]);
@@ -38,6 +44,7 @@ export const useWorkforceData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   // Refs to track current values for sync
   const dataRef = useRef({ masterEmployees, masterEvents, masterTeamStructures, hierarchy, scenarios });
@@ -53,8 +60,14 @@ export const useWorkforceData = () => {
     currentIndex: -1,
   });
 
-  // Load data from server on mount
+  // Load data from server when authenticated
   useEffect(() => {
+    // Only load if authenticated and haven't loaded yet
+    if (!isAuthenticated) {
+      setIsLoading(false);
+      return;
+    }
+
     const loadData = async () => {
       setIsLoading(true);
       setError(null);
@@ -66,6 +79,7 @@ export const useWorkforceData = () => {
         setMasterTeamStructures(data.teamStructures || []);
         setHierarchy(data.hierarchy || []);
         setScenarios(data.scenarios || []);
+        setHasLoaded(true);
         console.log('Loaded workforce data from server:', {
           employees: data.employees?.length || 0,
           events: data.events?.length || 0,
@@ -76,19 +90,21 @@ export const useWorkforceData = () => {
         console.error('Failed to load workforce data:', err);
         setError(message);
         toast.error('Failed to load data', { description: message });
-        // Use fallback initial data
-        setMasterEmployees(initialEmployees);
-        setMasterEvents(initialEvents);
-        setMasterTeamStructures(initialTeamStructures);
-        setHierarchy(initialHierarchy);
-        setScenarios([]);
+        // Use fallback initial data only if we haven't loaded before
+        if (!hasLoaded) {
+          setMasterEmployees(initialEmployees);
+          setMasterEvents(initialEvents);
+          setMasterTeamStructures(initialTeamStructures);
+          setHierarchy(initialHierarchy);
+          setScenarios([]);
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     loadData();
-  }, []);
+  }, [isAuthenticated]);
 
   // Sync data to server
   const syncToServer = useCallback(async (data: {
