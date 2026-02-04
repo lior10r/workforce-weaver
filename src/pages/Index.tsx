@@ -91,7 +91,9 @@ const Index = () => {
     jumpToHistory,
     pushToHistory,
     resetToInitial,
-  } = useWorkforceData();
+    isLoading: isDataLoading,
+    error: dataError,
+  } = useWorkforceData({ isAuthenticated });
 
   // Scenario State
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
