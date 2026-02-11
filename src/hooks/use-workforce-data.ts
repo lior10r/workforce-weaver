@@ -483,6 +483,7 @@ export const useWorkforceData = (options: UseWorkforceDataOptions = {}) => {
 
   const setScenariosWithSync = useCallback((updater: Scenario[] | ((prev: Scenario[]) => Scenario[])) => {
     const updated = typeof updater === 'function' ? updater(dataRef.current.scenarios) : updater;
+    dataRef.current = { ...dataRef.current, scenarios: updated };
     setScenarios(updated);
     syncToServer({ scenarios: updated });
   }, [syncToServer]);
