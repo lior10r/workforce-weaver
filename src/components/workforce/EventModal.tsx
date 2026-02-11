@@ -1,6 +1,10 @@
-import { X, BookOpen, TrendingUp } from 'lucide-react';
+import { X, BookOpen, TrendingUp, CalendarIcon } from 'lucide-react';
 import { Employee, EVENT_TYPES, formatDate, SENIORITY_LEVELS } from '@/lib/workforce-data';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -14,8 +18,8 @@ interface EventModalProps {
 export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, departments }: EventModalProps) => {
   const [selectedType, setSelectedType] = useState(prefill.isFlag ? 'Decision Flag' : 'Promotion');
   const [selectedDept, setSelectedDept] = useState<string>(Object.keys(departments)[0] || '');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [selectedEmpId, setSelectedEmpId] = useState<number | string>(prefill.empId);
   const [selectedNewRole, setSelectedNewRole] = useState<string>('');
 
@@ -25,8 +29,8 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
     setSelectedType(prefill.isFlag ? 'Decision Flag' : 'Promotion');
     setSelectedEmpId(prefill.empId);
     setSelectedNewRole('');
-    setStartDate('');
-    setEndDate('');
+    setStartDate(undefined);
+    setEndDate(undefined);
     setSelectedDept(Object.keys(departments)[0] || '');
   }, [isOpen, prefill.empId, prefill.isFlag, departments]);
 
@@ -54,11 +58,11 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
     onSubmit({
       empId: parseInt(formData.get('empId') as string),
       type,
-      date: formData.get('date') as string,
+      date: startDate ? format(startDate, 'yyyy-MM-dd') : '',
       details: formData.get('details') as string,
       isFlag: type === 'Decision Flag',
       targetTeam: type === 'Team Swap' ? formData.get('targetTeam') as string : undefined,
-      endDate: (type === 'Training' || type === 'Course') ? formData.get('endDate') as string : undefined,
+      endDate: (type === 'Training' || type === 'Course') && endDate ? format(endDate, 'yyyy-MM-dd') : undefined,
       newRole: type === 'Promotion' ? formData.get('newRole') as string : undefined,
     });
   };
@@ -122,17 +126,26 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
               <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
                 {isTrainingType ? 'Start Date' : 'Target Date'}
               </label>
-              <input 
-                type="date" 
-                required 
-                name="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="input-field" 
-              />
-              {startDate && (
-                <p className="text-[10px] text-muted-foreground mt-1">{formatDate(startDate)}</p>
-              )}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`w-full justify-start text-left font-normal input-field ${!startDate ? 'text-muted-foreground' : ''}`}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {startDate ? format(startDate, 'dd/MM/yyyy') : 'Select date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[110]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={setStartDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -143,17 +156,26 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
                 <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
                   End Date
                 </label>
-                <input 
-                  type="date" 
-                  required 
-                  name="endDate" 
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="input-field" 
-                />
-                {endDate && (
-                  <p className="text-[10px] text-muted-foreground mt-1">{formatDate(endDate)}</p>
-                )}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className={`w-full justify-start text-left font-normal input-field ${!endDate ? 'text-muted-foreground' : ''}`}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {endDate ? format(endDate, 'dd/MM/yyyy') : 'Select date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 z-[110]" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={endDate}
+                      onSelect={setEndDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
           )}
