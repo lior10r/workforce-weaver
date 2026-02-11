@@ -189,11 +189,23 @@ const Index = () => {
         allTeams.push(...d.directTeams);
       }
     });
-    setScopeFilter(prev => ({
-      departments: prev.departments.filter(d => allDepts.includes(d)),
-      groups: prev.groups.filter(g => allGroups.includes(g)),
-      teams: prev.teams.filter(t => allTeams.includes(t))
-    }));
+
+    setScopeFilter(prev => {
+      // Initial load fix: when hierarchy was empty on first render, prev filter is empty.
+      // Default to "show everything" once hierarchy arrives.
+      const prevIsEmpty =
+        prev.departments.length === 0 && prev.groups.length === 0 && prev.teams.length === 0;
+
+      if (prevIsEmpty) {
+        return { departments: allDepts, groups: allGroups, teams: allTeams };
+      }
+
+      return {
+        departments: prev.departments.filter(d => allDepts.includes(d)),
+        groups: prev.groups.filter(g => allGroups.includes(g)),
+        teams: prev.teams.filter(t => allTeams.includes(t)),
+      };
+    });
   }, [hierarchy]);
 
   // Legacy hierarchy for compatibility with some components
