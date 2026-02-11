@@ -501,6 +501,7 @@ export const EmployeeModal = ({
             <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  type="button"
                   variant="outline"
                   className={`w-full justify-start text-left font-normal input-field ${!hireDate ? 'text-muted-foreground' : ''}`}
                 >
@@ -508,7 +509,7 @@ export const EmployeeModal = ({
                   {hireDate ? format(hireDate, 'dd/MM/yyyy') : 'Select date'}
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent className="w-auto p-0 z-[110]" align="start">
                 <Calendar
                   mode="single"
                   selected={hireDate}
