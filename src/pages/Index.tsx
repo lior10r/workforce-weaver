@@ -746,27 +746,31 @@ const Index = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                <button 
-                  onClick={() => { setEditingEmployee(null); setIsEmployeeModalOpen(true); }}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  <UserPlus size={18} />
-                  <span className="hidden sm:inline">Hire</span>
-                </button>
-                <ExportImport
-                  employees={masterEmployees}
-                  events={masterEvents}
-                  teamStructures={masterTeamStructures}
-                  departments={departments}
-                  hierarchy={hierarchy}
-                  onImportEmployees={handleImportEmployees}
-                  onImportEvents={handleImportEvents}
-                  onImportTeamStructures={handleImportTeamStructures}
-                  onImportDepartments={handleImportDepartments}
-                  onImportHierarchy={handleImportHierarchy}
-                  onImportAll={handleImportAll}
-                  orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
-                />
+                {isAdmin && (
+                  <>
+                    <button 
+                      onClick={() => { setEditingEmployee(null); setIsEmployeeModalOpen(true); }}
+                      className="btn-primary whitespace-nowrap"
+                    >
+                      <UserPlus size={18} />
+                      <span className="hidden sm:inline">Hire</span>
+                    </button>
+                    <ExportImport
+                      employees={masterEmployees}
+                      events={masterEvents}
+                      teamStructures={masterTeamStructures}
+                      departments={departments}
+                      hierarchy={hierarchy}
+                      onImportEmployees={handleImportEmployees}
+                      onImportEvents={handleImportEvents}
+                      onImportTeamStructures={handleImportTeamStructures}
+                      onImportDepartments={handleImportDepartments}
+                      onImportHierarchy={handleImportHierarchy}
+                      onImportAll={handleImportAll}
+                      orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
+                    />
+                  </>
+                )}
                 
                 {/* Backend/Auth Status */}
                 {!isBackendAvailable && (
@@ -908,12 +912,12 @@ const Index = () => {
               onConfigureTeam={handleConfigureTeam}
               employeeDiffMap={employeeDiffMap}
               hierarchy={hierarchy}
-              onAddDepartment={handleAddDepartment}
-              onAddGroup={addGroup}
-              onAddTeam={handleAddTeamFull}
-              onDeleteDepartment={deleteDepartment}
-              onDeleteGroup={deleteGroup}
-              onDeleteTeam={deleteTeam}
+              onAddDepartment={isAdmin ? handleAddDepartment : undefined}
+              onAddGroup={isAdmin ? addGroup : undefined}
+              onAddTeam={isAdmin ? handleAddTeamFull : undefined}
+              onDeleteDepartment={isAdmin ? deleteDepartment : undefined}
+              onDeleteGroup={isAdmin ? deleteGroup : undefined}
+              onDeleteTeam={isAdmin ? deleteTeam : undefined}
               onSetDepartmentManager={(dept, id) => {
                 setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
               }}
@@ -1009,11 +1013,11 @@ const Index = () => {
                   );
                 }));
               }}
-              onHireForTeam={(prefill) => {
+              onHireForTeam={isAdmin ? (prefill) => {
                 setEmployeePrefill(prefill);
                 setEditingEmployee(null);
                 setIsEmployeeModalOpen(true);
-              }}
+              } : undefined}
             />
           )}
 
