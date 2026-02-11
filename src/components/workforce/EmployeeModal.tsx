@@ -1,4 +1,4 @@
-import { X, Building2, Trash2, AlertTriangle, Clock } from 'lucide-react';
+import { X, Building2, Trash2, AlertTriangle, Clock, CalendarIcon } from 'lucide-react';
 import {
   Employee,
   DEPARTMENT_NAMES,
@@ -10,8 +10,13 @@ import {
   TeamStructure,
   getAllDeptTeams,
   getTeamParent,
+  formatDate,
 } from '@/lib/workforce-data';
 import { FormEvent, useState, useEffect, useMemo } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { format, parse } from 'date-fns';
 
 interface EmployeeModalProps {
   isOpen: boolean;
@@ -47,6 +52,7 @@ export const EmployeeModal = ({
   const [selectedWorkType, setSelectedWorkType] = useState<WorkType>('Full-Time');
   const [partTimePercentage, setPartTimePercentage] = useState(50);
   const [initialized, setInitialized] = useState(false);
+  const [hireDate, setHireDate] = useState<Date | undefined>(undefined);
 
   // Get the department structure
   const deptStructure = useMemo(() => 
@@ -157,6 +163,7 @@ export const EmployeeModal = ({
       setSelectedDept(editingEmployee.dept);
       setSelectedWorkType(editingEmployee.workType || 'Full-Time');
       setPartTimePercentage(editingEmployee.partTimePercentage || 50);
+      setHireDate(editingEmployee.joined ? new Date(editingEmployee.joined) : undefined);
 
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
@@ -185,6 +192,7 @@ export const EmployeeModal = ({
       setSelectedTeam(prefill.team);
       setSelectedWorkType('Full-Time');
       setPartTimePercentage(50);
+      setHireDate(undefined);
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -194,6 +202,7 @@ export const EmployeeModal = ({
       setIsGroupLevel(false);
       setSelectedWorkType('Full-Time');
       setPartTimePercentage(50);
+      setHireDate(undefined);
 
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
@@ -300,7 +309,7 @@ export const EmployeeModal = ({
       group: group,
       role: formData.get('role') as string,
       status: formData.get('status') as string,
-      joined: formData.get('joined') as string,
+      joined: hireDate ? format(hireDate, 'yyyy-MM-dd') : '',
       isPotential: formData.get('isPotential') === 'on',
       managerId: autoManager,
       managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
@@ -489,13 +498,25 @@ export const EmployeeModal = ({
             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
               Hire Date
             </label>
-            <input 
-              type="date" 
-              required 
-              name="joined" 
-              defaultValue={editingEmployee?.joined} 
-              className="input-field" 
-            />
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={`w-full justify-start text-left font-normal input-field ${!hireDate ? 'text-muted-foreground' : ''}`}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {hireDate ? format(hireDate, 'dd/MM/yyyy') : 'Select date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={hireDate}
+                  onSelect={setHireDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Work Type */}
