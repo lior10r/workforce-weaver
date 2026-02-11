@@ -30,6 +30,14 @@ router.get('/employees', (req, res) => {
 // Create employee
 router.post('/employees', (req, res) => {
   try {
+    // Check if user can create in this scope
+    if (req.user.role !== 'admin') {
+      const newEmp = req.body;
+      if (!canModifyEmployee(req.user, newEmp)) {
+        return res.status(403).json({ error: 'Not authorized to create employees in this scope' });
+      }
+    }
+    
     const employees = readData('employees') || [];
     const newEmployee = {
       ...req.body,
@@ -103,9 +111,12 @@ router.delete('/employees/:id', (req, res) => {
   }
 });
 
-// Bulk update employees (for imports)
+// Bulk update employees (admin only - for imports)
 router.post('/employees/bulk', (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can perform bulk updates' });
+    }
     const { employees: newEmployees } = req.body;
     writeData('employees', newEmployees);
     res.json({ message: 'Employees updated successfully', count: newEmployees.length });
@@ -189,9 +200,12 @@ router.delete('/events/:id', (req, res) => {
   }
 });
 
-// Bulk update events
+// Bulk update events (admin only)
 router.post('/events/bulk', (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can perform bulk updates' });
+    }
     const { events: newEvents } = req.body;
     writeData('events', newEvents);
     res.json({ message: 'Events updated successfully', count: newEvents.length });
@@ -203,20 +217,61 @@ router.post('/events/bulk', (req, res) => {
 
 // ============== HIERARCHY ==============
 
-// Get hierarchy
+// Get hierarchy (filtered by user scope for non-admins)
 router.get('/hierarchy', (req, res) => {
   try {
     const hierarchy = readData('hierarchy') || [];
-    res.json(hierarchy);
+    
+    if (req.user.role === 'admin') {
+      return res.json(hierarchy);
+    }
+    
+    // Filter hierarchy to user's scope
+    const { getUserScope } = require('../middleware/permissions');
+    const { level, scope } = getUserScope(req.user.userId, req.user.role);
+    
+    if (level === 'none' || !scope) {
+      return res.json([]);
+    }
+    
+    // Filter to only the user's department, then narrow groups/teams
+    const filtered = hierarchy
+      .filter(d => d.name === scope.dept)
+      .map(d => {
+        if (level === 'department') return d; // See whole department
+        
+        // Group or team level: filter groups
+        const filteredGroups = d.groups
+          .filter(g => level === 'group' ? g.name === scope.group : g.teams.includes(scope.team))
+          .map(g => {
+            if (level === 'team') {
+              return { ...g, teams: g.teams.filter(t => t === scope.team) };
+            }
+            return g;
+          });
+        
+        const filteredDirectTeams = (d.directTeams || []).filter(t => {
+          if (level === 'group') return false; // Group managers see their group, not direct teams
+          if (level === 'team') return t === scope.team;
+          return true;
+        });
+        
+        return { ...d, groups: filteredGroups, directTeams: filteredDirectTeams };
+      });
+    
+    res.json(filtered);
   } catch (error) {
     console.error('Get hierarchy error:', error);
     res.status(500).json({ error: 'Failed to get hierarchy' });
   }
 });
 
-// Update hierarchy
+// Update hierarchy (admin only)
 router.put('/hierarchy', (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can modify hierarchy' });
+    }
     const { hierarchy } = req.body;
     writeData('hierarchy', hierarchy);
     res.json({ message: 'Hierarchy updated successfully' });
@@ -239,9 +294,12 @@ router.get('/team-structures', (req, res) => {
   }
 });
 
-// Update team structures
+// Update team structures (admin only)
 router.put('/team-structures', (req, res) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can modify team structures' });
+    }
     const { teamStructures } = req.body;
     writeData('team-structures', teamStructures);
     res.json({ message: 'Team structures updated successfully' });
@@ -292,10 +350,36 @@ router.get('/data', (req, res) => {
     const allowedEmployeeIds = new Set(filteredEmployees.map(e => e.id));
     const filteredEvents = events.filter(e => allowedEmployeeIds.has(e.empId));
 
+    // Filter hierarchy for non-admins
+    let filteredHierarchy = hierarchy;
+    if (req.user.role !== 'admin') {
+      const { getUserScope } = require('../middleware/permissions');
+      const { level, scope } = getUserScope(req.user.userId, req.user.role);
+      
+      if (level === 'none' || !scope) {
+        filteredHierarchy = [];
+      } else {
+        filteredHierarchy = hierarchy
+          .filter(d => d.name === scope.dept)
+          .map(d => {
+            if (level === 'department') return d;
+            const filteredGroups = d.groups
+              .filter(g => level === 'group' ? g.name === scope.group : g.teams.includes(scope.team))
+              .map(g => level === 'team' ? { ...g, teams: g.teams.filter(t => t === scope.team) } : g);
+            const filteredDirectTeams = (d.directTeams || []).filter(t => {
+              if (level === 'group') return false;
+              if (level === 'team') return t === scope.team;
+              return true;
+            });
+            return { ...d, groups: filteredGroups, directTeams: filteredDirectTeams };
+          });
+      }
+    }
+
     res.json({
       employees: filteredEmployees,
       events: filteredEvents,
-      hierarchy,
+      hierarchy: filteredHierarchy,
       teamStructures,
       scenarios
     });
@@ -309,11 +393,62 @@ router.get('/data', (req, res) => {
 router.put('/data', (req, res) => {
   try {
     const { employees, events, hierarchy, teamStructures, scenarios } = req.body;
+    const isAdmin = req.user.role === 'admin';
     
-    if (employees) writeData('employees', employees);
-    if (events) writeData('events', events);
-    if (hierarchy) writeData('hierarchy', hierarchy);
-    if (teamStructures) writeData('team-structures', teamStructures);
+    if (employees) {
+      if (isAdmin) {
+        // Admin can overwrite everything
+        writeData('employees', employees);
+      } else {
+        // Non-admin: merge only employees within their scope
+        const allEmployees = readData('employees') || [];
+        const { level, scope } = require('../middleware/permissions').getUserScope(req.user.userId, req.user.role);
+        
+        if (level !== 'none' && scope) {
+          // Build a set of IDs the user is allowed to modify
+          const allowedIds = new Set(
+            filterByPermission(req.user, allEmployees, 'employees').map(e => e.id)
+          );
+          
+          // Keep employees outside user's scope unchanged, replace those inside scope
+          const outsideScope = allEmployees.filter(e => !allowedIds.has(e.id));
+          const merged = [...outsideScope, ...employees.filter(e => allowedIds.has(e.id))];
+          writeData('employees', merged);
+        }
+        // If level === 'none', don't write anything
+      }
+    }
+    
+    if (events) {
+      if (isAdmin) {
+        writeData('events', events);
+      } else {
+        // Non-admin: merge only events for employees in their scope
+        const allEvents = readData('events') || [];
+        const allEmployees = readData('employees') || [];
+        const allowedEmpIds = new Set(
+          filterByPermission(req.user, allEmployees, 'employees').map(e => e.id)
+        );
+        const outsideScope = allEvents.filter(e => !allowedEmpIds.has(e.empId));
+        const merged = [...outsideScope, ...events.filter(e => allowedEmpIds.has(e.empId))];
+        writeData('events', merged);
+      }
+    }
+    
+    // Only admins can modify hierarchy and team structures
+    if (hierarchy) {
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'Only admins can modify hierarchy' });
+      }
+      writeData('hierarchy', hierarchy);
+    }
+    if (teamStructures) {
+      if (!isAdmin) {
+        return res.status(403).json({ error: 'Only admins can modify team structures' });
+      }
+      writeData('team-structures', teamStructures);
+    }
+    
     if (scenarios) writeData('scenarios', scenarios);
 
     res.json({ message: 'All data updated successfully' });
