@@ -746,8 +746,7 @@ const Index = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                {isAdmin && (
-                  <>
+                {(isAdmin || user?.role === 'manager') && (
                     <button 
                       onClick={() => { setEditingEmployee(null); setIsEmployeeModalOpen(true); }}
                       className="btn-primary whitespace-nowrap"
@@ -755,6 +754,8 @@ const Index = () => {
                       <UserPlus size={18} />
                       <span className="hidden sm:inline">Hire</span>
                     </button>
+                )}
+                {isAdmin && (
                     <ExportImport
                       employees={masterEmployees}
                       events={masterEvents}
@@ -769,7 +770,6 @@ const Index = () => {
                       onImportAll={handleImportAll}
                       orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
                     />
-                  </>
                 )}
                 
                 {/* Backend/Auth Status */}
@@ -1013,7 +1013,7 @@ const Index = () => {
                   );
                 }));
               }}
-              onHireForTeam={isAdmin ? (prefill) => {
+              onHireForTeam={(isAdmin || user?.role === 'manager') ? (prefill) => {
                 setEmployeePrefill(prefill);
                 setEditingEmployee(null);
                 setIsEmployeeModalOpen(true);
