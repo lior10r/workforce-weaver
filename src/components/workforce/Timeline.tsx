@@ -135,7 +135,7 @@ export const Timeline = ({
         startPos,
         endPos,
         level: 'senior', // Use senior level for styling consistency
-        color: `bg-${getRoleColor(emp.role)}` // Use role-specific color
+        color: getRoleColor(emp.role) // Use role-specific color (class already sets background-color)
       });
       return segments;
     }
