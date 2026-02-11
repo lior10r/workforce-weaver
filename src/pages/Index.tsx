@@ -509,15 +509,91 @@ const Index = () => {
     }
   };
 
-  const handleMergeToMaster = (scenario: Scenario) => {
+  const handleMergeToMaster = (scenario: Scenario, selectedChangeIds?: string[]) => {
     pushToHistory();
-    const finalEmployees = getScenarioEmployees(scenario);
-    const finalEvents = getScenarioEvents(scenario);
     
-    setMasterEmployeesDirect(finalEmployees);
-    setMasterEventsDirect(finalEvents);
+    // If no specific changes selected, merge everything
+    if (!selectedChangeIds || selectedChangeIds.length === scenario.changelog.length) {
+      const finalEmployees = getScenarioEmployees(scenario);
+      const finalEvents = getScenarioEvents(scenario);
+      setMasterEmployeesDirect(finalEmployees);
+      setMasterEventsDirect(finalEvents);
+      handleDeleteScenario(scenario.id);
+      return;
+    }
+
+    // Selective merge: only apply selected changelog entries
+    const selectedEntries = scenario.changelog.filter(c => selectedChangeIds.includes(c.id));
     
-    handleDeleteScenario(scenario.id);
+    let updatedEmployees = [...masterEmployees];
+    let updatedEvents = [...masterEvents];
+
+    selectedEntries.forEach(entry => {
+      switch (entry.type) {
+        case 'employee_added': {
+          const newEmp = scenario.proposedEmployees.find(e => e.id === entry.entityId);
+          if (newEmp) {
+            updatedEmployees = [...updatedEmployees.filter(e => e.id !== newEmp.id), newEmp];
+          }
+          break;
+        }
+        case 'employee_removed': {
+          updatedEmployees = updatedEmployees.filter(e => e.id !== entry.entityId);
+          break;
+        }
+        case 'employee_modified': {
+          const modifiedEmp = scenario.proposedEmployees.find(e => e.id === entry.entityId);
+          if (modifiedEmp) {
+            updatedEmployees = updatedEmployees.map(e => e.id === modifiedEmp.id ? modifiedEmp : e);
+          }
+          break;
+        }
+        case 'event_added': {
+          const newEvt = scenario.proposedEvents.find(e => e.id === entry.entityId);
+          if (newEvt) {
+            updatedEvents = [...updatedEvents.filter(e => e.id !== newEvt.id), newEvt];
+          }
+          break;
+        }
+        case 'event_removed': {
+          updatedEvents = updatedEvents.filter(e => e.id !== entry.entityId);
+          break;
+        }
+      }
+    });
+
+    setMasterEmployeesDirect(updatedEmployees);
+    setMasterEventsDirect(updatedEvents);
+
+    // Remove merged entries from scenario, or delete scenario if all merged
+    const remainingChangelog = scenario.changelog.filter(c => !selectedChangeIds.includes(c.id));
+    if (remainingChangelog.length === 0) {
+      handleDeleteScenario(scenario.id);
+    } else {
+      // Rebuild scenario without merged changes
+      const remainingEntries = new Set(remainingChangelog.map(c => c.id));
+      const keptProposedEmployees = scenario.proposedEmployees.filter(e => 
+        remainingChangelog.some(c => c.entityId === e.id && (c.type === 'employee_added' || c.type === 'employee_modified'))
+      );
+      const keptDeletedIds = scenario.deletedEmployeeIds.filter(id =>
+        remainingChangelog.some(c => c.entityId === id && c.type === 'employee_removed')
+      );
+      const keptProposedEvents = scenario.proposedEvents.filter(e =>
+        remainingChangelog.some(c => c.entityId === e.id && (c.type === 'event_added'))
+      );
+      const keptDeletedEventIds = (scenario.deletedEventIds || []).filter(id =>
+        remainingChangelog.some(c => c.entityId === id && c.type === 'event_removed')
+      );
+
+      setScenarios(prev => prev.map(s => s.id === scenario.id ? {
+        ...s,
+        changelog: remainingChangelog,
+        proposedEmployees: keptProposedEmployees,
+        deletedEmployeeIds: keptDeletedIds,
+        proposedEvents: keptProposedEvents,
+        deletedEventIds: keptDeletedEventIds,
+      } : s));
+    }
   };
 
   // Handle discarding specific changes from a scenario
