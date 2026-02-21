@@ -142,10 +142,6 @@ const Login: React.FC = () => {
               )}
             </Button>
 
-            <div className="text-center text-sm text-muted-foreground">
-              <p>Default credentials:</p>
-              <p className="font-mono text-xs mt-1">admin / admin123</p>
-            </div>
           </form>
         </CardContent>
       </Card>
