@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree, Settings } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree, Settings, ClipboardList, FileBarChart } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -231,10 +231,22 @@ export const Sidebar = ({
           active={view === 'analytics'} 
           onClick={() => setView('analytics')} 
         />
+        <SidebarItem 
+          icon={FileBarChart} 
+          label="Reports" 
+          active={view === 'reports'} 
+          onClick={() => setView('reports')} 
+        />
         
-        {/* Admin-only: User Management */}
+        {/* Admin-only items */}
         {isAdmin && (
-          <div className="mt-4 pt-4 border-t border-border">
+          <div className="mt-4 pt-4 border-t border-border space-y-2">
+            <SidebarItem 
+              icon={ClipboardList} 
+              label="Activity Log" 
+              active={view === 'audit'} 
+              onClick={() => setView('audit')} 
+            />
             <SidebarItem 
               icon={Settings} 
               label="User Management" 
