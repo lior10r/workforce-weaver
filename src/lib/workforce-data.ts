@@ -234,6 +234,18 @@ export interface Hierarchy {
   team: string;
 }
 
+// Audit log entry for tracking all changes
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  userId: string;
+  userName: string;
+  action: string;
+  category: 'employee' | 'event' | 'structure' | 'scenario';
+  summary: string;
+  details?: Record<string, { before?: string; after?: string }>;
+}
+
 // Changelog entry for tracking scenario changes
 export interface ScenarioChangelogEntry {
   id: string;

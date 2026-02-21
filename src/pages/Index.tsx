@@ -11,6 +11,8 @@ import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
 import { OrgChart } from '@/components/workforce/OrgChart';
+import { AuditLog } from '@/components/workforce/AuditLog';
+import { Reports } from '@/components/workforce/Reports';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
 import { TeamStructureModal } from '@/components/workforce/TeamStructureModal';
@@ -38,6 +40,7 @@ import {
   Hierarchy, 
   TeamStructure,
   Scenario,
+  AuditEntry,
   DiffStatus,
   DEPARTMENTS,
   getScenarioEmployees,
@@ -99,6 +102,23 @@ const Index = () => {
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>(null);
   
+  // Audit log state
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  
+  const addAuditEntry = useCallback((action: string, category: AuditEntry['category'], summary: string, details?: AuditEntry['details']) => {
+    const entry: AuditEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      userId: user?.id || 'unknown',
+      userName: user?.name || 'Unknown User',
+      action,
+      category,
+      summary,
+      details,
+    };
+    setAuditLog(prev => [...prev, entry]);
+  }, [user]);
+
   // Progression milestones state
   const [progressionMilestones, setProgressionMilestones] = useState<ProgressionMilestones>(DEFAULT_MILESTONES);
 
@@ -287,6 +307,8 @@ const Index = () => {
   const handleDeleteEmployee = (employeeId: number) => {
     const scenarioId = ensureWorkingScenario();
     deleteEmployee(employeeId, scenarioId);
+    const emp = employees.find(e => e.id === employeeId);
+    addAuditEntry('employee_removed', 'employee', `Removed ${emp?.name || 'employee'} from roster`);
   };
 
   const handleAddEmployee = (employeeData: Omit<Employee, 'id'>, id?: number) => {
@@ -360,6 +382,19 @@ const Index = () => {
       );
     }));
     
+    addAuditEntry(
+      isEditing ? 'employee_modified' : 'employee_added',
+      'employee',
+      isEditing ? `Modified ${newEmployee.name}` : `Added ${newEmployee.name} to ${newEmployee.team}`,
+      isEditing && existingEmployee ? Object.fromEntries(
+        Object.entries({
+          Team: existingEmployee.team !== newEmployee.team ? { before: existingEmployee.team, after: newEmployee.team } : undefined,
+          Role: existingEmployee.role !== newEmployee.role ? { before: existingEmployee.role, after: newEmployee.role } : undefined,
+          Status: existingEmployee.status !== newEmployee.status ? { before: existingEmployee.status, after: newEmployee.status } : undefined,
+        }).filter(([, v]) => v !== undefined)
+      ) as Record<string, { before?: string; after?: string }> : undefined
+    );
+    
     setIsEmployeeModalOpen(false);
     setEditingEmployee(null);
   };
@@ -423,6 +458,7 @@ const Index = () => {
         );
       }));
     }
+    addAuditEntry('event_added', 'event', `Added ${eventData.type} for ${emp?.name || 'Unknown'}${eventData.isFlag ? ' (Flag)' : ''}`);
     setIsEventModalOpen(false);
   };
 
@@ -744,6 +780,8 @@ const Index = () => {
       case 'planner': return 'Strategic Movements';
       case 'analytics': return 'Team Analytics';
       case 'orgchart': return 'Organization Chart';
+      case 'audit': return 'Activity Log';
+      case 'reports': return 'Reports';
       default: return 'Operations Center';
     }
   };
@@ -1210,6 +1248,19 @@ const Index = () => {
                   return emp;
                 }));
               }}
+            />
+          )}
+
+          {view === 'audit' && isAdmin && (
+            <AuditLog auditLog={auditLog} />
+          )}
+
+          {view === 'reports' && (
+            <Reports
+              employees={employees}
+              events={events}
+              teamStructures={teamStructures}
+              hierarchy={hierarchy}
             />
           )}
         </main>
