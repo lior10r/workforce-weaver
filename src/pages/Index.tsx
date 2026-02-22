@@ -337,8 +337,8 @@ const Index = () => {
         };
       }
       
-      // For new employees (not editing), add a 6-month training event
-      if (!isEditing) {
+      // For new junior employees (not editing), add a 6-month training event
+      if (!isEditing && newEmployee.role === 'Junior Dev') {
         const joinDate = new Date(newEmployee.joined);
         const trainingEndDate = new Date(joinDate);
         trainingEndDate.setMonth(trainingEndDate.getMonth() + 6);
@@ -377,7 +377,7 @@ const Index = () => {
         isEditing ? 'employee_modified' : 'employee_added',
         newId,
         newEmployee.name,
-        isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team} (with 6-month training)`,
+        isEditing ? `Modified employee details` : `Added new employee to ${newEmployee.team}${newEmployee.role === 'Junior Dev' ? ' (with 6-month training)' : ''}`,
         Object.keys(changeDetails).length > 0 ? changeDetails : undefined
       );
     }));
@@ -508,19 +508,17 @@ const Index = () => {
   };
 
   const handleSaveTeamStructure = (structure: TeamStructure) => {
-    if (activeScenario) {
-      // For now, team structures are read-only in scenarios
-    } else {
-      setMasterTeamStructures(prev => {
-        const existing = prev.findIndex(s => s.teamName === structure.teamName);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = structure;
-          return updated;
-        }
-        return [...prev, structure];
-      });
-    }
+    // Team structures always save to master (structural config, not scenario-specific)
+    setMasterTeamStructures(prev => {
+      const existing = prev.findIndex(s => s.teamName === structure.teamName);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = structure;
+        return updated;
+      }
+      return [...prev, structure];
+    });
+    addAuditEntry('structure_updated', 'structure', `Updated team structure for ${structure.teamName}`);
     setIsTeamStructureModalOpen(false);
     setEditingTeamStructure(null);
   };

@@ -515,13 +515,17 @@ export const getCapacityWeight = (
   const monthsOfExperience = (asOfDate.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
   const yearsOfExperience = monthsOfExperience / 12;
   
-  // First 6 months: training period (0.3x capacity)
-  // Junior (6mo-1yr): 0.7x, Mid-level (after 1 year): 1x, Senior (after 3 years total): 1.5x
-  let baseWeight = 0.3; // Training period
-  if (monthsOfExperience >= 6) {
-    baseWeight = 0.7; // Junior
-    if (yearsOfExperience >= 3) baseWeight = 1.5; // Senior
-    else if (yearsOfExperience >= 1) baseWeight = 1.0; // Mid-level
+  // Training period (0.3x) only applies to Junior Dev in first 6 months
+  // Junior: 0.7x, Mid-level: 1x, Senior: 1.5x
+  let baseWeight: number;
+  if (role === 'Junior Dev' && monthsOfExperience < 6) {
+    baseWeight = 0.3; // Training period for juniors only
+  } else if (role === 'Junior Dev') {
+    baseWeight = 0.7;
+  } else if (role === 'Senior Dev' || yearsOfExperience >= 3) {
+    baseWeight = 1.5;
+  } else {
+    baseWeight = 1.0; // Mid-level
   }
   
   // Part-time employees contribute based on their configured percentage

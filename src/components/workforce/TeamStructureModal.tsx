@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Users, UserCog } from 'lucide-react';
 import { TeamStructure, Employee, ROLES } from '@/lib/workforce-data';
 
@@ -27,20 +27,22 @@ export const TeamStructureModal = ({
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
     teamStructure?.requiredRoles || {}
   );
-  const [targetSize, setTargetSize] = useState<number | undefined>(teamStructure?.targetSize);
 
   // Team members for leader selection
   const teamMembers = employees.filter(e => e.team === teamName && !e.isPotential);
+
+  // Auto-calculate target size from required roles
+  const targetSize = useMemo(() => {
+    return Object.values(requiredRoles).reduce((sum, count) => sum + count, 0);
+  }, [requiredRoles]);
 
   useEffect(() => {
     if (teamStructure) {
       setTeamLeader(teamStructure.teamLeader);
       setRequiredRoles(teamStructure.requiredRoles);
-      setTargetSize(teamStructure.targetSize);
     } else {
       setTeamLeader(undefined);
       setRequiredRoles({});
-      setTargetSize(undefined);
     }
   }, [teamStructure, isOpen]);
 
@@ -69,7 +71,7 @@ export const TeamStructureModal = ({
       group: teamStructure?.group || group,
       teamLeader,
       requiredRoles,
-      targetSize
+      targetSize: targetSize || undefined
     });
     onClose();
   };
@@ -114,20 +116,18 @@ export const TeamStructureModal = ({
             </select>
           </div>
 
-          {/* Target Size */}
+          {/* Target Size (auto-calculated) */}
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-2">
               <Users size={16} className="text-primary" />
               Target Team Size
             </label>
-            <input
-              type="number"
-              min={1}
-              value={targetSize || ''}
-              onChange={(e) => setTargetSize(e.target.value ? Number(e.target.value) : undefined)}
-              placeholder="Optional"
-              className="input-field w-32"
-            />
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-bold font-mono text-primary">{targetSize}</span>
+              <span className="text-xs text-muted-foreground">
+                (auto-calculated from required roles)
+              </span>
+            </div>
           </div>
 
           {/* Required Roles */}
