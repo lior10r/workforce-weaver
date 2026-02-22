@@ -334,7 +334,7 @@ export const Roster = ({
     const today = new Date();
     const joinDate = new Date(emp.joined);
     const monthsOfExperience = (today.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-    const isInTraining = monthsOfExperience < 6 && emp.role !== 'Team Lead';
+    const isInTraining = monthsOfExperience < 6 && emp.role === 'Junior Dev';
     
     // Check if part-time
     const isPartTime = emp.workType === 'Part-Time';
@@ -667,8 +667,15 @@ export const Roster = ({
                                   </button>
                                   <Users size={14} className="text-green-500" />
                                   <span className="font-medium">{teamName}</span>
-                                  <span className="text-xs text-muted-foreground">({filteredTeamMembers.length})</span>
-                                  {teamLeader && (
+                                   <span className="text-xs text-muted-foreground">
+                                     ({filteredTeamMembers.length}{structure?.targetSize ? `/${structure.targetSize}` : ''})
+                                   </span>
+                                   {structure && Object.keys(structure.requiredRoles).length > 0 && (
+                                     <span className="text-xs text-muted-foreground hidden sm:inline">
+                                       • {Object.entries(structure.requiredRoles).map(([r, c]) => `${c}×${r}`).join(', ')}
+                                     </span>
+                                   )}
+                                   {teamLeader && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                                       • <Crown size={10} className="text-green-500" /> {teamLeader.name}
                                     </span>
@@ -825,7 +832,14 @@ export const Roster = ({
                                         </button>
                                         <Users size={12} className="text-green-500" />
                                         <span className="text-sm font-medium">{teamName}</span>
-                                        <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                          ({teamMembers.length}{structure?.targetSize ? `/${structure.targetSize}` : ''})
+                                        </span>
+                                        {structure && Object.keys(structure.requiredRoles).length > 0 && (
+                                          <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                                            • {Object.entries(structure.requiredRoles).map(([r, c]) => `${c}×${r}`).join(', ')}
+                                          </span>
+                                        )}
                                         {teamLeader && (
                                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                             • <Crown size={8} className="text-green-500" /> {teamLeader.name}
