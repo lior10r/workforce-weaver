@@ -1121,9 +1121,6 @@ const Index = () => {
               onDeleteDepartment={isAdmin ? deleteDepartment : undefined}
               onDeleteGroup={isAdmin ? deleteGroup : undefined}
               onDeleteTeam={isAdmin ? deleteTeam : undefined}
-              onSetDepartmentManager={handleSetDepartmentManager}
-              onSetGroupManager={handleSetGroupManager}
-              onSetTeamLeader={handleSetTeamLeader}
               onBulkAssignManager={(employeeIds, managerId) => {
                 const scenarioId = ensureWorkingScenario();
                 setScenarios(prev => prev.map(s => {

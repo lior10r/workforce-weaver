@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap } from 'lucide-react';
 import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -32,9 +32,6 @@ interface RosterProps {
   onDeleteDepartment?: (dept: string) => void;
   onDeleteGroup?: (dept: string, groupName: string) => void;
   onDeleteTeam?: (dept: string, groupName: string | null, teamName: string) => void;
-  onSetDepartmentManager?: (dept: string, managerId: number | null) => void;
-  onSetGroupManager?: (dept: string, groupName: string, managerId: number | null) => void;
-  onSetTeamLeader?: (teamName: string, leaderId: number | null) => void;
   onBulkAssignManager?: (employeeIds: number[], managerId: number | null) => void;
   onMoveEmployeeToTeam?: (employeeId: number, teamName: string, dept: string, group?: string) => void;
   onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
@@ -149,9 +146,6 @@ export const Roster = ({
   onDeleteDepartment,
   onDeleteGroup,
   onDeleteTeam,
-  onSetDepartmentManager,
-  onSetGroupManager,
-  onSetTeamLeader,
   onBulkAssignManager,
   onMoveEmployeeToTeam,
   onHireForTeam
@@ -281,47 +275,41 @@ export const Roster = ({
     employeeIds.forEach(id => onMoveEmployeeToTeam(id, teamName, dept, group));
   };
 
-  // Get employees eligible to be managers
-  const getEligibleManagers = (deptName?: string, groupTeams?: string[], teamName?: string) => {
-    let eligible = employees.filter(e => !e.isPotential);
-    if (deptName) {
-      eligible = eligible.filter(e => e.dept === deptName);
-    }
-    if (groupTeams) {
-      eligible = eligible.filter(e => groupTeams.includes(e.team));
-    }
-    if (teamName) {
-      eligible = eligible.filter(e => e.team === teamName);
-    }
-    return eligible;
+  // Auto-detect manager helper: find employees with matching managerLevel, pick most experienced
+  const autoDetectManager = (level: 'department' | 'group' | 'team', filters: { dept?: string; group?: string; team?: string }) => {
+    let candidates = employees.filter(e => !e.isPotential && e.managerLevel === level);
+    if (filters.dept) candidates = candidates.filter(e => e.dept === filters.dept);
+    if (filters.group) candidates = candidates.filter(e => e.group === filters.group);
+    if (filters.team) candidates = candidates.filter(e => e.team === filters.team);
+    
+    if (candidates.length === 0) return { manager: null, duplicates: false };
+    
+    // Sort by join date ascending (most experienced first)
+    candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+    
+    return { 
+      manager: candidates[0], 
+      duplicates: candidates.length > 1,
+      count: candidates.length 
+    };
   };
 
-  // Manager assignment dropdown
-  const renderManagerSelect = (
-    label: string, 
-    currentManagerId: number | undefined, 
-    eligibleEmployees: Employee[], 
-    onSelect: (id: number | null) => void
-  ) => (
-    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-      <Crown size={12} className="text-muted-foreground" />
-      <Select
-        value={currentManagerId?.toString() || 'none'}
-        onValueChange={(val) => onSelect(val === 'none' ? null : parseInt(val))}
-      >
-        <SelectTrigger className="h-7 text-xs w-48">
-          <SelectValue placeholder={`Select ${label}`} />
-        </SelectTrigger>
-        <SelectContent className="bg-popover border border-border z-50">
-          <SelectItem value="none">No {label}</SelectItem>
-          {eligibleEmployees.map(emp => (
-            <SelectItem key={emp.id} value={emp.id.toString()}>
-              {emp.name} - {emp.role}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+  // Auto-detect team leader from employees with role 'Team Lead' in that team
+  const autoDetectTeamLeader = (teamName: string) => {
+    const candidates = employees.filter(e => 
+      !e.isPotential && e.team === teamName && (e.managerLevel === 'team' || e.role === 'Team Lead')
+    );
+    if (candidates.length === 0) return { leader: null, duplicates: false };
+    candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+    return { leader: candidates[0], duplicates: candidates.length > 1, count: candidates.length };
+  };
+
+  // Warning badge for duplicate managers
+  const renderDuplicateWarning = (count: number, label: string) => (
+    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1">
+      <AlertTriangle size={10} />
+      {count} {label}s found
+    </span>
   );
 
   const renderEmployeeRow = (emp: Employee, isLeader = false, enableDrag = true) => {
@@ -541,10 +529,11 @@ export const Roster = ({
         {/* Hierarchy View */}
         {hierarchy.map(dept => {
           const isDeptExpanded = expandedDepts.has(dept.name);
-          const deptManager = dept.departmentManagerId ? employees.find(e => e.id === dept.departmentManagerId) : null;
           const allDeptTeams = getAllDeptTeams(dept);
           const deptEmployees = employees.filter(e => allDeptTeams.includes(e.team) || e.dept === dept.name);
-          const eligibleDeptManagers = getEligibleManagers(dept.name);
+          
+          // Auto-detect department manager
+          const { manager: deptManager, duplicates: deptDuplicates, count: deptManagerCount } = autoDetectManager('department', { dept: dept.name });
 
           return (
             <div key={dept.name} className="glass-card overflow-hidden">
@@ -560,11 +549,12 @@ export const Roster = ({
                   <Building2 size={20} className="text-primary" />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-lg font-bold">{dept.name}</h3>
                     <span className="text-xs text-muted-foreground">
                       {deptEmployees.length} employees • {dept.groups.length} groups • {allDeptTeams.length} teams
                     </span>
+                    {deptDuplicates && renderDuplicateWarning(deptManagerCount!, 'Dept Manager')}
                   </div>
                   {deptManager && (
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -576,6 +566,15 @@ export const Roster = ({
                 
                 {/* Department Actions */}
                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                  {onHireForTeam && (
+                    <button
+                      onClick={() => onHireForTeam({ dept: dept.name, team: dept.name, group: null })}
+                      className="p-1.5 hover:bg-primary/10 rounded-lg text-primary hover:text-primary"
+                      title="Hire for department"
+                    >
+                      <UserPlus size={14} />
+                    </button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -620,18 +619,16 @@ export const Roster = ({
 
               {isDeptExpanded && (
                 <div className="p-4 space-y-4">
-                  {/* Department Manager Selector */}
-                  {onSetDepartmentManager && (
-                    <div className="p-3 bg-accent/30 rounded-lg flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Department Manager</span>
-                      {renderManagerSelect('Manager', dept.departmentManagerId, eligibleDeptManagers, (id) => onSetDepartmentManager(dept.name, id))}
-                    </div>
-                  )}
-
-                  {/* Department Manager Card */}
+                  {/* Department Manager Card (auto-detected) */}
                   {deptManager && (
                     <div className="border-l-4 border-l-purple-500 rounded-r-lg overflow-hidden">
                       {renderEmployeeRow(deptManager, false, false)}
+                    </div>
+                  )}
+                  {!deptManager && (
+                    <div className="p-3 bg-accent/20 rounded-lg text-sm text-muted-foreground flex items-center gap-2">
+                      <Crown size={14} className="text-purple-500" />
+                      No Department Manager assigned — hire or edit an employee and check "Department Manager"
                     </div>
                   )}
 
@@ -645,11 +642,9 @@ export const Roster = ({
                       {dept.directTeams.map(teamName => {
                         const isTeamExpanded = expandedTeams.has(teamName);
                         const teamMembers = employees.filter(e => e.team === teamName);
+                        const { leader: teamLeader, duplicates: leaderDuplicates, count: leaderCount } = autoDetectTeamLeader(teamName);
                         const structure = teamStructures.find(s => s.teamName === teamName);
-                        const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
-                        const eligibleLeaders = getEligibleManagers(dept.name, undefined, teamName);
 
-                        // Filter out department managers from direct team lists
                         const filteredTeamMembers = teamMembers.filter(e => 
                           e.managerLevel !== 'department' && e.managerLevel !== 'group'
                         );
@@ -661,7 +656,7 @@ export const Roster = ({
                                 className="flex items-center justify-between p-3 bg-accent/20 cursor-pointer hover:bg-accent/30"
                                 onClick={() => toggleTeam(teamName)}
                               >
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <button className="p-0.5 hover:bg-accent rounded">
                                     {isTeamExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                                   </button>
@@ -680,6 +675,7 @@ export const Roster = ({
                                       • <Crown size={10} className="text-green-500" /> {teamLeader.name}
                                     </span>
                                   )}
+                                  {leaderDuplicates && renderDuplicateWarning(leaderCount!, 'Team Lead')}
                                 </div>
                                 <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                   {onHireForTeam && (
@@ -691,7 +687,6 @@ export const Roster = ({
                                       <UserPlus size={14} />
                                     </button>
                                   )}
-                                  {onSetTeamLeader && renderManagerSelect('Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
                                   <button
                                     onClick={() => onConfigureTeam(teamName, dept.name)}
                                     className="p-1.5 hover:bg-accent rounded-lg text-muted-foreground hover:text-foreground"
@@ -716,7 +711,7 @@ export const Roster = ({
                               {isTeamExpanded && (
                                 <div className="divide-y divide-border">
                                   {filteredTeamMembers.length > 0 ? (
-                                    filteredTeamMembers.map(emp => renderEmployeeRow(emp, emp.id === structure?.teamLeader))
+                                    filteredTeamMembers.map(emp => renderEmployeeRow(emp, emp.id === teamLeader?.id))
                                   ) : (
                                     <p className="p-4 text-sm text-muted-foreground italic">No team members - drag employees here</p>
                                   )}
@@ -733,9 +728,8 @@ export const Roster = ({
                   {dept.groups.map(group => {
                     const groupKey = `${dept.name}-${group.name}`;
                     const isGroupExpanded = expandedGroups.has(groupKey);
-                    const groupManager = group.groupManagerId ? employees.find(e => e.id === group.groupManagerId) : null;
+                    const { manager: groupManager, duplicates: groupDuplicates, count: groupManagerCount } = autoDetectManager('group', { dept: dept.name, group: group.name });
                     const groupEmployees = employees.filter(e => group.teams.includes(e.team));
-                    const eligibleGroupManagers = getEligibleManagers(dept.name, group.teams);
 
                     return (
                       <div key={group.name} className="border border-border rounded-xl overflow-hidden">
@@ -749,11 +743,12 @@ export const Roster = ({
                           </button>
                           <FolderTree size={16} className="text-blue-500" />
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <h4 className="font-semibold">{group.name}</h4>
                               <span className="text-xs text-muted-foreground">
                                 {groupEmployees.length} employees • {group.teams.length} teams
                               </span>
+                              {groupDuplicates && renderDuplicateWarning(groupManagerCount!, 'Group Manager')}
                             </div>
                             {groupManager && (
                               <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -765,6 +760,15 @@ export const Roster = ({
                           
                           {/* Group Actions */}
                           <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                            {onHireForTeam && (
+                              <button
+                                onClick={() => onHireForTeam({ dept: dept.name, team: group.name, group: group.name })}
+                                className="p-1 hover:bg-primary/10 rounded text-primary hover:text-primary"
+                                title="Hire for this group"
+                              >
+                                <UserPlus size={12} />
+                              </button>
+                            )}
                             <Button 
                               variant="ghost" 
                               size="sm"
@@ -791,15 +795,7 @@ export const Roster = ({
 
                         {isGroupExpanded && (
                           <div className="p-3 space-y-3">
-                            {/* Group Manager Selector */}
-                            {onSetGroupManager && (
-                              <div className="p-2 bg-accent/20 rounded-lg flex items-center justify-between">
-                                <span className="text-sm font-medium text-muted-foreground">Group Manager</span>
-                                {renderManagerSelect('Manager', group.groupManagerId, eligibleGroupManagers, (id) => onSetGroupManager(dept.name, group.name, id))}
-                              </div>
-                            )}
-
-                            {/* Group Manager Card */}
+                            {/* Group Manager Card (auto-detected) */}
                             {groupManager && (
                               <div className="border-l-4 border-l-blue-500 rounded-r-lg overflow-hidden">
                                 {renderEmployeeRow(groupManager, false, false)}
@@ -809,15 +805,13 @@ export const Roster = ({
                             {/* Teams */}
                             {group.teams.map(teamName => {
                               const isTeamExpanded = expandedTeams.has(teamName);
-                              // Filter out group/department managers from team lists - they're shown separately
                               const teamMembers = employees.filter(e => 
                                 e.team === teamName && 
                                 e.managerLevel !== 'group' && 
                                 e.managerLevel !== 'department'
                               );
                               const structure = teamStructures.find(s => s.teamName === teamName);
-                              const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
-                              const eligibleLeaders = getEligibleManagers(dept.name, group.teams, teamName);
+                              const { leader: teamLeader, duplicates: leaderDuplicates, count: leaderCount } = autoDetectTeamLeader(teamName);
 
                               return (
                                 <DroppableTeam key={teamName} teamName={teamName} dept={dept.name} group={group.name}>
@@ -826,7 +820,7 @@ export const Roster = ({
                                       className="flex items-center justify-between p-2 bg-background/50 cursor-pointer hover:bg-accent/20"
                                       onClick={() => toggleTeam(teamName)}
                                     >
-                                      <div className="flex items-center gap-2">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         <button className="p-0.5 hover:bg-accent rounded">
                                           {isTeamExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                                         </button>
@@ -845,6 +839,7 @@ export const Roster = ({
                                             • <Crown size={8} className="text-green-500" /> {teamLeader.name}
                                           </span>
                                         )}
+                                        {leaderDuplicates && renderDuplicateWarning(leaderCount!, 'Team Lead')}
                                       </div>
                                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                         {onHireForTeam && (
@@ -856,7 +851,6 @@ export const Roster = ({
                                             <UserPlus size={12} />
                                           </button>
                                         )}
-                                        {onSetTeamLeader && renderManagerSelect('Lead', structure?.teamLeader, eligibleLeaders, (id) => onSetTeamLeader(teamName, id))}
                                         <button
                                           onClick={() => onConfigureTeam(teamName, dept.name)}
                                           className="p-1 hover:bg-accent rounded text-muted-foreground hover:text-foreground"
@@ -881,7 +875,7 @@ export const Roster = ({
                                     {isTeamExpanded && (
                                       <div className="divide-y divide-border">
                                         {teamMembers.length > 0 ? (
-                                          teamMembers.map(emp => renderEmployeeRow(emp, emp.id === structure?.teamLeader))
+                                          teamMembers.map(emp => renderEmployeeRow(emp, emp.id === teamLeader?.id))
                                         ) : (
                                           <p className="p-3 text-sm text-muted-foreground italic">No team members - drag employees here</p>
                                         )}
