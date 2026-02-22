@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -34,6 +34,8 @@ interface SidebarProps {
   scopeFilter: ScopeFilter;
   setScopeFilter: (filter: ScopeFilter | ((prev: ScopeFilter) => ScopeFilter)) => void;
   hierarchy: HierarchyStructure;
+  showDeparted: boolean;
+  setShowDeparted: (show: boolean) => void;
 }
 
 export const Sidebar = ({ 
@@ -41,7 +43,9 @@ export const Sidebar = ({
   setView, 
   scopeFilter, 
   setScopeFilter,
-  hierarchy
+  hierarchy,
+  showDeparted,
+  setShowDeparted
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -251,8 +255,22 @@ export const Sidebar = ({
         )}
       </nav>
 
+      {/* Show Departed Toggle */}
+      <div className="mt-auto p-3 bg-accent/50 rounded-xl border border-border">
+        <button
+          onClick={() => setShowDeparted(!showDeparted)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          <div className={`w-8 h-4 rounded-full transition-colors relative ${showDeparted ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showDeparted ? 'translate-x-4' : 'translate-x-0.5'}`} />
+          </div>
+          <UserX size={14} className="text-muted-foreground" />
+          <span className="text-xs text-muted-foreground font-medium">Show departed</span>
+        </button>
+      </div>
+
       {/* Scope Filter - 3-Level Hierarchy */}
-      <div className="mt-auto p-4 bg-accent/50 rounded-2xl border border-border max-h-80 overflow-y-auto scrollbar-thin">
+      <div className="mt-3 p-4 bg-accent/50 rounded-2xl border border-border max-h-80 overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Scope Filter</p>
           <div className="flex gap-1">

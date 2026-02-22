@@ -183,7 +183,7 @@ const Index = () => {
   });
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [showDeparted, setShowDeparted] = useState(false);
   
   // Modal states
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -250,15 +250,32 @@ const Index = () => {
 
   // Filtered employees based on scope filter
   const allTeamsList = Object.values(departments).flat();
+  // Helper: check if employee has departed
+  const isEmployeeDeparted = useCallback((emp: Employee) => {
+    const today = new Date();
+    // Check departureDate
+    if (emp.departureDate && new Date(emp.departureDate) <= today) return true;
+    // Check departure events
+    const hasDepartureEvent = events.some(ev => 
+      ev.empId === emp.id && ev.type === 'Departure' && new Date(ev.date) <= today
+    );
+    return hasDepartureEvent;
+  }, [events]);
+
   const filteredEmployees = useMemo(() => {
     return employees.filter(e => {
       const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchTeam = scopeFilter.teams.includes(e.team);
       const isDeptLevel = !allTeamsList.includes(e.team);
       const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
-      return matchSearch && (matchTeam || matchDeptLevel);
+      const matchScope = matchTeam || matchDeptLevel;
+      
+      // Filter out departed employees unless toggle is on
+      if (!showDeparted && isEmployeeDeparted(e)) return false;
+      
+      return matchSearch && matchScope;
     });
-  }, [employees, searchQuery, scopeFilter, allTeamsList]);
+  }, [employees, searchQuery, scopeFilter, allTeamsList, showDeparted, isEmployeeDeparted]);
 
   // Stats
   const stats = useMemo(() => ({
@@ -915,6 +932,8 @@ const Index = () => {
         scopeFilter={scopeFilter}
         setScopeFilter={setScopeFilter}
         hierarchy={hierarchy}
+        showDeparted={showDeparted}
+        setShowDeparted={setShowDeparted}
       />
 
       {/* Main Content */}
