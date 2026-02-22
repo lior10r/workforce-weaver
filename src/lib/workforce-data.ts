@@ -214,6 +214,7 @@ export interface Employee {
   managerLevel?: ManagerLevel; // What level of management is this person
   workType?: WorkType; // Full-Time (default) or Part-Time
   partTimePercentage?: number; // 10-90% for part-time employees (default 50)
+  departureDate?: string; // Optional planned departure date
 }
 
 export interface WorkforceEvent {
