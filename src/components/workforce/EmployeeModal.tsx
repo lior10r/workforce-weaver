@@ -53,6 +53,7 @@ export const EmployeeModal = ({
   const [partTimePercentage, setPartTimePercentage] = useState(50);
   const [initialized, setInitialized] = useState(false);
   const [hireDate, setHireDate] = useState<Date | undefined>(undefined);
+  const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
 
   // Get the department structure
   const deptStructure = useMemo(() => 
@@ -164,6 +165,7 @@ export const EmployeeModal = ({
       setSelectedWorkType(editingEmployee.workType || 'Full-Time');
       setPartTimePercentage(editingEmployee.partTimePercentage || 50);
       setHireDate(editingEmployee.joined ? new Date(editingEmployee.joined) : undefined);
+      setDepartureDate(editingEmployee.departureDate ? new Date(editingEmployee.departureDate) : undefined);
 
       // Check if department level manager
       const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
@@ -193,6 +195,7 @@ export const EmployeeModal = ({
       setSelectedWorkType('Full-Time');
       setPartTimePercentage(50);
       setHireDate(undefined);
+      setDepartureDate(undefined);
     } else {
       // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
@@ -203,6 +206,7 @@ export const EmployeeModal = ({
       setSelectedWorkType('Full-Time');
       setPartTimePercentage(50);
       setHireDate(undefined);
+      setDepartureDate(undefined);
 
       // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
@@ -315,6 +319,7 @@ export const EmployeeModal = ({
       managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
       workType: selectedWorkType,
       partTimePercentage: selectedWorkType === 'Part-Time' ? partTimePercentage : undefined,
+      departureDate: departureDate ? format(departureDate, 'yyyy-MM-dd') : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -518,6 +523,46 @@ export const EmployeeModal = ({
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          {/* Departure Date */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
+              Departure Date <span className="font-normal normal-case">(optional)</span>
+            </label>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`flex-1 justify-start text-left font-normal input-field ${!departureDate ? 'text-muted-foreground' : ''}`}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {departureDate ? format(departureDate, 'dd/MM/yyyy') : 'No departure date'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 z-[110]" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={departureDate}
+                    onSelect={setDepartureDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              {departureDate && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setDepartureDate(undefined)}
+                  className="text-destructive hover:text-destructive h-auto px-2"
+                >
+                  <X size={14} />
+                </Button>
+              )}
+            </div>
           </div>
 
           {/* Work Type */}
