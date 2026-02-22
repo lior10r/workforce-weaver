@@ -306,6 +306,15 @@ export const EmployeeModal = ({
       group = selectedGroup || undefined;
     }
     
+    // Auto-calculate departure date if not set (5 years 8 months after hire)
+    let finalDepartureDate = departureDate;
+    if (!finalDepartureDate && hireDate && !editingEmployee) {
+      const defaultDeparture = new Date(hireDate);
+      defaultDeparture.setFullYear(defaultDeparture.getFullYear() + 5);
+      defaultDeparture.setMonth(defaultDeparture.getMonth() + 8);
+      finalDepartureDate = defaultDeparture;
+    }
+    
     const employeeData: Omit<Employee, 'id'> = {
       name: formData.get('name') as string,
       dept: dept,
@@ -319,7 +328,7 @@ export const EmployeeModal = ({
       managerLevel: isDepartmentLevel ? 'department' : isGroupLevel ? 'group' : undefined,
       workType: selectedWorkType,
       partTimePercentage: selectedWorkType === 'Part-Time' ? partTimePercentage : undefined,
-      departureDate: departureDate ? format(departureDate, 'yyyy-MM-dd') : undefined,
+      departureDate: finalDepartureDate ? format(finalDepartureDate, 'yyyy-MM-dd') : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -518,7 +527,16 @@ export const EmployeeModal = ({
                 <Calendar
                   mode="single"
                   selected={hireDate}
-                  onSelect={setHireDate}
+                  onSelect={(date) => {
+                    setHireDate(date);
+                    // Auto-set departure date for new employees (5y8m after hire)
+                    if (date && !editingEmployee && !departureDate) {
+                      const defaultDeparture = new Date(date);
+                      defaultDeparture.setFullYear(defaultDeparture.getFullYear() + 5);
+                      defaultDeparture.setMonth(defaultDeparture.getMonth() + 8);
+                      setDepartureDate(defaultDeparture);
+                    }
+                  }}
                   initialFocus
                 />
               </PopoverContent>
@@ -528,7 +546,7 @@ export const EmployeeModal = ({
           {/* Departure Date */}
           <div>
             <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider">
-              Departure Date <span className="font-normal normal-case">(optional)</span>
+              Departure Date <span className="font-normal normal-case">(default: 5y 8m after hire)</span>
             </label>
             <div className="flex gap-2">
               <Popover>

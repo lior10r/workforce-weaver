@@ -331,9 +331,9 @@ export const Timeline = ({
     const teamSwapEvent = empEvents.find(e => e.type === 'Team Swap');
     const trainingPeriods = getTrainingPeriods(emp.id);
     
-    // Calculate bar positions
+    // Calculate bar positions - use departureDate field as fallback
     let barStartDate = emp.joined;
-    let barEndDate = departureEvent?.date || null;
+    let barEndDate = departureEvent?.date || emp.departureDate || null;
     
     if (isTransfer && transferInfo) {
       // For transfers IN, bar starts at transfer date

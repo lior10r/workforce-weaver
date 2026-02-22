@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, GitBranch, FolderTree, Settings, ClipboardList, FileBarChart } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -218,12 +218,6 @@ export const Sidebar = ({
           label="Movement Planner" 
           active={view === 'planner'} 
           onClick={() => setView('planner')} 
-        />
-        <SidebarItem 
-          icon={GitBranch} 
-          label="Org Chart" 
-          active={view === 'orgchart'} 
-          onClick={() => setView('orgchart')} 
         />
         <SidebarItem 
           icon={BarChart3} 

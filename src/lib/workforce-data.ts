@@ -265,6 +265,7 @@ export interface Scenario {
   description: string;
   createdAt: string;
   updatedAt: string;
+  createdBy?: string; // User ID of the creator
   parentScenarioId?: string; // For duplicated scenarios
   // Snapshot of data when scenario was created
   baseEmployees: Employee[];
@@ -288,13 +289,15 @@ export const createScenario = (
   events: WorkforceEvent[],
   teamStructures: TeamStructure[],
   hierarchy: HierarchyStructure,
-  parentScenarioId?: string
+  parentScenarioId?: string,
+  createdBy?: string
 ): Scenario => ({
   id: `scenario-${Date.now()}`,
   name,
   description,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  createdBy,
   parentScenarioId,
   baseEmployees: JSON.parse(JSON.stringify(employees)),
   baseEvents: JSON.parse(JSON.stringify(events)),
@@ -309,13 +312,15 @@ export const createScenario = (
 
 export const duplicateScenario = (
   scenario: Scenario,
-  newName: string
+  newName: string,
+  createdBy?: string
 ): Scenario => ({
   id: `scenario-${Date.now()}`,
   name: newName,
   description: `Duplicated from "${scenario.name}"`,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
+  createdBy: createdBy || scenario.createdBy,
   parentScenarioId: scenario.id,
   baseEmployees: JSON.parse(JSON.stringify(scenario.baseEmployees)),
   baseEvents: JSON.parse(JSON.stringify(scenario.baseEvents)),
