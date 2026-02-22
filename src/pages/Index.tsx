@@ -770,6 +770,97 @@ const Index = () => {
     setScopeFilter({ departments: allDepts, groups: allGroups, teams: allTeams });
   };
 
+  // === Manager Assignment Handlers ===
+  const handleSetDepartmentManager = useCallback((dept: string, id: number | null) => {
+    const deptObj = hierarchy.find(d => d.name === dept);
+    const oldManagerId = deptObj?.departmentManagerId;
+    
+    setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
+    
+    setMasterEmployees(prev => prev.map(emp => {
+      if (oldManagerId && emp.id === oldManagerId && emp.id !== id) {
+        return { ...emp, managerLevel: undefined };
+      }
+      if (id && emp.id === id) {
+        return { ...emp, dept, team: dept, group: undefined, managerLevel: 'department' as const, managerId: undefined };
+      }
+      return emp;
+    }));
+    
+    const empName = id ? employees.find(e => e.id === id)?.name : null;
+    addAuditEntry('structure_updated', 'structure', `Set ${empName || 'none'} as Department Manager of ${dept}`);
+  }, [hierarchy, employees, setHierarchy, setMasterEmployees, addAuditEntry]);
+
+  const handleSetGroupManager = useCallback((dept: string, groupName: string, id: number | null) => {
+    const deptObj = hierarchy.find(d => d.name === dept);
+    const groupObj = deptObj?.groups.find(g => g.name === groupName);
+    const oldManagerId = groupObj?.groupManagerId;
+    const deptManagerId = deptObj?.departmentManagerId;
+    
+    setHierarchy(prev => prev.map(d => d.name === dept ? { 
+      ...d, groups: d.groups.map(g => g.name === groupName ? { ...g, groupManagerId: id || undefined } : g) 
+    } : d));
+    
+    setMasterEmployees(prev => prev.map(emp => {
+      if (oldManagerId && emp.id === oldManagerId && emp.id !== id) {
+        return { ...emp, managerLevel: undefined };
+      }
+      if (id && emp.id === id) {
+        return { ...emp, dept, group: groupName, team: groupName, managerLevel: 'group' as const, managerId: deptManagerId || undefined };
+      }
+      return emp;
+    }));
+    
+    const empName = id ? employees.find(e => e.id === id)?.name : null;
+    addAuditEntry('structure_updated', 'structure', `Set ${empName || 'none'} as Group Manager of ${groupName}`);
+  }, [hierarchy, employees, setHierarchy, setMasterEmployees, addAuditEntry]);
+
+  const handleSetTeamLeader = useCallback((teamName: string, id: number | null) => {
+    const existingStructure = teamStructures.find(s => s.teamName === teamName);
+    const oldLeaderId = existingStructure?.teamLeader;
+    
+    setMasterTeamStructures(prev => {
+      const existing = prev.find(s => s.teamName === teamName);
+      if (existing) {
+        return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
+      }
+      let teamDept = '';
+      let teamGroup = '';
+      for (const d of hierarchy) {
+        if (d.directTeams?.includes(teamName)) { teamDept = d.name; break; }
+        for (const g of d.groups) {
+          if (g.teams.includes(teamName)) { teamDept = d.name; teamGroup = g.name; break; }
+        }
+        if (teamDept) break;
+      }
+      return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
+    });
+    
+    // Find reporting line
+    let groupManagerId: number | undefined;
+    let deptManagerId: number | undefined;
+    for (const d of hierarchy) {
+      if (d.directTeams?.includes(teamName)) { deptManagerId = d.departmentManagerId; break; }
+      for (const g of d.groups) {
+        if (g.teams.includes(teamName)) { deptManagerId = d.departmentManagerId; groupManagerId = g.groupManagerId; break; }
+      }
+      if (deptManagerId) break;
+    }
+    
+    setMasterEmployees(prev => prev.map(emp => {
+      if (id && emp.id === id) {
+        return { ...emp, role: 'Team Lead', managerLevel: 'team' as const, managerId: groupManagerId || deptManagerId || undefined };
+      }
+      if (oldLeaderId && emp.id === oldLeaderId && emp.id !== id) {
+        return { ...emp, role: 'Senior Dev', managerLevel: undefined };
+      }
+      return emp;
+    }));
+    
+    const empName = id ? employees.find(e => e.id === id)?.name : null;
+    addAuditEntry('structure_updated', 'structure', `Set ${empName || 'none'} as Team Leader of ${teamName}`);
+  }, [hierarchy, teamStructures, employees, setMasterTeamStructures, setMasterEmployees, addAuditEntry]);
+
   const getViewTitle = () => {
     switch (view) {
       case 'dashboard': return 'Operations Center';
@@ -1030,54 +1121,9 @@ const Index = () => {
               onDeleteDepartment={isAdmin ? deleteDepartment : undefined}
               onDeleteGroup={isAdmin ? deleteGroup : undefined}
               onDeleteTeam={isAdmin ? deleteTeam : undefined}
-              onSetDepartmentManager={(dept, id) => {
-                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
-              }}
-              onSetGroupManager={(dept, groupName, id) => {
-                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, groups: d.groups.map(g => g.name === groupName ? { ...g, groupManagerId: id || undefined } : g) } : d));
-              }}
-              onSetTeamLeader={(teamName, id) => {
-                // Get the old team leader to revert their role
-                const existingStructure = teamStructures.find(s => s.teamName === teamName);
-                const oldLeaderId = existingStructure?.teamLeader;
-                
-                // Update team structure
-                setMasterTeamStructures(prev => {
-                  const existing = prev.find(s => s.teamName === teamName);
-                  if (existing) {
-                    return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
-                  }
-                  let teamDept = '';
-                  let teamGroup = '';
-                  for (const dept of hierarchy) {
-                    if (dept.directTeams?.includes(teamName)) {
-                      teamDept = dept.name;
-                      break;
-                    }
-                    for (const group of dept.groups) {
-                      if (group.teams.includes(teamName)) {
-                        teamDept = dept.name;
-                        teamGroup = group.name;
-                        break;
-                      }
-                    }
-                  }
-                  return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
-                });
-                
-                // Update employee roles - set new leader to Team Lead, revert old leader to Senior Dev
-                setMasterEmployees(prev => prev.map(emp => {
-                  if (id && emp.id === id) {
-                    // New team leader - set role to Team Lead
-                    return { ...emp, role: 'Team Lead', managerLevel: 'team' as const };
-                  }
-                  if (oldLeaderId && emp.id === oldLeaderId && emp.id !== id) {
-                    // Old team leader being replaced - revert to Senior Dev
-                    return { ...emp, role: 'Senior Dev', managerLevel: undefined };
-                  }
-                  return emp;
-                }));
-              }}
+              onSetDepartmentManager={handleSetDepartmentManager}
+              onSetGroupManager={handleSetGroupManager}
+              onSetTeamLeader={handleSetTeamLeader}
               onBulkAssignManager={(employeeIds, managerId) => {
                 const scenarioId = ensureWorkingScenario();
                 setScenarios(prev => prev.map(s => {
@@ -1197,55 +1243,9 @@ const Index = () => {
               onDeleteDepartment={deleteDepartment}
               onDeleteGroup={deleteGroup}
               onDeleteTeam={deleteTeam}
-              onSetDepartmentManager={(dept, id) => {
-                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, departmentManagerId: id || undefined } : d));
-              }}
-              onSetGroupManager={(dept, groupName, id) => {
-                setHierarchy(prev => prev.map(d => d.name === dept ? { ...d, groups: d.groups.map(g => g.name === groupName ? { ...g, groupManagerId: id || undefined } : g) } : d));
-              }}
-              onSetTeamLeader={(teamName, id) => {
-                // Get the old team leader to revert their role
-                const existingStructure = teamStructures.find(s => s.teamName === teamName);
-                const oldLeaderId = existingStructure?.teamLeader;
-                
-                // Update team structure
-                setMasterTeamStructures(prev => {
-                  const existing = prev.find(s => s.teamName === teamName);
-                  if (existing) {
-                    return prev.map(s => s.teamName === teamName ? { ...s, teamLeader: id || undefined } : s);
-                  }
-                  // Find the team's parent info from hierarchy
-                  let teamDept = '';
-                  let teamGroup = '';
-                  for (const dept of hierarchy) {
-                    if (dept.directTeams?.includes(teamName)) {
-                      teamDept = dept.name;
-                      break;
-                    }
-                    for (const group of dept.groups) {
-                      if (group.teams.includes(teamName)) {
-                        teamDept = dept.name;
-                        teamGroup = group.name;
-                        break;
-                      }
-                    }
-                  }
-                  return [...prev, { teamName, department: teamDept, group: teamGroup, requiredRoles: {}, teamLeader: id || undefined }];
-                });
-                
-                // Update employee roles - set new leader to Team Lead, revert old leader to Senior Dev
-                setMasterEmployees(prev => prev.map(emp => {
-                  if (id && emp.id === id) {
-                    // New team leader - set role to Team Lead
-                    return { ...emp, role: 'Team Lead', managerLevel: 'team' as const };
-                  }
-                  if (oldLeaderId && emp.id === oldLeaderId && emp.id !== id) {
-                    // Old team leader being replaced - revert to Senior Dev
-                    return { ...emp, role: 'Senior Dev', managerLevel: undefined };
-                  }
-                  return emp;
-                }));
-              }}
+              onSetDepartmentManager={handleSetDepartmentManager}
+              onSetGroupManager={handleSetGroupManager}
+              onSetTeamLeader={handleSetTeamLeader}
             />
           )}
 
