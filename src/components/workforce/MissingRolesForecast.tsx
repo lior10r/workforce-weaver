@@ -40,10 +40,15 @@ export const MissingRolesForecast = ({
         e.team === structure.teamName && !e.isPotential
       );
 
-      // Find departures before or on forecast date
+      // Find departures before or on forecast date (from events)
       const departures = events.filter(e => 
         e.type === 'Departure' && 
         new Date(e.date) <= targetDate
+      );
+
+      // Also find employees with departureDate <= forecast date
+      const employeeDepartures = currentTeamEmployees.filter(e =>
+        e.departureDate && new Date(e.departureDate) <= targetDate
       );
 
       // Find team swaps (transfers out) before or on forecast date
@@ -65,7 +70,8 @@ export const MissingRolesForecast = ({
           transfersOut.filter(t => {
             const emp = employees.find(e => e.id === t.empId);
             return emp?.team === structure.teamName;
-          }).map(t => t.empId)
+          }).map(t => t.empId),
+          employeeDepartures.map(e => e.id)
         )
       );
 
@@ -104,13 +110,21 @@ export const MissingRolesForecast = ({
       });
 
       // Get departing/arriving employee details for this team
-      const departingEmployees = departures
+      const departingFromEvents = departures
         .filter(d => currentTeamEmployees.some(e => e.id === d.empId))
         .map(d => {
           const emp = employees.find(e => e.id === d.empId);
           return emp ? { name: emp.name, role: emp.role, departureDate: d.date } : null;
         })
         .filter((e): e is NonNullable<typeof e> => e !== null);
+
+      // Add employees departing via departureDate (avoid duplicates with event-based departures)
+      const eventDepartedIds = new Set(departures.map(d => d.empId));
+      const departingFromDate = employeeDepartures
+        .filter(e => !eventDepartedIds.has(e.id))
+        .map(e => ({ name: e.name, role: e.role, departureDate: e.departureDate! }));
+
+      const departingEmployees = [...departingFromEvents, ...departingFromDate];
 
       const arrivingEmployees = arrivals.map(e => ({
         name: e.name,
