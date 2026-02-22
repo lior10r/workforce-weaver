@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   GitBranch, 
   GitMerge, 
@@ -71,6 +72,7 @@ export const ScenarioManager = ({
   onMergeToMaster,
   onDiscardChanges
 }: ScenarioManagerProps) => {
+  const { user } = useAuth();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDetailedCompareOpen, setIsDetailedCompareOpen] = useState(false);
@@ -89,6 +91,13 @@ export const ScenarioManager = ({
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
   const compareScenario = scenarios.find(s => s.id === compareScenarioId);
+  
+  // Filter scenarios to only show ones created by current user (or all for admins)
+  const visibleScenarios = scenarios.filter(s => {
+    if (user?.role === 'admin') return true;
+    if (!s.createdBy) return true; // Legacy scenarios without createdBy
+    return s.createdBy === user?.id;
+  });
 
   const handleCreateScenario = () => {
     if (!newScenarioName.trim()) {
@@ -102,7 +111,9 @@ export const ScenarioManager = ({
       masterEmployees,
       masterEvents,
       masterTeamStructures,
-      masterHierarchy || initialHierarchy
+      masterHierarchy || initialHierarchy,
+      undefined,
+      user?.id
     );
 
     onCreateScenario(scenario);
@@ -118,7 +129,7 @@ export const ScenarioManager = ({
       return;
     }
 
-    const newScenario = duplicateScenario(scenarioToDuplicate, duplicateName.trim());
+    const newScenario = duplicateScenario(scenarioToDuplicate, duplicateName.trim(), user?.id);
     onCreateScenario(newScenario);
     setDuplicateName('');
     setScenarioToDuplicate(null);
@@ -283,7 +294,7 @@ export const ScenarioManager = ({
           >
             Master Plan
           </button>
-          {scenarios.map(scenario => (
+          {visibleScenarios.map(scenario => (
             <div key={scenario.id} className="flex items-center gap-1">
               <button
                 onClick={() => onSetActiveScenario(scenario.id)}
@@ -318,7 +329,7 @@ export const ScenarioManager = ({
         <div className="flex-1" />
 
         <div className="flex items-center gap-2">
-          {scenarios.length > 0 && (
+          {visibleScenarios.length > 0 && (
             <button
               onClick={() => setIsCompareOpen(true)}
               className="flex items-center gap-1 px-2 py-1 text-xs bg-accent hover:bg-accent/80 rounded transition-colors"

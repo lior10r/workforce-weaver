@@ -10,7 +10,7 @@ import { Timeline } from '@/components/workforce/Timeline';
 import { Roster } from '@/components/workforce/Roster';
 import { Planner } from '@/components/workforce/Planner';
 import { TeamAnalytics } from '@/components/workforce/TeamAnalytics';
-import { OrgChart } from '@/components/workforce/OrgChart';
+
 import { AuditLog } from '@/components/workforce/AuditLog';
 import { Reports } from '@/components/workforce/Reports';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
@@ -184,7 +184,7 @@ const Index = () => {
   });
   const [view, setView] = useState('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
-  const orgChartRef = useRef<HTMLDivElement>(null);
+  
   
   // Modal states
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
@@ -296,13 +296,15 @@ const Index = () => {
       masterEmployees,
       masterEvents,
       masterTeamStructures,
-      hierarchy
+      hierarchy,
+      undefined,
+      user?.id
     );
     setScenarios(prev => [...prev, workingDraft]);
     setActiveScenarioId(workingDraft.id);
     toast.info('Created "Working Draft" scenario - Master Plan is read-only. Merge when ready.');
     return workingDraft.id;
-  }, [activeScenarioId, masterEmployees, masterEvents, masterTeamStructures, hierarchy, setScenarios]);
+  }, [activeScenarioId, masterEmployees, masterEvents, masterTeamStructures, hierarchy, setScenarios, user]);
 
   const handleDeleteEmployee = (employeeId: number) => {
     const scenarioId = ensureWorkingScenario();
@@ -518,6 +520,22 @@ const Index = () => {
       }
       return [...prev, structure];
     });
+    
+    // Also update active scenario's baseTeamStructures so it's visible immediately
+    if (activeScenarioId) {
+      setScenarios(prev => prev.map(s => {
+        if (s.id !== activeScenarioId) return s;
+        const existing = s.baseTeamStructures.findIndex(ts => ts.teamName === structure.teamName);
+        const updated = [...s.baseTeamStructures];
+        if (existing >= 0) {
+          updated[existing] = structure;
+        } else {
+          updated.push(structure);
+        }
+        return { ...s, baseTeamStructures: updated };
+      }));
+    }
+    
     addAuditEntry('structure_updated', 'structure', `Updated team structure for ${structure.teamName}`);
     setIsTeamStructureModalOpen(false);
     setEditingTeamStructure(null);
@@ -868,7 +886,7 @@ const Index = () => {
       case 'roster': return 'Department Directory';
       case 'planner': return 'Strategic Movements';
       case 'analytics': return 'Team Analytics';
-      case 'orgchart': return 'Organization Chart';
+      
       case 'audit': return 'Activity Log';
       case 'reports': return 'Reports';
       default: return 'Operations Center';
@@ -971,7 +989,7 @@ const Index = () => {
                       onImportDepartments={handleImportDepartments}
                       onImportHierarchy={handleImportHierarchy}
                       onImportAll={handleImportAll}
-                      orgChartRef={view === 'orgchart' ? orgChartRef : undefined}
+                      orgChartRef={undefined}
                     />
                 )}
                 
@@ -1227,24 +1245,6 @@ const Index = () => {
             />
           )}
 
-          {view === 'orgchart' && (
-            <OrgChart
-              ref={orgChartRef}
-              employees={filteredEmployees}
-              teamStructures={teamStructures}
-              hierarchy={hierarchy}
-              onEditEmployee={handleEditEmployee}
-              onAddDepartment={handleAddDepartment}
-              onAddGroup={addGroup}
-              onAddTeam={handleAddTeamFull}
-              onDeleteDepartment={deleteDepartment}
-              onDeleteGroup={deleteGroup}
-              onDeleteTeam={deleteTeam}
-              onSetDepartmentManager={handleSetDepartmentManager}
-              onSetGroupManager={handleSetGroupManager}
-              onSetTeamLeader={handleSetTeamLeader}
-            />
-          )}
 
           {view === 'audit' && isAdmin && (
             <AuditLog auditLog={auditLog} />

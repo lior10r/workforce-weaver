@@ -39,9 +39,13 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
       const dateStr = currentDate.toISOString().split('T')[0];
       
       const activeEmployees = teamEmployees.filter(emp => {
+        // Skip department/group managers (their team is set to dept/group name)
+        if (emp.managerLevel === 'department' || emp.managerLevel === 'group') return false;
+        
         const joinDate = new Date(emp.joined);
         const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
-        const departureDate = departureEvent ? new Date(departureEvent.date) : new Date('2099-12-31');
+        const departureDateStr = departureEvent?.date || emp.departureDate;
+        const departureDate = departureDateStr ? new Date(departureDateStr) : new Date('2099-12-31');
         
         return joinDate <= currentDate && currentDate <= departureDate;
       });
@@ -74,10 +78,11 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
       const structure = teamStructures.find(ts => ts.teamName === teamName);
       const targetSize = structure?.targetSize || 0;
       
-      const teamEmployees = employees.filter(e => e.team === teamName);
+      const teamEmployees = employees.filter(e => e.team === teamName && e.managerLevel !== 'department' && e.managerLevel !== 'group');
       const activeEmployees = teamEmployees.filter(emp => {
         const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
-        const departureDate = departureEvent ? new Date(departureEvent.date) : new Date('2099-12-31');
+        const departureDateStr = departureEvent?.date || emp.departureDate;
+        const departureDate = departureDateStr ? new Date(departureDateStr) : new Date('2099-12-31');
         return departureDate >= today;
       });
 
@@ -115,11 +120,12 @@ export const TeamAnalytics = ({ employees, events, selectedTeams, departments, t
   // Calculate current overall stats
   const currentStats = useMemo(() => {
     const today = new Date();
-    const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team));
+    const teamEmployees = employees.filter(e => teamsToInclude.includes(e.team) && e.managerLevel !== 'department' && e.managerLevel !== 'group');
     
     const activeEmployees = teamEmployees.filter(emp => {
       const departureEvent = events.find(e => e.empId === emp.id && e.type === 'Departure');
-      const departureDate = departureEvent ? new Date(departureEvent.date) : new Date('2099-12-31');
+      const departureDateStr = departureEvent?.date || emp.departureDate;
+      const departureDate = departureDateStr ? new Date(departureDateStr) : new Date('2099-12-31');
       return departureDate >= today;
     });
 
