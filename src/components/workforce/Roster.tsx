@@ -275,7 +275,34 @@ export const Roster = ({
     employeeIds.forEach(id => onMoveEmployeeToTeam(id, teamName, dept, group));
   };
 
-  // Auto-detect manager helper: find employees with matching managerLevel, pick most experienced
+  // Check if an employee is currently active (hired, not departed, not in training)
+  const isCurrentlyActive = (emp: Employee) => {
+    const today = new Date();
+    const joinDate = new Date(emp.joined);
+    if (joinDate > today) return false; // Not yet started
+    
+    // Check departure date
+    if (emp.departureDate && new Date(emp.departureDate) <= today) return false;
+    
+    // Check departure events
+    const hasDeparted = events.some(ev => 
+      ev.empId === emp.id && ev.type === 'Departure' && new Date(ev.date) <= today
+    );
+    if (hasDeparted) return false;
+    
+    return true;
+  };
+
+  // Check if employee is in training period (Junior Dev, first 6 months)
+  const isInTrainingPeriod = (emp: Employee) => {
+    const today = new Date();
+    const joinDate = new Date(emp.joined);
+    const monthsOfExperience = (today.getTime() - joinDate.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
+    return monthsOfExperience < 6 && emp.role === 'Junior Dev';
+  };
+
+  // Auto-detect manager helper: prioritize currently active non-training manager,
+  // fall back to most experienced if multiple are simultaneously active
   const autoDetectManager = (level: 'department' | 'group' | 'team', filters: { dept?: string; group?: string; team?: string }) => {
     let candidates = employees.filter(e => !e.isPotential && e.managerLevel === level);
     if (filters.dept) candidates = candidates.filter(e => e.dept === filters.dept);
@@ -283,25 +310,56 @@ export const Roster = ({
     if (filters.team) candidates = candidates.filter(e => e.team === filters.team);
     
     if (candidates.length === 0) return { manager: null, duplicates: false };
-    
-    // Sort by join date ascending (most experienced first)
-    candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+
+    // Separate into active and non-active
+    const activeCandidates = candidates.filter(c => isCurrentlyActive(c));
+    const activeNonTraining = activeCandidates.filter(c => !isInTrainingPeriod(c));
+
+    let chosen: Employee;
+    if (activeNonTraining.length >= 1) {
+      // Prefer active non-training managers; if multiple, pick most experienced
+      activeNonTraining.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = activeNonTraining[0];
+    } else if (activeCandidates.length >= 1) {
+      // All active ones are in training, pick most experienced
+      activeCandidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = activeCandidates[0];
+    } else {
+      // No active candidates, pick the next upcoming one
+      candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = candidates[0];
+    }
     
     return { 
-      manager: candidates[0], 
-      duplicates: candidates.length > 1,
-      count: candidates.length 
+      manager: chosen, 
+      duplicates: activeCandidates.length > 1,
+      count: activeCandidates.length || candidates.length
     };
   };
 
-  // Auto-detect team leader from employees with role 'Team Lead' in that team
+  // Auto-detect team leader with same active-first logic
   const autoDetectTeamLeader = (teamName: string) => {
     const candidates = employees.filter(e => 
       !e.isPotential && e.team === teamName && (e.managerLevel === 'team' || e.role === 'Team Lead')
     );
     if (candidates.length === 0) return { leader: null, duplicates: false };
-    candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
-    return { leader: candidates[0], duplicates: candidates.length > 1, count: candidates.length };
+
+    const activeCandidates = candidates.filter(c => isCurrentlyActive(c));
+    const activeNonTraining = activeCandidates.filter(c => !isInTrainingPeriod(c));
+
+    let chosen: Employee;
+    if (activeNonTraining.length >= 1) {
+      activeNonTraining.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = activeNonTraining[0];
+    } else if (activeCandidates.length >= 1) {
+      activeCandidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = activeCandidates[0];
+    } else {
+      candidates.sort((a, b) => new Date(a.joined).getTime() - new Date(b.joined).getTime());
+      chosen = candidates[0];
+    }
+
+    return { leader: chosen, duplicates: activeCandidates.length > 1, count: activeCandidates.length || candidates.length };
   };
 
   // Warning badge for duplicate managers
