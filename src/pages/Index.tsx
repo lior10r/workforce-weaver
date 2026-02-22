@@ -1266,7 +1266,7 @@ const Index = () => {
 
           {view === 'reports' && (
             <Reports
-              employees={employees}
+              employees={filteredEmployees}
               events={events}
               teamStructures={teamStructures}
               hierarchy={hierarchy}
