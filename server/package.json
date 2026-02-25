@@ -2,10 +2,10 @@
   "name": "workforce-planner-api",
   "version": "1.0.0",
   "description": "Backend API for Workforce Planner with hierarchical permissions",
-  "main": "index.js",
+  "main": "index-sqlite.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+    "start": "node index-sqlite.js",
+    "dev": "node index-sqlite.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
