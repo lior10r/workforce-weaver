@@ -168,19 +168,22 @@ export const EmployeeModal = ({
       setDepartureDate(editingEmployee.departureDate ? new Date(editingEmployee.departureDate) : undefined);
 
       // Check if department level manager
-      const isDeptMgr = hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
+      const isDeptMgr = editingEmployee.managerLevel === 'department' ||
+        hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
       setIsDepartmentLevel(isDeptMgr);
 
       // Check if group level manager
       if (resolvedGroup) {
         setSelectedGroup(resolvedGroup);
-        const isGroupMgr = hierarchy.some(d =>
-          d.groups.some(g => g.name === resolvedGroup && g.groupManagerId === editingEmployee.id)
-        );
+        const isGroupMgr = editingEmployee.managerLevel === 'group' ||
+          hierarchy.some(d =>
+            d.groups.some(g => g.name === resolvedGroup && g.groupManagerId === editingEmployee.id)
+          );
         setIsGroupLevel(isGroupMgr);
       } else {
         setSelectedGroup(null);
-        setIsGroupLevel(false);
+        // Still check managerLevel even without a resolved group
+        setIsGroupLevel(editingEmployee.managerLevel === 'group');
       }
 
       // Set team - directly from employee
