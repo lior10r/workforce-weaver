@@ -549,6 +549,25 @@ export const Roster = ({
             Add Department
           </Button>
         )}
+        {/* Add Department Dialog (must be inside early return) */}
+        <Dialog open={showAddDeptDialog} onOpenChange={setShowAddDeptDialog}>
+          <DialogContent className="bg-background border border-border">
+            <DialogHeader>
+              <DialogTitle>Add Department</DialogTitle>
+              <DialogDescription>Create a new department in your organization.</DialogDescription>
+            </DialogHeader>
+            <Input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Department name"
+              onKeyDown={(e) => e.key === 'Enter' && handleAddDept()}
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => { setNewName(''); setShowAddDeptDialog(false); }}>Cancel</Button>
+              <Button onClick={handleAddDept}>Add Department</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
