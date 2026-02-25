@@ -151,9 +151,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     login,
     logout,
     checkAuth,
-    isAdmin: state.user?.role === 'admin',
-    isManager: state.user?.role === 'admin' || state.user?.role === 'manager',
-    canManageUsers: state.user?.role === 'admin',
+    isAdmin: state.user?.role === 'admin' || !state.isBackendAvailable,
+    isManager: state.user?.role === 'admin' || state.user?.role === 'manager' || !state.isBackendAvailable,
+    canManageUsers: state.user?.role === 'admin' || !state.isBackendAvailable,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
