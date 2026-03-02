@@ -1,73 +1,141 @@
-# Welcome to your Lovable project
+# Workforce Planner
 
-## Project info
+A full-stack workforce planning application with hierarchical permissions, built with React + Express + SQLite.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## Tech Stack
 
-## How can I edit this code?
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn/ui
+- **Backend:** Node.js, Express
+- **Database:** SQLite (via better-sqlite3)
+- **Auth:** JWT with httpOnly cookies
 
-There are several ways of editing your application.
+## Quick Start (Local Development)
 
-**Use Lovable**
+### 1. Install frontend dependencies
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+```bash
+npm install
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+### 2. Install and run the backend server
 
-**Use your preferred IDE**
+The server uses `better-sqlite3` which is **not** included in the root `package.json`. You must install it separately in the `server/` directory:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+```bash
+cd server
+npm install
+npm install better-sqlite3
+npm start
+```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+The API server will start on `http://localhost:3001`.
 
-Follow these steps:
+### 3. Start the frontend dev server
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+In a separate terminal, from the project root:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The frontend will start on `http://localhost:5173` and proxy API requests to the backend.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Default Admin Account
 
-**Use GitHub Codespaces**
+- **Username:** `admin`
+- **Password:** `admin123`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+⚠️ Change this password immediately in production!
 
-## What technologies are used for this project?
+---
 
-This project is built with:
+## Running with Docker
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Build the image
 
-## How can I deploy this project?
+```bash
+docker build -t workforce-planner .
+```
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+### Run the container
 
-## Can I connect a custom domain to my Lovable project?
+```bash
+docker run -d \
+  --name workforce-planner \
+  -p 3001:3001 \
+  -v workforce-data:/app/server/data \
+  workforce-planner
+```
 
-Yes, you can!
+The app (frontend + API) will be available at `http://localhost:3001`.
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Environment variables
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3001` | Server port |
+| `JWT_SECRET` | (built-in) | JWT signing secret — **set this in production** |
+| `NODE_ENV` | `production` | Environment mode |
+| `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed CORS origins (comma-separated) |
+
+Example with custom settings:
+
+```bash
+docker run -d \
+  --name workforce-planner \
+  -p 8080:8080 \
+  -e PORT=8080 \
+  -e JWT_SECRET=my-super-secret-key \
+  -v workforce-data:/app/server/data \
+  workforce-planner
+```
+
+### Persistent data
+
+The SQLite database is stored at `/app/server/data/workforce.db` inside the container. Mount a volume to `/app/server/data` to persist data across container restarts:
+
+```bash
+# Named volume (recommended)
+-v workforce-data:/app/server/data
+
+# Or bind mount to a host directory
+-v /path/on/host:/app/server/data
+```
+
+### Docker Compose
+
+Create a `docker-compose.yml`:
+
+```yaml
+version: "3.8"
+services:
+  workforce-planner:
+    build: .
+    ports:
+      - "3001:3001"
+    environment:
+      - JWT_SECRET=change-me-in-production
+    volumes:
+      - workforce-data:/app/server/data
+    restart: unless-stopped
+
+volumes:
+  workforce-data:
+```
+
+Then run:
+
+```bash
+docker compose up -d
+```
+
+---
+
+## Data & Reset
+
+- Initial seed data lives in `server/data/initial-data.js`
+- To reset the database, stop the server and delete `server/data/workforce.db`, then restart
+
+## API Documentation
+
+See [server/README.md](server/README.md) for full API endpoint documentation and permission details.
