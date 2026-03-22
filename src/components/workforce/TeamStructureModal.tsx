@@ -53,7 +53,7 @@ export const TeamStructureModal = ({
     if (teamStructure) {
       setTeamLeader(teamStructure.teamLeader);
       setRequiredRoles(teamStructure.requiredRoles);
-      setRequiredSkills(teamStructure.requiredSkills || []);
+      setRequiredSkills(teamStructure.requiredSkills || {});
     } else {
       setTeamLeader(undefined);
       setRequiredRoles({});
