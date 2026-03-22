@@ -47,16 +47,11 @@ export const Sidebar = ({
   hierarchy,
   showDeparted,
   setShowDeparted,
-  labels = [],
-  onCreateLabel,
-  onDeleteLabel
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
-  const [showLabels, setShowLabels] = useState(false);
-  const [newLabelName, setNewLabelName] = useState('');
 
   const toggleDeptExpanded = (dept: string) => {
     setExpandedDepts(prev => 
