@@ -26,7 +26,10 @@ export const TeamStructureModal = ({
   department,
   group = '',
   employees,
-  labels = []
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel,
+  isAdmin = false,
 }: TeamStructureModalProps) => {
   const [teamLeader, setTeamLeader] = useState<number | undefined>(teamStructure?.teamLeader);
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
