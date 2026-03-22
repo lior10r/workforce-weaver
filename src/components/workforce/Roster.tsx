@@ -42,6 +42,10 @@ interface RosterProps {
   onBulkAssignManager?: (employeeIds: number[], managerId: number | null) => void;
   onMoveEmployeeToTeam?: (employeeId: number, teamName: string, dept: string, group?: string) => void;
   onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
+  labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  onDeleteLabel?: (id: number) => void;
+  isAdmin?: boolean;
 }
 
 const getDiffStyles = (status?: DiffStatus) => {
