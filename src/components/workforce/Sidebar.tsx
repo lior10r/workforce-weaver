@@ -234,66 +234,8 @@ export const Sidebar = ({
         )}
       </nav>
 
-      {/* Labels Management */}
-      <div className="mt-auto p-3 bg-accent/50 rounded-xl border border-border mb-3">
-        <button
-          onClick={() => setShowLabels(!showLabels)}
-          className="flex items-center gap-2 w-full text-left"
-        >
-          {showLabels ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          <Tag size={14} className="text-primary" />
-          <span className="text-xs font-medium text-foreground">Skills Labels</span>
-          <span className="text-[9px] text-muted-foreground ml-auto">{labels.length}</span>
-        </button>
-        
-        {showLabels && (
-          <div className="mt-3 space-y-2 animate-fade-in">
-            {/* Label list */}
-            <div className="max-h-32 overflow-y-auto space-y-1">
-              {labels.map(label => (
-                <div key={label.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/30 group">
-                  <span className="text-xs text-foreground">{label.name}</span>
-                  {isAdmin && onDeleteLabel && (
-                    <button
-                      onClick={() => onDeleteLabel(label.id)}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive transition-all"
-                    >
-                      <Trash2 size={10} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              {labels.length === 0 && (
-                <p className="text-[10px] text-muted-foreground italic px-2">No labels yet</p>
-              )}
-            </div>
-            
-            {/* Add new label */}
-            {onCreateLabel && (
-              <div className="flex gap-1.5">
-                <Input
-                  value={newLabelName}
-                  onChange={(e) => setNewLabelName(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
-                  placeholder="New label..."
-                  className="h-7 text-xs"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCreateLabel}
-                  disabled={!newLabelName.trim()}
-                  className="h-7 px-2"
-                >
-                  <Plus size={12} />
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Show Departed Toggle */}
+      <div className="mt-auto" />
       <div className="p-3 bg-accent/50 rounded-xl border border-border">
         <button
           onClick={() => setShowDeparted(!showDeparted)}
