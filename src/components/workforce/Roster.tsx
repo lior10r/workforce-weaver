@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap, Tag } from 'lucide-react';
-import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight } from '@/lib/workforce-data';
+import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight, Label } from '@/lib/workforce-data';
 
 // Helper: check missing skills for a team
 const getMissingSkills = (teamMembers: Employee[], structure?: TeamStructure): string[] => {
@@ -42,6 +42,10 @@ interface RosterProps {
   onBulkAssignManager?: (employeeIds: number[], managerId: number | null) => void;
   onMoveEmployeeToTeam?: (employeeId: number, teamName: string, dept: string, group?: string) => void;
   onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
+  labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  onDeleteLabel?: (id: number) => void;
+  isAdmin?: boolean;
 }
 
 const getDiffStyles = (status?: DiffStatus) => {
@@ -155,7 +159,11 @@ export const Roster = ({
   onDeleteTeam,
   onBulkAssignManager,
   onMoveEmployeeToTeam,
-  onHireForTeam
+  onHireForTeam,
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel,
+  isAdmin = false,
 }: RosterProps) => {
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -169,6 +177,8 @@ export const Roster = ({
   const [showAddTeamDialog, setShowAddTeamDialog] = useState<{ dept: string; group: string | null } | null>(null);
   const [newName, setNewName] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string | null; team?: string } | null>(null);
+  const [showSkillsDialog, setShowSkillsDialog] = useState(false);
+  const [newSkillName, setNewSkillName] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -580,6 +590,7 @@ export const Roster = ({
   }
 
   return (
+    <>
     <DndContext 
       sensors={sensors}
       collisionDetection={closestCenter}
@@ -602,7 +613,22 @@ export const Roster = ({
           />
         )}
 
-        {/* Drag hint */}
+        {/* Skills Management Button */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSkillsDialog(true)}
+            className="h-8 text-xs"
+          >
+            <Tag size={14} className="mr-1.5" />
+            Manage Skills
+            {labels.length > 0 && (
+              <span className="ml-1.5 bg-primary/10 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-semibold">{labels.length}</span>
+            )}
+          </Button>
+        </div>
+
         {onMoveEmployeeToTeam && (
           <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 bg-accent/30 rounded-lg">
             <GripVertical size={14} />
@@ -1205,5 +1231,80 @@ export const Roster = ({
         )}
       </DragOverlay>
     </DndContext>
+
+    {/* Skills Management Dialog */}
+    <Dialog open={showSkillsDialog} onOpenChange={setShowSkillsDialog}>
+      <DialogContent className="bg-background border border-border max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag size={18} className="text-primary" />
+            Manage Skills
+          </DialogTitle>
+          <DialogDescription>
+            View and manage all available skill labels. Skills can be assigned to employees and required for teams.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-3">
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {labels.map(label => (
+              <div key={label.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent/30 group border border-transparent hover:border-border transition-colors">
+                <div className="flex items-center gap-2">
+                  <Tag size={12} className="text-primary" />
+                  <span className="text-sm font-medium text-foreground">{label.name}</span>
+                </div>
+                {isAdmin && onDeleteLabel && (
+                  <button
+                    onClick={() => onDeleteLabel(label.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all rounded"
+                    title="Delete skill (admin only)"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {labels.length === 0 && (
+              <p className="text-sm text-muted-foreground italic text-center py-4">No skills created yet</p>
+            )}
+          </div>
+
+          {onCreateLabel && (
+            <div className="flex gap-2 pt-2 border-t border-border">
+              <Input
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && newSkillName.trim()) {
+                    e.preventDefault();
+                    try {
+                      await onCreateLabel(newSkillName.trim());
+                      setNewSkillName('');
+                    } catch {}
+                  }
+                }}
+                placeholder="New skill name..."
+                className="flex-1"
+              />
+              <Button
+                onClick={async () => {
+                  if (!newSkillName.trim()) return;
+                  try {
+                    await onCreateLabel(newSkillName.trim());
+                    setNewSkillName('');
+                  } catch {}
+                }}
+                disabled={!newSkillName.trim()}
+                size="sm"
+              >
+                <Plus size={14} className="mr-1" />
+                Add
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 };

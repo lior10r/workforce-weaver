@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Users, UserCog, Tag } from 'lucide-react';
 import { TeamStructure, Employee, ROLES, Label } from '@/lib/workforce-data';
+import { Input } from '@/components/ui/input';
 
 interface TeamStructureModalProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface TeamStructureModalProps {
   group?: string;
   employees: Employee[];
   labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  onDeleteLabel?: (id: number) => void;
+  isAdmin?: boolean;
 }
 
 export const TeamStructureModal = ({
@@ -23,7 +27,10 @@ export const TeamStructureModal = ({
   department,
   group = '',
   employees,
-  labels = []
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel,
+  isAdmin = false,
 }: TeamStructureModalProps) => {
   const [teamLeader, setTeamLeader] = useState<number | undefined>(teamStructure?.teamLeader);
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
@@ -32,6 +39,7 @@ export const TeamStructureModal = ({
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     teamStructure?.requiredSkills || []
   );
+  const [newSkillName, setNewSkillName] = useState('');
 
   // Team members for leader selection
   const teamMembers = employees.filter(e => e.team === teamName && !e.isPotential);
@@ -235,7 +243,7 @@ export const TeamStructureModal = ({
 
             {/* Add Skill from existing labels */}
             {availableSkills.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap mb-3">
                 {availableSkills.map(label => (
                   <button
                     key={label.id}
@@ -249,9 +257,46 @@ export const TeamStructureModal = ({
               </div>
             )}
 
-            {labels.length === 0 && (
+            {/* Create new skill inline */}
+            {onCreateLabel && (
+              <div className="flex gap-2">
+                <Input
+                  value={newSkillName}
+                  onChange={(e) => setNewSkillName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && newSkillName.trim()) {
+                      e.preventDefault();
+                      try {
+                        await onCreateLabel(newSkillName.trim());
+                        handleAddSkill(newSkillName.trim());
+                        setNewSkillName('');
+                      } catch {}
+                    }
+                  }}
+                  placeholder="Create new skill..."
+                  className="h-8 text-xs flex-1"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newSkillName.trim()) return;
+                    try {
+                      await onCreateLabel(newSkillName.trim());
+                      handleAddSkill(newSkillName.trim());
+                      setNewSkillName('');
+                    } catch {}
+                  }}
+                  disabled={!newSkillName.trim()}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Plus size={12} />
+                  Add
+                </button>
+              </div>
+            )}
+
+            {labels.length === 0 && !onCreateLabel && (
               <p className="text-xs text-muted-foreground italic">
-                No labels created yet. Add labels from the sidebar to define required skills.
+                No skills created yet.
               </p>
             )}
           </div>

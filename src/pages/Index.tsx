@@ -938,9 +938,6 @@ const Index = () => {
         hierarchy={hierarchy}
         showDeparted={showDeparted}
         setShowDeparted={setShowDeparted}
-        labels={labels}
-        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
-        onDeleteLabel={isAdmin ? deleteLabel : undefined}
       />
 
       {/* Main Content */}
@@ -1212,6 +1209,10 @@ const Index = () => {
                 setEditingEmployee(null);
                 setIsEmployeeModalOpen(true);
               } : undefined}
+              labels={labels}
+              onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+              onDeleteLabel={isAdmin ? deleteLabel : undefined}
+              isAdmin={isAdmin}
             />
           )}
 
@@ -1316,6 +1317,9 @@ const Index = () => {
         department={editingTeamStructure?.department || ''}
         employees={employees}
         labels={labels}
+        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+        onDeleteLabel={isAdmin ? deleteLabel : undefined}
+        isAdmin={isAdmin}
       />
     </div>
   );
