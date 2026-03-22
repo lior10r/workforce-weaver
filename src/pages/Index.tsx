@@ -938,9 +938,6 @@ const Index = () => {
         hierarchy={hierarchy}
         showDeparted={showDeparted}
         setShowDeparted={setShowDeparted}
-        labels={labels}
-        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
-        onDeleteLabel={isAdmin ? deleteLabel : undefined}
       />
 
       {/* Main Content */}
