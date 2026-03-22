@@ -70,7 +70,21 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     data TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS labels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    color TEXT,
+    created_by TEXT
+  );
 `);
+
+// Add skills column to employees if not exists
+try {
+  db.exec(`ALTER TABLE employees ADD COLUMN skills TEXT DEFAULT '[]'`);
+} catch (e) {
+  // Column already exists
+}
 
 // ============== USER OPERATIONS ==============
 
@@ -143,9 +157,9 @@ const getEmployeeById = (id) => {
 const createEmployee = (emp) => {
   const id = emp.id || Date.now();
   db.prepare(`
-    INSERT OR REPLACE INTO employees (id, name, dept, "group", team, role, status, joined, manager_id, manager_level, is_potential, departure_date)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, emp.name, emp.dept, emp.group || null, emp.team, emp.role, emp.status || 'Active', emp.joined, emp.managerId || null, emp.managerLevel || null, emp.isPotential ? 1 : 0, emp.departureDate || null);
+    INSERT OR REPLACE INTO employees (id, name, dept, "group", team, role, status, joined, manager_id, manager_level, is_potential, departure_date, skills)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, emp.name, emp.dept, emp.group || null, emp.team, emp.role, emp.status || 'Active', emp.joined, emp.managerId || null, emp.managerLevel || null, emp.isPotential ? 1 : 0, emp.departureDate || null, JSON.stringify(emp.skills || []));
   return { ...emp, id };
 };
 
@@ -154,9 +168,9 @@ const updateEmployee = (id, updates) => {
   if (!existing) return null;
   const merged = { ...existing, ...updates, id };
   db.prepare(`
-    UPDATE employees SET name=?, dept=?, "group"=?, team=?, role=?, status=?, joined=?, manager_id=?, manager_level=?, is_potential=?, departure_date=?
+    UPDATE employees SET name=?, dept=?, "group"=?, team=?, role=?, status=?, joined=?, manager_id=?, manager_level=?, is_potential=?, departure_date=?, skills=?
     WHERE id=?
-  `).run(merged.name, merged.dept, merged.group || null, merged.team, merged.role, merged.status, merged.joined, merged.managerId || null, merged.managerLevel || null, merged.isPotential ? 1 : 0, merged.departureDate || null, id);
+  `).run(merged.name, merged.dept, merged.group || null, merged.team, merged.role, merged.status, merged.joined, merged.managerId || null, merged.managerLevel || null, merged.isPotential ? 1 : 0, merged.departureDate || null, JSON.stringify(merged.skills || []), id);
   return getEmployeeById(id);
 };
 
@@ -168,11 +182,11 @@ const bulkReplaceEmployees = (employees) => {
   const transaction = db.transaction((emps) => {
     db.prepare('DELETE FROM employees').run();
     const stmt = db.prepare(`
-      INSERT INTO employees (id, name, dept, "group", team, role, status, joined, manager_id, manager_level, is_potential, departure_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO employees (id, name, dept, "group", team, role, status, joined, manager_id, manager_level, is_potential, departure_date, skills)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const emp of emps) {
-      stmt.run(emp.id, emp.name, emp.dept, emp.group || null, emp.team, emp.role, emp.status || 'Active', emp.joined, emp.managerId || null, emp.managerLevel || null, emp.isPotential ? 1 : 0, emp.departureDate || null);
+      stmt.run(emp.id, emp.name, emp.dept, emp.group || null, emp.team, emp.role, emp.status || 'Active', emp.joined, emp.managerId || null, emp.managerLevel || null, emp.isPotential ? 1 : 0, emp.departureDate || null, JSON.stringify(emp.skills || []));
     }
   });
   transaction(employees);
@@ -193,6 +207,10 @@ const rowToEmployee = (row) => {
   if (row.manager_level) emp.managerLevel = row.manager_level;
   if (row.is_potential) emp.isPotential = true;
   if (row.departure_date) emp.departureDate = row.departure_date;
+  try {
+    const skills = JSON.parse(row.skills || '[]');
+    if (skills.length > 0) emp.skills = skills;
+  } catch (e) {}
   return emp;
 };
 
@@ -282,6 +300,23 @@ const setTeamStructures = (data) => setJsonData('team_structures', data);
 const getScenarios = () => getJsonData('scenarios') || [];
 const setScenarios = (data) => setJsonData('scenarios', data);
 
+// ============== LABEL OPERATIONS ==============
+
+const getLabels = () => {
+  return db.prepare('SELECT * FROM labels ORDER BY name').all();
+};
+
+const createLabel = (label) => {
+  const result = db.prepare(`
+    INSERT INTO labels (name, color, created_by) VALUES (?, ?, ?)
+  `).run(label.name, label.color || null, label.createdBy || null);
+  return { id: result.lastInsertRowid, name: label.name, color: label.color || null, created_by: label.createdBy || null };
+};
+
+const deleteLabel = (id) => {
+  return db.prepare('DELETE FROM labels WHERE id = ?').run(id);
+};
+
 // ============== INITIALIZATION ==============
 
 const isInitialized = () => {
@@ -301,6 +336,8 @@ module.exports = {
   getHierarchy, setHierarchy,
   getTeamStructures, setTeamStructures,
   getScenarios, setScenarios,
+  // Labels
+  getLabels, createLabel, deleteLabel,
   // Init
   isInitialized,
 };
