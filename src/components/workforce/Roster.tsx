@@ -1230,5 +1230,81 @@ export const Roster = ({
         )}
       </DragOverlay>
     </DndContext>
+
+    {/* Skills Management Dialog */}
+    <Dialog open={showSkillsDialog} onOpenChange={setShowSkillsDialog}>
+      <DialogContent className="bg-background border border-border max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Tag size={18} className="text-primary" />
+            Manage Skills
+          </DialogTitle>
+          <DialogDescription>
+            View and manage all available skill labels. Skills can be assigned to employees and required for teams.
+          </DialogDescription>
+        </DialogHeader>
+        
+        <div className="space-y-3">
+          {/* Existing labels */}
+          <div className="max-h-60 overflow-y-auto space-y-1">
+            {labels.map(label => (
+              <div key={label.id} className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-accent/30 group border border-transparent hover:border-border transition-colors">
+                <div className="flex items-center gap-2">
+                  <Tag size={12} className="text-primary" />
+                  <span className="text-sm font-medium text-foreground">{label.name}</span>
+                </div>
+                {isAdmin && onDeleteLabel && (
+                  <button
+                    onClick={() => onDeleteLabel(label.id)}
+                    className="opacity-0 group-hover:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-all rounded"
+                    title="Delete skill (admin only)"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+            {labels.length === 0 && (
+              <p className="text-sm text-muted-foreground italic text-center py-4">No skills created yet</p>
+            )}
+          </div>
+
+          {/* Add new skill */}
+          {onCreateLabel && (
+            <div className="flex gap-2 pt-2 border-t border-border">
+              <Input
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key === 'Enter' && newSkillName.trim()) {
+                    e.preventDefault();
+                    try {
+                      await onCreateLabel(newSkillName.trim());
+                      setNewSkillName('');
+                    } catch {}
+                  }
+                }}
+                placeholder="New skill name..."
+                className="flex-1"
+              />
+              <Button
+                onClick={async () => {
+                  if (!newSkillName.trim()) return;
+                  try {
+                    await onCreateLabel(newSkillName.trim());
+                    setNewSkillName('');
+                  } catch {}
+                }}
+                disabled={!newSkillName.trim()}
+                size="sm"
+              >
+                <Plus size={14} className="mr-1" />
+                Add
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 };
