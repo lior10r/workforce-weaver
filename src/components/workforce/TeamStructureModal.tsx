@@ -12,6 +12,9 @@ interface TeamStructureModalProps {
   group?: string;
   employees: Employee[];
   labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  onDeleteLabel?: (id: number) => void;
+  isAdmin?: boolean;
 }
 
 export const TeamStructureModal = ({
