@@ -1,4 +1,4 @@
-import { X, Building2, Trash2, AlertTriangle, Clock, CalendarIcon } from 'lucide-react';
+import { X, Building2, Trash2, AlertTriangle, Clock, CalendarIcon, Tag, Plus } from 'lucide-react';
 import {
   Employee,
   DEPARTMENT_NAMES,
@@ -8,6 +8,7 @@ import {
   WorkType,
   HierarchyStructure,
   TeamStructure,
+  Label,
   getAllDeptTeams,
   getTeamParent,
   formatDate,
@@ -29,6 +30,8 @@ interface EmployeeModalProps {
   employees: Employee[];
   teamStructures: TeamStructure[];
   prefill?: { dept: string; team: string; group?: string | null };
+  labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
 }
 
 export const EmployeeModal = ({
@@ -42,6 +45,8 @@ export const EmployeeModal = ({
   employees,
   teamStructures,
   prefill,
+  labels = [],
+  onCreateLabel,
 }: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDept, setSelectedDept] = useState(DEPARTMENT_NAMES[0]);
@@ -54,6 +59,8 @@ export const EmployeeModal = ({
   const [initialized, setInitialized] = useState(false);
   const [hireDate, setHireDate] = useState<Date | undefined>(undefined);
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [newSkillInput, setNewSkillInput] = useState('');
 
   // Get the department structure
   const deptStructure = useMemo(() => 
@@ -92,43 +99,24 @@ export const EmployeeModal = ({
   }, [editingEmployee, selectedTeam, teamStructures]);
 
   // Auto-calculate manager based on hierarchy
-  // Reporting chain: Team Member → Team Leader → Group Manager → Department Manager
   const autoManager = useMemo(() => {
-    if (isDepartmentLevel) {
-      // Department manager reports to no one
-      return undefined;
-    }
-    
-    if (isGroupLevel && selectedGroup) {
-      // Group manager reports to department manager
-      return deptStructure?.departmentManagerId;
-    }
-    
-    // Check if this employee IS the team leader - they report to group/dept manager
+    if (isDepartmentLevel) return undefined;
+    if (isGroupLevel && selectedGroup) return deptStructure?.departmentManagerId;
     if (isTeamLeader && selectedTeam) {
       const group = deptStructure?.groups.find(g => g.name === selectedGroup);
       return group?.groupManagerId || deptStructure?.departmentManagerId;
     }
-    
-    // Regular team member - check if there's a team leader first
     if (selectedTeam) {
       const teamStructure = teamStructures.find(ts => ts.teamName === selectedTeam);
-      
-      // If team has a leader and it's not the current employee, report to leader
       if (teamStructure?.teamLeader && teamStructure.teamLeader !== editingEmployee?.id) {
         return teamStructure.teamLeader;
       }
-      
-      // No team leader, fall back to group manager or department manager
       if (selectedGroup) {
         const group = deptStructure?.groups.find(g => g.name === selectedGroup);
         return group?.groupManagerId || deptStructure?.departmentManagerId;
       }
-      
-      // Direct team under department
       return deptStructure?.departmentManagerId;
     }
-    
     return undefined;
   }, [isDepartmentLevel, isGroupLevel, isTeamLeader, selectedDept, selectedGroup, selectedTeam, deptStructure, teamStructures, editingEmployee]);
 
@@ -147,7 +135,13 @@ export const EmployeeModal = ({
     return selectedTeam !== '';
   }, [isDepartmentLevel, isGroupLevel, selectedTeam]);
 
-  // Initialize form when modal opens - ONE TIME ONLY
+  // Available labels for picker
+  const availableLabels = useMemo(() => 
+    labels.filter(l => !selectedSkills.includes(l.name)),
+    [labels, selectedSkills]
+  );
+
+  // Initialize form when modal opens
   useEffect(() => {
     if (!isOpen) {
       setInitialized(false);
@@ -157,7 +151,6 @@ export const EmployeeModal = ({
     if (initialized) return;
 
     if (editingEmployee) {
-      // Editing existing employee - use their current values
       const parent = getTeamParent(hierarchy, editingEmployee.team);
       const resolvedGroup = editingEmployee.group ?? parent?.group?.name ?? null;
 
@@ -166,13 +159,12 @@ export const EmployeeModal = ({
       setPartTimePercentage(editingEmployee.partTimePercentage || 50);
       setHireDate(editingEmployee.joined ? new Date(editingEmployee.joined) : undefined);
       setDepartureDate(editingEmployee.departureDate ? new Date(editingEmployee.departureDate) : undefined);
+      setSelectedSkills(editingEmployee.skills || []);
 
-      // Check if department level manager
       const isDeptMgr = editingEmployee.managerLevel === 'department' ||
         hierarchy.some(d => d.departmentManagerId === editingEmployee.id);
       setIsDepartmentLevel(isDeptMgr);
 
-      // Check if group level manager
       if (resolvedGroup) {
         setSelectedGroup(resolvedGroup);
         const isGroupMgr = editingEmployee.managerLevel === 'group' ||
@@ -182,14 +174,11 @@ export const EmployeeModal = ({
         setIsGroupLevel(isGroupMgr);
       } else {
         setSelectedGroup(null);
-        // Still check managerLevel even without a resolved group
         setIsGroupLevel(editingEmployee.managerLevel === 'group');
       }
 
-      // Set team - directly from employee
       setSelectedTeam(editingEmployee.team);
     } else if (prefill) {
-      // New employee - prefilled from context (e.g. hire from roster)
       setSelectedDept(prefill.dept);
       setSelectedGroup(prefill.group ?? null);
       setIsDepartmentLevel(false);
@@ -199,8 +188,8 @@ export const EmployeeModal = ({
       setPartTimePercentage(50);
       setHireDate(undefined);
       setDepartureDate(undefined);
+      setSelectedSkills([]);
     } else {
-      // New employee - set sensible defaults
       const firstDept = DEPARTMENT_NAMES[0];
       setSelectedDept(firstDept);
       setSelectedGroup(null);
@@ -210,16 +199,14 @@ export const EmployeeModal = ({
       setPartTimePercentage(50);
       setHireDate(undefined);
       setDepartureDate(undefined);
+      setSelectedSkills([]);
 
-      // Find first available team in the first department
       const firstDeptStructure = hierarchy.find(d => d.name === firstDept);
       if (firstDeptStructure) {
-        // First try direct teams
         if (firstDeptStructure.directTeams && firstDeptStructure.directTeams.length > 0) {
           setSelectedTeam(firstDeptStructure.directTeams[0]);
           setSelectedGroup(null);
         } else {
-          // Then try teams in groups
           for (const group of firstDeptStructure.groups) {
             if (group.teams.length > 0) {
               setSelectedGroup(group.name);
@@ -231,16 +218,13 @@ export const EmployeeModal = ({
       }
     }
     setShowDeleteConfirm(false);
+    setNewSkillInput('');
     setInitialized(true);
   }, [isOpen, editingEmployee, hierarchy, initialized, prefill]);
 
-  // Only auto-select team when user MANUALLY changes group (not during init)
   const handleGroupChange = (newGroup: string | null) => {
     setSelectedGroup(newGroup);
-    
     if (isDepartmentLevel || isGroupLevel) return;
-    
-    // When group changes, update team selection
     if (newGroup) {
       const group = deptStructure?.groups.find(g => g.name === newGroup);
       const groupTeams = group?.teams || [];
@@ -248,7 +232,6 @@ export const EmployeeModal = ({
         setSelectedTeam(groupTeams[0]);
       }
     } else {
-      // Switched to direct teams
       const directTeams = deptStructure?.directTeams || [];
       if (directTeams.length > 0) {
         setSelectedTeam(directTeams[0]);
@@ -256,19 +239,12 @@ export const EmployeeModal = ({
     }
   };
 
-  // Only auto-select when user MANUALLY changes department
   const handleDeptChange = (newDept: string) => {
     setSelectedDept(newDept);
-    
     const newDeptStructure = hierarchy.find(d => d.name === newDept);
     if (!newDeptStructure) return;
-    
-    // Reset group and team for new department
     setSelectedGroup(null);
-    
     if (isDepartmentLevel || isGroupLevel) return;
-    
-    // Find first available team
     if (newDeptStructure.directTeams && newDeptStructure.directTeams.length > 0) {
       setSelectedTeam(newDeptStructure.directTeams[0]);
     } else {
@@ -282,34 +258,53 @@ export const EmployeeModal = ({
     }
   };
 
+  const handleAddSkill = (skillName: string) => {
+    if (!selectedSkills.includes(skillName)) {
+      setSelectedSkills(prev => [...prev, skillName]);
+    }
+  };
+
+  const handleRemoveSkill = (skillName: string) => {
+    setSelectedSkills(prev => prev.filter(s => s !== skillName));
+  };
+
+  const handleCreateAndAddSkill = async () => {
+    const name = newSkillInput.trim();
+    if (!name || !onCreateLabel) return;
+    try {
+      const label = await onCreateLabel(name);
+      if (label) {
+        handleAddSkill(label.name);
+        setNewSkillInput('');
+      }
+    } catch (e) {
+      // error already toasted
+    }
+  };
+
   if (!isOpen) return null;
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
     if (!canSubmit) return;
     
     const formData = new FormData(e.currentTarget);
-    
     const dept = selectedDept;
     
-    // Determine team based on level
     let team: string;
     let group: string | undefined;
     
     if (isDepartmentLevel) {
-      team = dept; // Department level managers have dept as team
+      team = dept;
       group = undefined;
     } else if (isGroupLevel) {
       team = selectedGroup || dept;
       group = selectedGroup || undefined;
     } else {
-      // Regular team member - must have a valid team
       team = selectedTeam;
       group = selectedGroup || undefined;
     }
     
-    // Auto-calculate departure date if not set (5 years 8 months after hire)
     let finalDepartureDate = departureDate;
     if (!finalDepartureDate && hireDate && !editingEmployee) {
       const defaultDeparture = new Date(hireDate);
@@ -332,6 +327,7 @@ export const EmployeeModal = ({
       workType: selectedWorkType,
       partTimePercentage: selectedWorkType === 'Part-Time' ? partTimePercentage : undefined,
       departureDate: finalDepartureDate ? format(finalDepartureDate, 'yyyy-MM-dd') : undefined,
+      skills: selectedSkills.length > 0 ? selectedSkills : undefined,
     };
 
     onSubmit(employeeData, editingEmployee?.id);
@@ -532,7 +528,6 @@ export const EmployeeModal = ({
                   selected={hireDate}
                   onSelect={(date) => {
                     setHireDate(date);
-                    // Auto-set departure date for new employees (5y8m after hire)
                     if (date && !editingEmployee && !departureDate) {
                       const defaultDeparture = new Date(date);
                       defaultDeparture.setFullYear(defaultDeparture.getFullYear() + 5);
@@ -643,6 +638,77 @@ export const EmployeeModal = ({
               </p>
             </div>
           )}
+
+          {/* Skills / Labels */}
+          <div>
+            <label className="text-[10px] text-muted-foreground font-bold uppercase block mb-1.5 tracking-wider flex items-center gap-1">
+              <Tag size={12} />
+              Skills
+            </label>
+            
+            {/* Selected skills */}
+            {selectedSkills.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {selectedSkills.map(skill => (
+                  <span
+                    key={skill}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                  >
+                    {skill}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSkill(skill)}
+                      className="hover:text-destructive transition-colors"
+                    >
+                      <X size={10} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Available labels to add */}
+            {availableLabels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {availableLabels.map(label => (
+                  <button
+                    key={label.id}
+                    type="button"
+                    onClick={() => handleAddSkill(label.name)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Plus size={10} />
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Create new label inline */}
+            {onCreateLabel && (
+              <div className="flex gap-2 mt-2">
+                <input
+                  type="text"
+                  value={newSkillInput}
+                  onChange={(e) => setNewSkillInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleCreateAndAddSkill())}
+                  placeholder="Add new skill..."
+                  className="input-field flex-1 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateAndAddSkill}
+                  disabled={!newSkillInput.trim()}
+                  className="h-auto text-xs"
+                >
+                  <Plus size={12} className="mr-1" />
+                  Add
+                </Button>
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-3 p-3 bg-accent/30 rounded-xl border border-border">
             <input 
