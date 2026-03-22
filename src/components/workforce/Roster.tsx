@@ -612,7 +612,22 @@ export const Roster = ({
           />
         )}
 
-        {/* Drag hint */}
+        {/* Skills Management Button */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowSkillsDialog(true)}
+            className="h-8 text-xs"
+          >
+            <Tag size={14} className="mr-1.5" />
+            Manage Skills
+            {labels.length > 0 && (
+              <span className="ml-1.5 bg-primary/10 text-primary px-1.5 py-0.5 rounded-full text-[10px] font-semibold">{labels.length}</span>
+            )}
+          </Button>
+        </div>
+
         {onMoveEmployeeToTeam && (
           <div className="text-xs text-muted-foreground flex items-center gap-2 p-2 bg-accent/30 rounded-lg">
             <GripVertical size={14} />
