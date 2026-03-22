@@ -39,6 +39,7 @@ export const TeamStructureModal = ({
   const [requiredSkills, setRequiredSkills] = useState<string[]>(
     teamStructure?.requiredSkills || []
   );
+  const [newSkillName, setNewSkillName] = useState('');
 
   // Team members for leader selection
   const teamMembers = employees.filter(e => e.team === teamName && !e.isPotential);
