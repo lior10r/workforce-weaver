@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Plus, Trash2, Users, UserCog, Tag } from 'lucide-react';
 import { TeamStructure, Employee, ROLES, Label } from '@/lib/workforce-data';
+import { Input } from '@/components/ui/input';
 
 interface TeamStructureModalProps {
   isOpen: boolean;
