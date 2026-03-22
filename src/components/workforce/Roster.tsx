@@ -590,6 +590,7 @@ export const Roster = ({
   }
 
   return (
+    <>
     <DndContext 
       sensors={sensors}
       collisionDetection={closestCenter}
