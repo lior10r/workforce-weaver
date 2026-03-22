@@ -2,11 +2,9 @@ import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, Chev
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { HierarchyStructure, GroupStructure, Label } from '@/lib/workforce-data';
+import { HierarchyStructure, GroupStructure } from '@/lib/workforce-data';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 
 interface SidebarItemProps {
   icon: LucideIcon;
