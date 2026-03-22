@@ -10,70 +10,70 @@
 
 @layer base {
   :root {
-    /* Dark command center theme */
-    --background: 222 47% 4%;
-    --foreground: 210 40% 98%;
+    /* Light professional theme */
+    --background: 220 20% 97%;
+    --foreground: 222 47% 11%;
 
-    --card: 222 47% 6%;
-    --card-foreground: 210 40% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
 
-    --popover: 222 47% 5%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 4%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 217 33% 12%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 220 14% 92%;
+    --secondary-foreground: 222 47% 11%;
 
-    --muted: 217 33% 12%;
-    --muted-foreground: 215 20% 55%;
+    --muted: 220 14% 92%;
+    --muted-foreground: 215 16% 47%;
 
-    --accent: 217 33% 15%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 220 14% 95%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217 33% 15%;
-    --input: 217 33% 15%;
-    --ring: 217 91% 60%;
+    --border: 220 13% 87%;
+    --input: 220 13% 87%;
+    --ring: 217 91% 50%;
 
     --radius: 0.75rem;
 
     /* Custom role colors */
-    --role-junior: 160 84% 39%;
-    --role-mid: 47 96% 53%;
-    --role-senior: 217 91% 60%;
-    --role-lead: 270 91% 65%;
-    --role-architect: 25 95% 53%;
-    --role-pm: 330 81% 60%;
-    --role-qa: 187 92% 51%;
-    --role-manager: 0 84% 60%;
+    --role-junior: 160 84% 36%;
+    --role-mid: 47 96% 46%;
+    --role-senior: 217 91% 50%;
+    --role-lead: 270 91% 55%;
+    --role-architect: 25 95% 48%;
+    --role-pm: 330 81% 52%;
+    --role-qa: 187 92% 42%;
+    --role-manager: 0 84% 55%;
     --role-default: 215 14% 45%;
 
     /* Status colors */
-    --status-active: 142 76% 45%;
-    --status-course: 270 91% 65%;
-    --status-leave: 45 93% 47%;
-    --status-notice: 0 84% 60%;
+    --status-active: 142 76% 40%;
+    --status-course: 270 91% 55%;
+    --status-leave: 45 93% 42%;
+    --status-notice: 0 84% 55%;
 
     /* Accent colors for UI */
-    --flag-color: 25 95% 53%;
-    --success-color: 160 84% 39%;
-    --info-color: 217 91% 60%;
-    --accent-blue: 199 89% 48%;
-    --potential-color: 280 70% 50%;
+    --flag-color: 25 95% 48%;
+    --success-color: 160 84% 36%;
+    --info-color: 217 91% 50%;
+    --accent-blue: 199 89% 42%;
+    --potential-color: 280 70% 45%;
 
     /* Sidebar */
-    --sidebar-background: 222 47% 5%;
-    --sidebar-foreground: 215 20% 65%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 210 40% 98%;
-    --sidebar-accent: 217 33% 12%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 15%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-background: 220 20% 95%;
+    --sidebar-foreground: 215 16% 47%;
+    --sidebar-primary: 217 91% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 90%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 220 13% 87%;
+    --sidebar-ring: 217 91% 50%;
   }
 
   .dark {
