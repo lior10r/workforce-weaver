@@ -159,7 +159,11 @@ export const Roster = ({
   onDeleteTeam,
   onBulkAssignManager,
   onMoveEmployeeToTeam,
-  onHireForTeam
+  onHireForTeam,
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel,
+  isAdmin = false,
 }: RosterProps) => {
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
