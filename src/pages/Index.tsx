@@ -1209,6 +1209,10 @@ const Index = () => {
                 setEditingEmployee(null);
                 setIsEmployeeModalOpen(true);
               } : undefined}
+              labels={labels}
+              onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+              onDeleteLabel={isAdmin ? deleteLabel : undefined}
+              isAdmin={isAdmin}
             />
           )}
 
