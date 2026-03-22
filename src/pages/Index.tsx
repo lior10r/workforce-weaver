@@ -1312,6 +1312,7 @@ const Index = () => {
         teamName={editingTeamStructure?.teamName || ''}
         department={editingTeamStructure?.department || ''}
         employees={employees}
+        labels={labels}
       />
     </div>
   );
