@@ -98,6 +98,9 @@ const Index = () => {
     error: dataError,
   } = useWorkforceData({ isAuthenticated });
 
+  // Labels
+  const { labels, createLabel, deleteLabel } = useLabels(isAuthenticated);
+
   // Scenario State
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>(null);
