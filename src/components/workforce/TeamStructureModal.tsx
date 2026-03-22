@@ -36,8 +36,8 @@ export const TeamStructureModal = ({
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
     teamStructure?.requiredRoles || {}
   );
-  const [requiredSkills, setRequiredSkills] = useState<string[]>(
-    teamStructure?.requiredSkills || []
+  const [requiredSkills, setRequiredSkills] = useState<Record<string, number>>(
+    teamStructure?.requiredSkills || {}
   );
   const [newSkillName, setNewSkillName] = useState('');
 
@@ -53,11 +53,11 @@ export const TeamStructureModal = ({
     if (teamStructure) {
       setTeamLeader(teamStructure.teamLeader);
       setRequiredRoles(teamStructure.requiredRoles);
-      setRequiredSkills(teamStructure.requiredSkills || []);
+      setRequiredSkills(teamStructure.requiredSkills || {});
     } else {
       setTeamLeader(undefined);
       setRequiredRoles({});
-      setRequiredSkills([]);
+      setRequiredSkills({});
     }
   }, [teamStructure, isOpen]);
 
@@ -80,13 +80,21 @@ export const TeamStructureModal = ({
   };
 
   const handleAddSkill = (skillName: string) => {
-    if (!requiredSkills.includes(skillName)) {
-      setRequiredSkills(prev => [...prev, skillName]);
+    if (!(skillName in requiredSkills)) {
+      setRequiredSkills(prev => ({ ...prev, [skillName]: 1 }));
     }
   };
 
   const handleRemoveSkill = (skillName: string) => {
-    setRequiredSkills(prev => prev.filter(s => s !== skillName));
+    setRequiredSkills(prev => {
+      const updated = { ...prev };
+      delete updated[skillName];
+      return updated;
+    });
+  };
+
+  const handleSkillCountChange = (skillName: string, count: number) => {
+    setRequiredSkills(prev => ({ ...prev, [skillName]: Math.max(1, count) }));
   };
 
   const handleSubmit = () => {
@@ -96,14 +104,14 @@ export const TeamStructureModal = ({
       group: teamStructure?.group || group,
       teamLeader,
       requiredRoles,
-      requiredSkills: requiredSkills.length > 0 ? requiredSkills : undefined,
+      requiredSkills: Object.keys(requiredSkills).length > 0 ? requiredSkills : undefined,
       targetSize: targetSize || undefined
     });
     onClose();
   };
 
   const availableRoles = ROLES.filter(r => !requiredRoles[r]);
-  const availableSkills = labels.filter(l => !requiredSkills.includes(l.name));
+  const availableSkills = labels.filter(l => !(l.name in requiredSkills));
 
   if (!isOpen) return null;
 
@@ -218,25 +226,40 @@ export const TeamStructureModal = ({
               Required Skills
             </label>
             <p className="text-xs text-muted-foreground mb-3">
-              Skills the team needs at least one member to have
+              Skills the team needs — specify how many people must have each skill
             </p>
 
-            {requiredSkills.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {requiredSkills.map(skill => (
-                  <span
+            {Object.keys(requiredSkills).length > 0 && (
+              <div className="space-y-2 mb-4">
+                {Object.entries(requiredSkills).map(([skill, count]) => (
+                  <div
                     key={skill}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/5 border border-primary/20"
                   >
-                    <Tag size={10} />
-                    {skill}
+                    <Tag size={10} className="text-primary" />
+                    <span className="text-xs font-medium text-foreground flex-1">{skill}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleSkillCountChange(skill, count - 1)}
+                        className="w-5 h-5 rounded flex items-center justify-center bg-secondary hover:bg-secondary/80 text-foreground text-xs"
+                      >
+                        −
+                      </button>
+                      <span className="text-xs font-bold w-5 text-center">{count}</span>
+                      <button
+                        onClick={() => handleSkillCountChange(skill, count + 1)}
+                        className="w-5 h-5 rounded flex items-center justify-center bg-secondary hover:bg-secondary/80 text-foreground text-xs"
+                      >
+                        +
+                      </button>
+                    </div>
                     <button
                       onClick={() => handleRemoveSkill(skill)}
                       className="hover:text-destructive transition-colors ml-1"
                     >
                       <X size={12} />
                     </button>
-                  </span>
+                  </div>
                 ))}
               </div>
             )}

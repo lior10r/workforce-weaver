@@ -1,10 +1,11 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX, Sun, Moon } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HierarchyStructure, GroupStructure } from '@/lib/workforce-data';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTheme } from '@/hooks/use-theme';
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -50,6 +51,7 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
@@ -234,15 +236,24 @@ export const Sidebar = ({
         )}
       </nav>
 
-      {/* Show Departed Toggle */}
+      {/* Theme Toggle & Show Departed */}
       <div className="mt-auto" />
+      <div className="flex gap-2 mb-2">
+        <button
+          onClick={toggleTheme}
+          className="flex items-center gap-2 flex-1 p-3 bg-accent/50 rounded-xl border border-border hover:bg-accent transition-colors"
+        >
+          {theme === 'dark' ? <Sun size={14} className="text-muted-foreground" /> : <Moon size={14} className="text-muted-foreground" />}
+          <span className="text-xs text-muted-foreground font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
+        </button>
+      </div>
       <div className="p-3 bg-accent/50 rounded-xl border border-border">
         <button
           onClick={() => setShowDeparted(!showDeparted)}
           className="flex items-center gap-2 w-full text-left"
         >
           <div className={`w-8 h-4 rounded-full transition-colors relative ${showDeparted ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
-            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${showDeparted ? 'translate-x-4' : 'translate-x-0.5'}`} />
+            <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-foreground transition-transform ${showDeparted ? 'translate-x-4' : 'translate-x-0.5'}`} />
           </div>
           <UserX size={14} className="text-muted-foreground" />
           <span className="text-xs text-muted-foreground font-medium">Show departed</span>

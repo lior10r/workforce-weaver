@@ -2,11 +2,18 @@ import { useState, useMemo } from 'react';
 import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap, Tag } from 'lucide-react';
 import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight, Label } from '@/lib/workforce-data';
 
-// Helper: check missing skills for a team
-const getMissingSkills = (teamMembers: Employee[], structure?: TeamStructure): string[] => {
-  if (!structure?.requiredSkills || structure.requiredSkills.length === 0) return [];
-  const teamSkills = new Set(teamMembers.flatMap(e => e.skills || []));
-  return structure.requiredSkills.filter(skill => !teamSkills.has(skill));
+// Helper: check missing skills for a team (returns skills with insufficient coverage)
+const getMissingSkills = (teamMembers: Employee[], structure?: TeamStructure): { skill: string; have: number; need: number }[] => {
+  if (!structure?.requiredSkills || Object.keys(structure.requiredSkills).length === 0) return [];
+  const activeMembers = teamMembers.filter(e => !e.isPotential && e.status === 'Active');
+  const missing: { skill: string; have: number; need: number }[] = [];
+  for (const [skill, needed] of Object.entries(structure.requiredSkills)) {
+    const have = activeMembers.filter(e => (e.skills || []).includes(skill)).length;
+    if (have < needed) {
+      missing.push({ skill, have, need: needed });
+    }
+  }
+  return missing;
 };
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -825,13 +832,17 @@ export const Roster = ({
                                        <TooltipProvider>
                                          <Tooltip>
                                            <TooltipTrigger asChild>
-                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
-                                               <Tag size={10} />
-                                               Missing: {missing.join(', ')}
-                                             </span>
-                                           </TooltipTrigger>
-                                           <TooltipContent>
-                                             <p className="text-xs">No team member has: {missing.join(', ')}</p>
+                                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                                                <Tag size={10} />
+                                                Missing: {missing.map(m => `${m.skill} (${m.have}/${m.need})`).join(', ')}
+                                              </span>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                              <div className="text-xs space-y-1">
+                                                {missing.map(m => (
+                                                  <p key={m.skill}>{m.skill}: {m.have} of {m.need} required</p>
+                                                ))}
+                                              </div>
                                            </TooltipContent>
                                          </Tooltip>
                                        </TooltipProvider>
@@ -1052,13 +1063,17 @@ export const Roster = ({
                                             <TooltipProvider>
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
-                                                    <Tag size={10} />
-                                                    Missing: {missing.join(', ')}
-                                                  </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p className="text-xs">No team member has: {missing.join(', ')}</p>
+                                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                                                     <Tag size={10} />
+                                                     Missing: {missing.map(m => `${m.skill} (${m.have}/${m.need})`).join(', ')}
+                                                   </span>
+                                                 </TooltipTrigger>
+                                                 <TooltipContent>
+                                                   <div className="text-xs space-y-1">
+                                                     {missing.map(m => (
+                                                       <p key={m.skill}>{m.skill}: {m.have} of {m.need} required</p>
+                                                     ))}
+                                                   </div>
                                                 </TooltipContent>
                                               </Tooltip>
                                             </TooltipProvider>
