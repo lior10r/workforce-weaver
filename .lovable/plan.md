@@ -1,34 +1,60 @@
 
 
-## Timeline Scale and Range Configuration
+## Skills as User-Defined Labels
+
+### Approach
+
+Labels are the better pattern here. They're flexible, visual, and familiar. Any user can create a new label (e.g., "OS", "Python", "Networking") and assign it to employees or team requirements. Only admins can delete labels from the system. Labels are stored in a dedicated SQLite table, not hardcoded.
 
 ### What changes
 
-1. **Add scale toggle** (Years / Quarters) to the timeline toolbar next to the existing "Group by" toggle
-2. **Add configurable date range** with start/end inputs, defaulting to:
-   - **Years view**: 2 years before now to 5 years in the future (2024-01 to 2031-03)
-   - **Quarters view**: 4 quarters back to 8 quarters forward
-3. **Dynamic header labels**: Show year labels in yearly mode, Q1/Q2/Q3/Q4 labels in quarterly mode
-4. **Update `getTimelinePosition`**: Make it accept dynamic start/end dates instead of the hardcoded 2020-2030 range
+**1. New `labels` table in SQLite (`server/utils/database.js`)**
+- `id INTEGER PRIMARY KEY`, `name TEXT UNIQUE NOT NULL`, `color TEXT` (optional hex/preset color), `created_by TEXT`
+- CRUD operations: `getLabels`, `createLabel`, `deleteLabel` (admin-only check on the route)
 
-### Technical approach
+**2. Link labels to employees and team structures**
+- Add `skills TEXT` column to `employees` table — stores JSON array of label IDs/names
+- Add `requiredSkills` field to `TeamStructure` interface — stored in the existing `team_structures` JSON blob
+- Update `rowToEmployee` / `createEmployee` / `updateEmployee` to handle skills
 
-**`src/lib/workforce-data.ts`**:
-- Keep `TIMELINE_START`/`TIMELINE_END` as absolute bounds but add a new helper `getTimelinePositionInRange(dateStr, rangeStart, rangeEnd)` that calculates percentage within a custom range
+**3. New API routes (`server/routes/workforce-sqlite.js`)**
+- `GET /api/labels` — list all labels
+- `POST /api/labels` — create a new label (any authenticated user)
+- `DELETE /api/labels/:id` — delete a label (admin only)
 
-**`src/components/workforce/Timeline.tsx`**:
-- Add state: `timelineScale` (`'years' | 'quarters'`), `rangeStart` (Date), `rangeEnd` (Date)
-- Compute default ranges based on scale:
-  - Years: `new Date(now.getFullYear() - 2, 0, 1)` to `new Date(now.getFullYear() + 5, 11, 31)`
-  - Quarters: 4 quarters back to 8 quarters forward from current quarter
-- Generate column labels dynamically: years array for yearly, `Q1 2024`, `Q2 2024`... for quarterly
-- Add date inputs (year/month pickers or simple inputs) to let users adjust the range
-- Replace all `getTimelinePosition()` calls with the range-aware version using `rangeStart`/`rangeEnd`
-- Update grid `gridTemplateColumns` to match the number of columns
-- Add scale toggle buttons (Years / Quarters) in the toolbar
-- Update `min-w` dynamically based on number of columns
+**4. Frontend data model (`src/lib/workforce-data.ts`)**
+- Add `skills?: string[]` to `Employee` interface
+- Add `requiredSkills?: string[]` to `TeamStructure` interface
+- Add `Label` interface: `{ id: number; name: string; color?: string }`
+
+**5. Labels management UI**
+- Add a "Manage Labels" button in the Sidebar or a small settings area
+- Simple list with add input + delete button (delete only visible to admins)
+- Labels shown as colored chips/badges throughout the app
+
+**6. Employee Modal (`src/components/workforce/EmployeeModal.tsx`)**
+- Add a label picker section — searchable dropdown of existing labels, click to assign, click to create new
+- Display assigned labels as removable chips
+
+**7. Team Structure Modal (`src/components/workforce/TeamStructureModal.tsx`)**
+- Add "Required Skills" section below Required Roles
+- Same label picker pattern — select from existing labels
+- These define what skills the team needs at least one member to have
+
+**8. Roster alerts (`src/components/workforce/Roster.tsx`)**
+- For teams with `requiredSkills`, check if at least one active member has each label
+- Show amber "Missing: X, Y" badge on team header (same style as understaffed alerts)
+
+**9. API client (`src/lib/api-client.ts`)**
+- Add `getLabels`, `createLabel`, `deleteLabel` methods
 
 ### Files to modify
-- `src/lib/workforce-data.ts` -- add range-aware position helper
-- `src/components/workforce/Timeline.tsx` -- scale toggle, range controls, dynamic columns
+- `server/utils/database.js` — new labels table + skills column
+- `server/routes/workforce-sqlite.js` — label CRUD endpoints
+- `src/lib/workforce-data.ts` — types
+- `src/lib/api-client.ts` — API methods
+- `src/components/workforce/EmployeeModal.tsx` — label assignment
+- `src/components/workforce/TeamStructureModal.tsx` — required skills
+- `src/components/workforce/Roster.tsx` — missing skills alerts
+- `src/components/workforce/Sidebar.tsx` — labels management UI
 
