@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, Check, X, MessageSquare, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -232,7 +232,7 @@ export const Timeline = ({
     };
 
     return (
-      <div key={isTransfer ? `transfer-${emp.id}` : `${isManagerRow ? 'mgr-' : ''}${emp.id}`} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''} ${getDiffBorderColor(diffStatus)} ${getDiffBgColor(diffStatus)} ${isManagerRow ? 'bg-accent/20' : ''}`}>
+      <div key={isTransfer ? `transfer-${emp.id}` : `${isManagerRow ? 'mgr-' : ''}${emp.id}`} data-timeline-emp-id={isTransfer ? `transfer-${emp.id}` : emp.id} className={`flex items-center group py-1.5 ${isPotential ? 'opacity-60' : ''} ${getDiffBorderColor(diffStatus)} ${getDiffBgColor(diffStatus)} ${isManagerRow ? 'bg-accent/20' : ''}`}>
         {/* Name & Quick Actions */}
         <div className="w-72 pr-6 flex justify-between items-center">
           <Tooltip>
@@ -505,9 +505,24 @@ export const Timeline = ({
                   </p>
                   <p className="text-foreground font-medium">{ev.details}</p>
                   {isTeamSwap && ev.targetTeam && (
-                    <p className="text-accent-blue mt-1 flex items-center gap-1">
-                      <ArrowRight size={12} /> {ev.targetTeam}
-                    </p>
+                    <div className="mt-1">
+                      <p className="text-accent-blue flex items-center gap-1">
+                        <ArrowRight size={12} /> {ev.targetTeam}
+                      </p>
+                      <button
+                        onClick={() => {
+                          const targetEl = document.querySelector(`[data-timeline-emp-id="transfer-${ev.empId}"]`);
+                          if (targetEl) {
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            targetEl.classList.add('ring-2', 'ring-primary', 'rounded');
+                            setTimeout(() => targetEl.classList.remove('ring-2', 'ring-primary', 'rounded'), 2000);
+                          }
+                        }}
+                        className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 transition-colors"
+                      >
+                        <ArrowRight size={10} /> Go to transferred
+                      </button>
+                    </div>
                   )}
                   {/* Show resolution note for resolved flags */}
                   {isResolved && ev.resolutionNote && (
