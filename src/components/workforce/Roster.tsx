@@ -1,6 +1,13 @@
 import { useState, useMemo } from 'react';
-import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap } from 'lucide-react';
+import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap, Tag } from 'lucide-react';
 import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight } from '@/lib/workforce-data';
+
+// Helper: check missing skills for a team
+const getMissingSkills = (teamMembers: Employee[], structure?: TeamStructure): string[] => {
+  if (!structure?.requiredSkills || structure.requiredSkills.length === 0) return [];
+  const teamSkills = new Set(teamMembers.flatMap(e => e.skills || []));
+  return structure.requiredSkills.filter(skill => !teamSkills.has(skill));
+};
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { Button } from '@/components/ui/button';
