@@ -51,7 +51,7 @@ const getDefaultYearsRange = () => {
 const getDefaultQuartersRange = () => {
   const now = new Date();
   const currentQuarter = Math.floor(now.getMonth() / 3);
-  const startQuarter = currentQuarter - 4;
+  const startQuarter = currentQuarter - 2;
   const endQuarter = currentQuarter + 8;
   
   const startYear = now.getFullYear() + Math.floor(startQuarter / 4);
