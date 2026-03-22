@@ -792,6 +792,25 @@ export const Roster = ({
                                        </>
                                      );
                                    })()}
+                                   {(() => {
+                                     const missing = getMissingSkills(filteredTeamMembers, structure);
+                                     if (missing.length === 0) return null;
+                                     return (
+                                       <TooltipProvider>
+                                         <Tooltip>
+                                           <TooltipTrigger asChild>
+                                             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                                               <Tag size={10} />
+                                               Missing: {missing.join(', ')}
+                                             </span>
+                                           </TooltipTrigger>
+                                           <TooltipContent>
+                                             <p className="text-xs">No team member has: {missing.join(', ')}</p>
+                                           </TooltipContent>
+                                         </Tooltip>
+                                       </TooltipProvider>
+                                     );
+                                   })()}
                                    {teamLeader && (
                                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                                       • <Crown size={10} className="text-green-500" /> {teamLeader.name}
