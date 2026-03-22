@@ -1313,6 +1313,9 @@ const Index = () => {
         department={editingTeamStructure?.department || ''}
         employees={employees}
         labels={labels}
+        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+        onDeleteLabel={isAdmin ? deleteLabel : undefined}
+        isAdmin={isAdmin}
       />
     </div>
   );
