@@ -1,10 +1,13 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX, Tag, Plus, X, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { HierarchyStructure, GroupStructure } from '@/lib/workforce-data';
+import { HierarchyStructure, GroupStructure, Label } from '@/lib/workforce-data';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+
 interface SidebarItemProps {
   icon: LucideIcon;
   label: string;
@@ -36,6 +39,9 @@ interface SidebarProps {
   hierarchy: HierarchyStructure;
   showDeparted: boolean;
   setShowDeparted: (show: boolean) => void;
+  labels?: Label[];
+  onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  onDeleteLabel?: (id: number) => void;
 }
 
 export const Sidebar = ({ 
@@ -45,12 +51,17 @@ export const Sidebar = ({
   setScopeFilter,
   hierarchy,
   showDeparted,
-  setShowDeparted
+  setShowDeparted,
+  labels = [],
+  onCreateLabel,
+  onDeleteLabel
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
+  const [showLabels, setShowLabels] = useState(false);
+  const [newLabelName, setNewLabelName] = useState('');
 
   const toggleDeptExpanded = (dept: string) => {
     setExpandedDepts(prev => 
@@ -64,14 +75,12 @@ export const Sidebar = ({
     );
   };
 
-  // Get all teams in a department (including direct teams)
   const getDeptTeams = (dept: { name: string; groups: GroupStructure[]; directTeams?: string[] }): string[] => {
     const teams: string[] = [...(dept.directTeams || [])];
     dept.groups.forEach(g => teams.push(...g.teams));
     return teams;
   };
 
-  // Get all groups in a department
   const getDeptGroups = (dept: { name: string; groups: GroupStructure[] }): string[] => {
     return dept.groups.map(g => g.name);
   };
@@ -79,10 +88,8 @@ export const Sidebar = ({
   const handleDeptCheckbox = (deptName: string, checked: boolean) => {
     const dept = hierarchy.find(d => d.name === deptName);
     if (!dept) return;
-    
     const deptTeams = getDeptTeams(dept);
     const deptGroups = getDeptGroups(dept);
-    
     if (checked) {
       setScopeFilter({
         departments: [...scopeFilter.departments.filter(d => d !== deptName), deptName],
@@ -102,13 +109,10 @@ export const Sidebar = ({
     const dept = hierarchy.find(d => d.name === deptName);
     const group = dept?.groups.find(g => g.name === groupName);
     if (!group) return;
-    
     const groupTeams = group.teams;
     const deptGroups = getDeptGroups(dept!);
-    
     let newTeams: string[];
     let newGroups: string[];
-    
     if (checked) {
       newTeams = [...scopeFilter.teams.filter(t => !groupTeams.includes(t)), ...groupTeams];
       newGroups = [...scopeFilter.groups.filter(g => g !== groupName), groupName];
@@ -116,48 +120,36 @@ export const Sidebar = ({
       newTeams = scopeFilter.teams.filter(t => !groupTeams.includes(t));
       newGroups = scopeFilter.groups.filter(g => g !== groupName);
     }
-    
-    // Update dept checkbox state
     const allGroupsChecked = deptGroups.every(g => newGroups.includes(g));
     const newDepts = allGroupsChecked 
       ? [...scopeFilter.departments.filter(d => d !== deptName), deptName]
       : scopeFilter.departments.filter(d => d !== deptName);
-    
     setScopeFilter({ departments: newDepts, groups: newGroups, teams: newTeams });
   };
 
   const handleTeamCheckbox = (deptName: string, groupName: string | null, team: string, checked: boolean) => {
     const dept = hierarchy.find(d => d.name === deptName);
     if (!dept) return;
-    
     let newTeams: string[];
-    
     if (checked) {
       newTeams = [...scopeFilter.teams, team];
     } else {
       newTeams = scopeFilter.teams.filter(t => t !== team);
     }
-    
     if (groupName) {
       const group = dept.groups.find(g => g.name === groupName);
       if (!group) return;
-      
-      // Update group checkbox state
       const allTeamsInGroupChecked = group.teams.every(t => newTeams.includes(t));
       let newGroups = allTeamsInGroupChecked 
         ? [...scopeFilter.groups.filter(g => g !== groupName), groupName]
         : scopeFilter.groups.filter(g => g !== groupName);
-      
-      // Update dept checkbox state
       const deptGroups = getDeptGroups(dept);
       const allGroupsChecked = deptGroups.every(g => newGroups.includes(g));
       const newDepts = allGroupsChecked 
         ? [...scopeFilter.departments.filter(d => d !== deptName), deptName]
         : scopeFilter.departments.filter(d => d !== deptName);
-
       setScopeFilter({ departments: newDepts, groups: newGroups, teams: newTeams });
     } else {
-      // Direct team under department
       setScopeFilter(prev => ({ ...prev, teams: newTeams }));
     }
   };
@@ -171,9 +163,7 @@ export const Sidebar = ({
         allGroups.push(g.name);
         allTeams.push(...g.teams);
       });
-      if (d.directTeams) {
-        allTeams.push(...d.directTeams);
-      }
+      if (d.directTeams) allTeams.push(...d.directTeams);
     });
     setScopeFilter({ departments: allDepts, groups: allGroups, teams: allTeams });
   };
@@ -182,7 +172,16 @@ export const Sidebar = ({
     setScopeFilter({ departments: [], groups: [], teams: [] });
   };
 
-  const allSelected = hierarchy.every(d => scopeFilter.departments.includes(d.name));
+  const handleCreateLabel = async () => {
+    const name = newLabelName.trim();
+    if (!name || !onCreateLabel) return;
+    try {
+      await onCreateLabel(name);
+      setNewLabelName('');
+    } catch (e) {
+      // error handled in hook
+    }
+  };
 
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col p-6">
@@ -255,8 +254,67 @@ export const Sidebar = ({
         )}
       </nav>
 
+      {/* Labels Management */}
+      <div className="mt-auto p-3 bg-accent/50 rounded-xl border border-border mb-3">
+        <button
+          onClick={() => setShowLabels(!showLabels)}
+          className="flex items-center gap-2 w-full text-left"
+        >
+          {showLabels ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <Tag size={14} className="text-primary" />
+          <span className="text-xs font-medium text-foreground">Skills Labels</span>
+          <span className="text-[9px] text-muted-foreground ml-auto">{labels.length}</span>
+        </button>
+        
+        {showLabels && (
+          <div className="mt-3 space-y-2 animate-fade-in">
+            {/* Label list */}
+            <div className="max-h-32 overflow-y-auto space-y-1">
+              {labels.map(label => (
+                <div key={label.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/30 group">
+                  <span className="text-xs text-foreground">{label.name}</span>
+                  {isAdmin && onDeleteLabel && (
+                    <button
+                      onClick={() => onDeleteLabel(label.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive transition-all"
+                    >
+                      <Trash2 size={10} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {labels.length === 0 && (
+                <p className="text-[10px] text-muted-foreground italic px-2">No labels yet</p>
+              )}
+            </div>
+            
+            {/* Add new label */}
+            {onCreateLabel && (
+              <div className="flex gap-1.5">
+                <Input
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
+                  placeholder="New label..."
+                  className="h-7 text-xs"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCreateLabel}
+                  disabled={!newLabelName.trim()}
+                  className="h-7 px-2"
+                >
+                  <Plus size={12} />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Show Departed Toggle */}
-      <div className="mt-auto p-3 bg-accent/50 rounded-xl border border-border">
+      <div className="p-3 bg-accent/50 rounded-xl border border-border">
         <button
           onClick={() => setShowDeparted(!showDeparted)}
           className="flex items-center gap-2 w-full text-left"
@@ -269,24 +327,14 @@ export const Sidebar = ({
         </button>
       </div>
 
-      {/* Scope Filter - 3-Level Hierarchy */}
+      {/* Scope Filter */}
       <div className="mt-3 p-4 bg-accent/50 rounded-2xl border border-border max-h-80 overflow-y-auto scrollbar-thin">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">Scope Filter</p>
           <div className="flex gap-1">
-            <button 
-              onClick={selectAll}
-              className="text-[9px] text-primary hover:underline"
-            >
-              All
-            </button>
+            <button onClick={selectAll} className="text-[9px] text-primary hover:underline">All</button>
             <span className="text-muted-foreground text-[9px]">/</span>
-            <button 
-              onClick={clearAll}
-              className="text-[9px] text-muted-foreground hover:underline"
-            >
-              None
-            </button>
+            <button onClick={clearAll} className="text-[9px] text-muted-foreground hover:underline">None</button>
           </div>
         </div>
 
@@ -300,12 +348,8 @@ export const Sidebar = ({
 
             return (
               <div key={dept.name} className="space-y-1">
-                {/* Department Row */}
                 <div className="flex items-center gap-2 py-1 px-1 hover:bg-accent/50 rounded-lg transition-colors">
-                  <button
-                    onClick={() => toggleDeptExpanded(dept.name)}
-                    className="p-0.5 hover:bg-accent rounded transition-colors"
-                  >
+                  <button onClick={() => toggleDeptExpanded(dept.name)} className="p-0.5 hover:bg-accent rounded transition-colors">
                     {isDeptExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
                   </button>
                   <Checkbox 
@@ -315,15 +359,11 @@ export const Sidebar = ({
                     onCheckedChange={(checked) => handleDeptCheckbox(dept.name, checked as boolean)}
                     className="h-3.5 w-3.5"
                   />
-                  <label 
-                    htmlFor={`dept-${dept.name}`}
-                    className="text-xs font-semibold text-foreground cursor-pointer flex-1 truncate"
-                  >
+                  <label htmlFor={`dept-${dept.name}`} className="text-xs font-semibold text-foreground cursor-pointer flex-1 truncate">
                     {dept.name}
                   </label>
                 </div>
 
-                {/* Groups & Direct Teams */}
                 {isDeptExpanded && (
                   <div className="ml-5 space-y-0.5 animate-fade-in">
                     {dept.groups.map(group => {
@@ -335,12 +375,8 @@ export const Sidebar = ({
 
                       return (
                         <div key={group.name} className="space-y-0.5">
-                          {/* Group Row */}
                           <div className="flex items-center gap-2 py-0.5 px-1 hover:bg-accent/30 rounded transition-colors">
-                            <button
-                              onClick={() => toggleGroupExpanded(groupKey)}
-                              className="p-0.5 hover:bg-accent rounded transition-colors"
-                            >
+                            <button onClick={() => toggleGroupExpanded(groupKey)} className="p-0.5 hover:bg-accent rounded transition-colors">
                               {isGroupExpanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                             </button>
                             <Checkbox 
@@ -351,15 +387,11 @@ export const Sidebar = ({
                               className="h-3 w-3"
                             />
                             <FolderTree size={10} className="text-muted-foreground" />
-                            <label 
-                              htmlFor={`group-${groupKey}`}
-                              className="text-[11px] text-muted-foreground cursor-pointer truncate flex-1 font-medium"
-                            >
+                            <label htmlFor={`group-${groupKey}`} className="text-[11px] text-muted-foreground cursor-pointer truncate flex-1 font-medium">
                               {group.name}
                             </label>
                           </div>
 
-                          {/* Teams in Group */}
                           {isGroupExpanded && (
                             <div className="ml-6 space-y-0 animate-fade-in">
                               {group.teams.map(team => (
@@ -371,10 +403,7 @@ export const Sidebar = ({
                                     className="h-2.5 w-2.5"
                                   />
                                   <Users size={8} className="text-muted-foreground/60" />
-                                  <label 
-                                    htmlFor={`team-${team}`}
-                                    className="text-[10px] text-muted-foreground/80 cursor-pointer truncate flex-1"
-                                  >
+                                  <label htmlFor={`team-${team}`} className="text-[10px] text-muted-foreground/80 cursor-pointer truncate flex-1">
                                     {team}
                                   </label>
                                 </div>
@@ -388,7 +417,6 @@ export const Sidebar = ({
                       );
                     })}
                     
-                    {/* Direct Teams (under department, not in groups) */}
                     {dept.directTeams && dept.directTeams.length > 0 && (
                       <div className="mt-1 pt-1 border-t border-border/30">
                         <p className="text-[9px] text-muted-foreground/60 uppercase tracking-wider mb-1 ml-1">Direct Teams</p>
@@ -401,10 +429,7 @@ export const Sidebar = ({
                               className="h-2.5 w-2.5"
                             />
                             <Users size={8} className="text-primary/60" />
-                            <label 
-                              htmlFor={`dteam-${team}`}
-                              className="text-[10px] text-muted-foreground/80 cursor-pointer truncate flex-1"
-                            >
+                            <label htmlFor={`dteam-${team}`} className="text-[10px] text-muted-foreground/80 cursor-pointer truncate flex-1">
                               {team}
                             </label>
                           </div>

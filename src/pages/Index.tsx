@@ -21,6 +21,7 @@ import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
+import { useLabels } from '@/hooks/use-labels';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -96,6 +97,9 @@ const Index = () => {
     isLoading: isDataLoading,
     error: dataError,
   } = useWorkforceData({ isAuthenticated });
+
+  // Labels
+  const { labels, createLabel, deleteLabel } = useLabels(isAuthenticated);
 
   // Scenario State
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
@@ -934,6 +938,9 @@ const Index = () => {
         hierarchy={hierarchy}
         showDeparted={showDeparted}
         setShowDeparted={setShowDeparted}
+        labels={labels}
+        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+        onDeleteLabel={isAdmin ? deleteLabel : undefined}
       />
 
       {/* Main Content */}
@@ -1287,6 +1294,8 @@ const Index = () => {
         employees={employees}
         teamStructures={teamStructures}
         prefill={employeePrefill}
+        labels={labels}
+        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
       />
 
       <EventModal
@@ -1306,6 +1315,7 @@ const Index = () => {
         teamName={editingTeamStructure?.teamName || ''}
         department={editingTeamStructure?.department || ''}
         employees={employees}
+        labels={labels}
       />
     </div>
   );

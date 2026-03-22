@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Plus, Trash2, Users, UserCog } from 'lucide-react';
-import { TeamStructure, Employee, ROLES } from '@/lib/workforce-data';
+import { X, Plus, Trash2, Users, UserCog, Tag } from 'lucide-react';
+import { TeamStructure, Employee, ROLES, Label } from '@/lib/workforce-data';
 
 interface TeamStructureModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface TeamStructureModalProps {
   department: string;
   group?: string;
   employees: Employee[];
+  labels?: Label[];
 }
 
 export const TeamStructureModal = ({
@@ -21,11 +22,15 @@ export const TeamStructureModal = ({
   teamName,
   department,
   group = '',
-  employees
+  employees,
+  labels = []
 }: TeamStructureModalProps) => {
   const [teamLeader, setTeamLeader] = useState<number | undefined>(teamStructure?.teamLeader);
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
     teamStructure?.requiredRoles || {}
+  );
+  const [requiredSkills, setRequiredSkills] = useState<string[]>(
+    teamStructure?.requiredSkills || []
   );
 
   // Team members for leader selection
@@ -40,9 +45,11 @@ export const TeamStructureModal = ({
     if (teamStructure) {
       setTeamLeader(teamStructure.teamLeader);
       setRequiredRoles(teamStructure.requiredRoles);
+      setRequiredSkills(teamStructure.requiredSkills || []);
     } else {
       setTeamLeader(undefined);
       setRequiredRoles({});
+      setRequiredSkills([]);
     }
   }, [teamStructure, isOpen]);
 
@@ -64,6 +71,16 @@ export const TeamStructureModal = ({
     setRequiredRoles(prev => ({ ...prev, [role]: Math.max(0, count) }));
   };
 
+  const handleAddSkill = (skillName: string) => {
+    if (!requiredSkills.includes(skillName)) {
+      setRequiredSkills(prev => [...prev, skillName]);
+    }
+  };
+
+  const handleRemoveSkill = (skillName: string) => {
+    setRequiredSkills(prev => prev.filter(s => s !== skillName));
+  };
+
   const handleSubmit = () => {
     onSubmit({
       teamName,
@@ -71,12 +88,14 @@ export const TeamStructureModal = ({
       group: teamStructure?.group || group,
       teamLeader,
       requiredRoles,
+      requiredSkills: requiredSkills.length > 0 ? requiredSkills : undefined,
       targetSize: targetSize || undefined
     });
     onClose();
   };
 
   const availableRoles = ROLES.filter(r => !requiredRoles[r]);
+  const availableSkills = labels.filter(l => !requiredSkills.includes(l.name));
 
   if (!isOpen) return null;
 
@@ -181,6 +200,59 @@ export const TeamStructureModal = ({
                   </button>
                 ))}
               </div>
+            )}
+          </div>
+
+          {/* Required Skills */}
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
+              <Tag size={16} className="text-primary" />
+              Required Skills
+            </label>
+            <p className="text-xs text-muted-foreground mb-3">
+              Skills the team needs at least one member to have
+            </p>
+
+            {requiredSkills.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {requiredSkills.map(skill => (
+                  <span
+                    key={skill}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20"
+                  >
+                    <Tag size={10} />
+                    {skill}
+                    <button
+                      onClick={() => handleRemoveSkill(skill)}
+                      className="hover:text-destructive transition-colors ml-1"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* Add Skill from existing labels */}
+            {availableSkills.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {availableSkills.map(label => (
+                  <button
+                    key={label.id}
+                    onClick={() => handleAddSkill(label.name)}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-secondary/30 hover:bg-secondary rounded-lg transition-colors"
+                  >
+                    <Plus size={12} />
+                    {label.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {labels.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">
+                No labels created yet. Add labels from the sidebar to define required skills.
+              </p>
             )}
           </div>
         </div>

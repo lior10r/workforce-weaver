@@ -302,4 +302,45 @@ router.put('/data', (req, res) => {
   }
 });
 
+// ============== LABELS ==============
+
+router.get('/labels', (req, res) => {
+  try {
+    res.json(db.getLabels());
+  } catch (error) {
+    console.error('Get labels error:', error);
+    res.status(500).json({ error: 'Failed to get labels' });
+  }
+});
+
+router.post('/labels', (req, res) => {
+  try {
+    const { name, color } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Label name is required' });
+    }
+    const label = db.createLabel({ name: name.trim(), color, createdBy: req.user.userId });
+    res.status(201).json(label);
+  } catch (error) {
+    if (error.message?.includes('UNIQUE constraint')) {
+      return res.status(409).json({ error: 'Label already exists' });
+    }
+    console.error('Create label error:', error);
+    res.status(500).json({ error: 'Failed to create label' });
+  }
+});
+
+router.delete('/labels/:id', (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Only admins can delete labels' });
+    }
+    db.deleteLabel(parseInt(req.params.id));
+    res.json({ message: 'Label deleted successfully' });
+  } catch (error) {
+    console.error('Delete label error:', error);
+    res.status(500).json({ error: 'Failed to delete label' });
+  }
+});
+
 module.exports = router;
