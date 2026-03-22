@@ -111,7 +111,7 @@ export const TeamStructureModal = ({
   };
 
   const availableRoles = ROLES.filter(r => !requiredRoles[r]);
-  const availableSkills = labels.filter(l => !requiredSkills.includes(l.name));
+  const availableSkills = labels.filter(l => !(l.name in requiredSkills));
 
   if (!isOpen) return null;
 
