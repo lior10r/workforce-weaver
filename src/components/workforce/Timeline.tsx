@@ -505,9 +505,24 @@ export const Timeline = ({
                   </p>
                   <p className="text-foreground font-medium">{ev.details}</p>
                   {isTeamSwap && ev.targetTeam && (
-                    <p className="text-accent-blue mt-1 flex items-center gap-1">
-                      <ArrowRight size={12} /> {ev.targetTeam}
-                    </p>
+                    <div className="mt-1">
+                      <p className="text-accent-blue flex items-center gap-1">
+                        <ArrowRight size={12} /> {ev.targetTeam}
+                      </p>
+                      <button
+                        onClick={() => {
+                          const targetEl = document.querySelector(`[data-timeline-emp-id="transfer-${ev.empId}"]`);
+                          if (targetEl) {
+                            targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            targetEl.classList.add('ring-2', 'ring-primary', 'rounded');
+                            setTimeout(() => targetEl.classList.remove('ring-2', 'ring-primary', 'rounded'), 2000);
+                          }
+                        }}
+                        className="mt-1 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-accent-blue/10 text-accent-blue hover:bg-accent-blue/20 transition-colors"
+                      >
+                        <ArrowRight size={10} /> Go to transferred
+                      </button>
+                    </div>
                   )}
                   {/* Show resolution note for resolved flags */}
                   {isResolved && ev.resolutionNote && (
