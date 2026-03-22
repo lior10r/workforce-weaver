@@ -1069,6 +1069,12 @@ export const Roster = ({
                                             • <Crown size={8} className="text-green-500" /> {teamLeader.name}
                                           </span>
                                         )}
+                                        {!teamLeader && teamMembers.length > 0 && (
+                                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1">
+                                            <AlertTriangle size={10} />
+                                            No Team Leader
+                                          </span>
+                                        )}
                                         {leaderDuplicates && renderDuplicateWarning(leaderCount!, 'Team Lead')}
                                       </div>
                                       <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
