@@ -162,16 +162,6 @@ export const Sidebar = ({
     setScopeFilter({ departments: [], groups: [], teams: [] });
   };
 
-  const handleCreateLabel = async () => {
-    const name = newLabelName.trim();
-    if (!name || !onCreateLabel) return;
-    try {
-      await onCreateLabel(name);
-      setNewLabelName('');
-    } catch (e) {
-      // error handled in hook
-    }
-  };
 
   return (
     <aside className="w-72 bg-sidebar border-r border-sidebar-border flex flex-col p-6">
