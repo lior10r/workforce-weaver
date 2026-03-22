@@ -80,13 +80,21 @@ export const TeamStructureModal = ({
   };
 
   const handleAddSkill = (skillName: string) => {
-    if (!requiredSkills.includes(skillName)) {
-      setRequiredSkills(prev => [...prev, skillName]);
+    if (!(skillName in requiredSkills)) {
+      setRequiredSkills(prev => ({ ...prev, [skillName]: 1 }));
     }
   };
 
   const handleRemoveSkill = (skillName: string) => {
-    setRequiredSkills(prev => prev.filter(s => s !== skillName));
+    setRequiredSkills(prev => {
+      const updated = { ...prev };
+      delete updated[skillName];
+      return updated;
+    });
+  };
+
+  const handleSkillCountChange = (skillName: string, count: number) => {
+    setRequiredSkills(prev => ({ ...prev, [skillName]: Math.max(1, count) }));
   };
 
   const handleSubmit = () => {
