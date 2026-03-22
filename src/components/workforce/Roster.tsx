@@ -1063,13 +1063,17 @@ export const Roster = ({
                                             <TooltipProvider>
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
-                                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
-                                                    <Tag size={10} />
-                                                    Missing: {missing.join(', ')}
-                                                  </span>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p className="text-xs">No team member has: {missing.join(', ')}</p>
+                                                   <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                                                     <Tag size={10} />
+                                                     Missing: {missing.map(m => `${m.skill} (${m.have}/${m.need})`).join(', ')}
+                                                   </span>
+                                                 </TooltipTrigger>
+                                                 <TooltipContent>
+                                                   <div className="text-xs space-y-1">
+                                                     {missing.map(m => (
+                                                       <p key={m.skill}>{m.skill}: {m.have} of {m.need} required</p>
+                                                     ))}
+                                                   </div>
                                                 </TooltipContent>
                                               </Tooltip>
                                             </TooltipProvider>
