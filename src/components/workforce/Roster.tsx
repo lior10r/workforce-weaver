@@ -944,11 +944,49 @@ export const Roster = ({
                                         <span className="text-[10px] text-muted-foreground">
                                           ({teamMembers.length}{structure?.targetSize ? `/${structure.targetSize}` : ''})
                                         </span>
-                                        {structure && Object.keys(structure.requiredRoles).length > 0 && (
-                                          <span className="text-[10px] text-muted-foreground hidden sm:inline">
-                                            • {Object.entries(structure.requiredRoles).map(([r, c]) => `${c}×${r}`).join(', ')}
-                                          </span>
-                                        )}
+                                        {structure && Object.keys(structure.requiredRoles).length > 0 && (() => {
+                                          const targetSize = structure.targetSize || Object.values(structure.requiredRoles).reduce((a, b) => a + b, 0);
+                                          const count = teamMembers.length;
+                                          const isUnder = count < targetSize;
+                                          const isOver = count > targetSize;
+                                          return (
+                                            <>
+                                              <span className="text-[10px] text-muted-foreground hidden sm:inline">
+                                                • {Object.entries(structure.requiredRoles).map(([r, c]) => `${c}×${r}`).join(', ')}
+                                              </span>
+                                              {isUnder && (
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-destructive/20 text-destructive uppercase flex items-center gap-1 cursor-help">
+                                                        <AlertTriangle size={10} />
+                                                        Understaffed ({targetSize - count})
+                                                      </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      <p className="text-xs">Team has {count} members but needs {targetSize}</p>
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              )}
+                                              {isOver && (
+                                                <TooltipProvider>
+                                                  <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500 uppercase flex items-center gap-1 cursor-help">
+                                                        <AlertTriangle size={10} />
+                                                        Overstaffed (+{count - targetSize})
+                                                      </span>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                      <p className="text-xs">Team has {count} members but target is {targetSize}</p>
+                                                    </TooltipContent>
+                                                  </Tooltip>
+                                                </TooltipProvider>
+                                              )}
+                                            </>
+                                          );
+                                        })()}
                                         {teamLeader && (
                                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                             • <Crown size={8} className="text-green-500" /> {teamLeader.name}
