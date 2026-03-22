@@ -1291,6 +1291,8 @@ const Index = () => {
         employees={employees}
         teamStructures={teamStructures}
         prefill={employeePrefill}
+        labels={labels}
+        onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
       />
 
       <EventModal
