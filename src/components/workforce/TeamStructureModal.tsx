@@ -104,7 +104,7 @@ export const TeamStructureModal = ({
       group: teamStructure?.group || group,
       teamLeader,
       requiredRoles,
-      requiredSkills: requiredSkills.length > 0 ? requiredSkills : undefined,
+      requiredSkills: Object.keys(requiredSkills).length > 0 ? requiredSkills : undefined,
       targetSize: targetSize || undefined
     });
     onClose();
