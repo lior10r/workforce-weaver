@@ -104,7 +104,31 @@
     --border: 217 33% 15%;
     --input: 217 33% 15%;
     --ring: 217 91% 60%;
-    
+
+    /* Custom role colors */
+    --role-junior: 160 84% 39%;
+    --role-mid: 47 96% 53%;
+    --role-senior: 217 91% 60%;
+    --role-lead: 270 91% 65%;
+    --role-architect: 25 95% 53%;
+    --role-pm: 330 81% 60%;
+    --role-qa: 187 92% 51%;
+    --role-manager: 0 84% 60%;
+    --role-default: 215 14% 45%;
+
+    /* Status colors */
+    --status-active: 142 76% 45%;
+    --status-course: 270 91% 65%;
+    --status-leave: 45 93% 47%;
+    --status-notice: 0 84% 60%;
+
+    /* Accent colors for UI */
+    --flag-color: 25 95% 53%;
+    --success-color: 160 84% 39%;
+    --info-color: 217 91% 60%;
+    --accent-blue: 199 89% 48%;
+    --potential-color: 280 70% 50%;
+
     --sidebar-background: 222 47% 5%;
     --sidebar-foreground: 215 20% 65%;
     --sidebar-primary: 217 91% 60%;

@@ -192,7 +192,7 @@ export interface TeamStructure {
   group: string; // Parent group name
   teamLeader?: number; // Employee ID of team leader
   requiredRoles: Record<string, number>; // Role name -> count required
-  requiredSkills?: string[]; // Label names the team needs at least one member to have
+  requiredSkills?: Record<string, number>; // Label name -> minimum count of people who must have it
   targetSize?: number; // Optional target team size
 }
 
