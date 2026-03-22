@@ -177,6 +177,8 @@ export const Roster = ({
   const [showAddTeamDialog, setShowAddTeamDialog] = useState<{ dept: string; group: string | null } | null>(null);
   const [newName, setNewName] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'dept' | 'group' | 'team'; dept: string; group?: string | null; team?: string } | null>(null);
+  const [showSkillsDialog, setShowSkillsDialog] = useState(false);
+  const [newSkillName, setNewSkillName] = useState('');
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
