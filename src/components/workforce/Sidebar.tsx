@@ -37,9 +37,6 @@ interface SidebarProps {
   hierarchy: HierarchyStructure;
   showDeparted: boolean;
   setShowDeparted: (show: boolean) => void;
-  labels?: Label[];
-  onCreateLabel?: (name: string) => Promise<Label | undefined>;
-  onDeleteLabel?: (id: number) => void;
 }
 
 export const Sidebar = ({ 
