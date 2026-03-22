@@ -36,8 +36,8 @@ export const TeamStructureModal = ({
   const [requiredRoles, setRequiredRoles] = useState<Record<string, number>>(
     teamStructure?.requiredRoles || {}
   );
-  const [requiredSkills, setRequiredSkills] = useState<string[]>(
-    teamStructure?.requiredSkills || []
+  const [requiredSkills, setRequiredSkills] = useState<Record<string, number>>(
+    teamStructure?.requiredSkills || {}
   );
   const [newSkillName, setNewSkillName] = useState('');
 
