@@ -21,6 +21,7 @@ import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
+import { useLabels } from '@/hooks/use-labels';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
