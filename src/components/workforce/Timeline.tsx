@@ -1,14 +1,16 @@
 import { useState, useMemo, useCallback } from 'react';
-import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, Check, X, MessageSquare, Trash2, Pencil } from 'lucide-react';
+import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, Check, X, MessageSquare, Trash2, Pencil, Calendar, ZoomIn, ZoomOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePosition, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
+import { Employee, WorkforceEvent, TeamStructure, getRoleColor, getTimelinePositionInRange, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, getDepartmentsFlat } from '@/lib/workforce-data';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 
 type GroupingMode = 'team' | 'hierarchy';
+type TimelineScale = 'years' | 'quarters';
 
 interface TimelineProps {
   employees: Employee[];
@@ -38,7 +40,58 @@ interface TransferInfo {
   transferDate: string;
 }
 
+const getDefaultYearsRange = () => {
+  const now = new Date();
+  return {
+    start: new Date(now.getFullYear() - 2, 0, 1),
+    end: new Date(now.getFullYear() + 5, 11, 31),
+  };
+};
 
+const getDefaultQuartersRange = () => {
+  const now = new Date();
+  const currentQuarter = Math.floor(now.getMonth() / 3);
+  const startQuarter = currentQuarter - 4;
+  const endQuarter = currentQuarter + 8;
+  
+  const startYear = now.getFullYear() + Math.floor(startQuarter / 4);
+  const startMonth = ((startQuarter % 4) + 4) % 4 * 3;
+  
+  const endYear = now.getFullYear() + Math.floor(endQuarter / 4);
+  const endMonth = ((endQuarter % 4) + 4) % 4 * 3 + 2;
+  
+  return {
+    start: new Date(startYear, startMonth, 1),
+    end: new Date(endYear, endMonth + 1, 0), // last day of end month
+  };
+};
+
+const generateYearLabels = (start: Date, end: Date): string[] => {
+  const labels: string[] = [];
+  for (let y = start.getFullYear(); y <= end.getFullYear(); y++) {
+    labels.push(String(y));
+  }
+  return labels;
+};
+
+const generateQuarterLabels = (start: Date, end: Date): string[] => {
+  const labels: string[] = [];
+  let year = start.getFullYear();
+  let quarter = Math.floor(start.getMonth() / 3);
+  
+  const endYear = end.getFullYear();
+  const endQuarter = Math.floor(end.getMonth() / 3);
+  
+  while (year < endYear || (year === endYear && quarter <= endQuarter)) {
+    labels.push(`Q${quarter + 1} ${year}`);
+    quarter++;
+    if (quarter > 3) {
+      quarter = 0;
+      year++;
+    }
+  }
+  return labels;
+};
 
 
 const getDiffBorderColor = (status?: DiffStatus) => {
@@ -77,14 +130,43 @@ export const Timeline = ({
 }: TimelineProps) => {
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
+  const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
   
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+
+  // Range state
+  const defaultYears = useMemo(() => getDefaultYearsRange(), []);
+  const defaultQuarters = useMemo(() => getDefaultQuartersRange(), []);
   
-  const years = ['2020', '2021', '2022', '2023', '2024', '2025', '2026', '2027', '2028', '2029', '2030'];
+  const [yearsRangeStart, setYearsRangeStart] = useState(defaultYears.start.getFullYear());
+  const [yearsRangeEnd, setYearsRangeEnd] = useState(defaultYears.end.getFullYear());
+  const [quartersRangeStart, setQuartersRangeStart] = useState(defaultQuarters.start);
+  const [quartersRangeEnd, setQuartersRangeEnd] = useState(defaultQuarters.end);
+
+  const rangeStart = useMemo(() => {
+    if (timelineScale === 'years') return new Date(yearsRangeStart, 0, 1);
+    return quartersRangeStart;
+  }, [timelineScale, yearsRangeStart, quartersRangeStart]);
+
+  const rangeEnd = useMemo(() => {
+    if (timelineScale === 'years') return new Date(yearsRangeEnd, 11, 31);
+    return quartersRangeEnd;
+  }, [timelineScale, yearsRangeEnd, quartersRangeEnd]);
+
+  const columnLabels = useMemo(() => {
+    if (timelineScale === 'years') return generateYearLabels(rangeStart, rangeEnd);
+    return generateQuarterLabels(rangeStart, rangeEnd);
+  }, [timelineScale, rangeStart, rangeEnd]);
+
   const currentDate = new Date();
-  const currentDatePos = getTimelinePosition(currentDate.toISOString().split('T')[0]);
+  const currentYear = currentDate.getFullYear();
+  const currentDatePos = getTimelinePositionInRange(currentDate.toISOString().split('T')[0], rangeStart, rangeEnd);
+
+  const pos = useCallback((dateStr: string) => getTimelinePositionInRange(dateStr, rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+
+  const minWidth = useMemo(() => Math.max(1200, columnLabels.length * 160), [columnLabels]);
 
   // Get all unique teams from employees for grouping
   const getTeamsFromEmployees = (emps: Employee[]): string[] => {
@@ -103,9 +185,6 @@ export const Timeline = ({
         details: e.details
       }));
   };
-
-// Check if role is a developer role (eligible for progression)
-
 
   // Get transfer info for an employee who transferred to a team
   const getTransferInfo = (empId: number, targetTeam: string): TransferInfo | null => {
@@ -159,23 +238,19 @@ export const Timeline = ({
       employee: Employee; 
       transferInfo?: TransferInfo;
       isTransfer: boolean;
-      isSourceTeam?: boolean; // True if this is the source team (bar ends at swap)
+      isSourceTeam?: boolean;
     }[] = [];
 
-    // Add direct members - including those who transferred OUT (show in source until swap date)
     directMembers.forEach(emp => {
       const transferOutEvent = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
-      // Always add direct members - for transfers out, the bar will end at swap date
       allTeamMembers.push({ 
         employee: emp, 
         isTransfer: false,
-        isSourceTeam: !!transferOutEvent // Mark as source team if there's a transfer out
+        isSourceTeam: !!transferOutEvent
       });
     });
 
-    // Add transferred in members (bar starts at transfer date)
     transfersIn.forEach(({ employee, movement }) => {
-      // Only add if not already a direct member
       if (!directMembers.some(e => e.id === employee.id)) {
         allTeamMembers.push({ 
           employee: { ...employee, team: teamName, dept: employee.dept },
@@ -198,34 +273,30 @@ export const Timeline = ({
     isTransfer = false,
     isManagerRow = false,
     managerLevel?: 'dept' | 'group',
-    isSourceTeam = false // True when showing in source team (bar ends at swap)
+    isSourceTeam = false
   ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
     const teamSwapEvent = empEvents.find(e => e.type === 'Team Swap');
     const trainingPeriods = getTrainingPeriods(emp.id);
     
-    // Calculate bar positions - use departureDate field as fallback
     let barStartDate = emp.joined;
     let barEndDate = departureEvent?.date || emp.departureDate || null;
     
     if (isTransfer && transferInfo) {
-      // For transfers IN, bar starts at transfer date
       barStartDate = transferInfo.transferDate;
     } else if (isSourceTeam && teamSwapEvent) {
-      // For source team, bar ends at swap date
       barEndDate = teamSwapEvent.date;
     }
     
-    const joinedPos = getTimelinePosition(barStartDate);
-    const departurePos = barEndDate ? getTimelinePosition(barEndDate) : 100;
+    const joinedPos = pos(barStartDate);
+    const departurePos = barEndDate ? pos(barEndDate) : 100;
     const durationWidth = Math.max(0, departurePos - joinedPos);
 
     const isPotential = emp.isPotential;
     const diffInfo = employeeDiffMap?.get(emp.id);
     const diffStatus = diffInfo?.status;
 
-    // Manager badge colors
     const managerBadgeColors = {
       dept: 'bg-purple-500/20 text-purple-500',
       group: 'bg-blue-500/20 text-blue-500'
@@ -343,25 +414,29 @@ export const Timeline = ({
 
         {/* Gantt Area */}
         <div className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50`}>
-          {/* Year grid lines */}
-          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${years.length}, 1fr)` }}>
-            {years.map((year, i) => (
+          {/* Grid lines */}
+          <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${columnLabels.length}, 1fr)` }}>
+            {columnLabels.map((label, i) => (
               <div 
                 key={i} 
                 className={`border-l first:border-l-0 ${
-                  year === '2025' ? 'border-primary/30' : 'border-border/30'
+                  (timelineScale === 'years' && label === String(currentYear)) ||
+                  (timelineScale === 'quarters' && label === `Q${Math.floor(currentDate.getMonth() / 3) + 1} ${currentYear}`)
+                    ? 'border-primary/30' : 'border-border/30'
                 }`} 
               />
             ))}
           </div>
 
           {/* Current Date Marker */}
-          <div 
-            style={{ left: `${currentDatePos}%` }}
-            className="absolute inset-y-0 w-0.5 bg-destructive z-30"
-          />
+          {currentDatePos >= 0 && currentDatePos <= 100 && (
+            <div 
+              style={{ left: `${currentDatePos}%` }}
+              className="absolute inset-y-0 w-0.5 bg-destructive z-30"
+            />
+          )}
 
-          {/* The Tenure Bar with Progression Colors */}
+          {/* The Tenure Bar */}
           {isPotential ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -382,7 +457,6 @@ export const Timeline = ({
             </Tooltip>
           ) : (
             <>
-              {/* Simple role-colored bar */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div 
@@ -425,8 +499,8 @@ export const Timeline = ({
 
           {/* Training Period Overlays */}
           {!isPotential && trainingPeriods.map((training, idx) => {
-            const trainStart = getTimelinePosition(training.startDate);
-            const trainEnd = getTimelinePosition(training.endDate);
+            const trainStart = pos(training.startDate);
+            const trainEnd = pos(training.endDate);
             const trainWidth = Math.max(0, trainEnd - trainStart);
             
             return (
@@ -453,11 +527,9 @@ export const Timeline = ({
             );
           })}
 
-
-
           {/* Event Markers */}
           {!isPotential && empEvents.map(ev => {
-            const pos = getTimelinePosition(ev.date);
+            const evPos = pos(ev.date);
             if (ev.type === 'Departure') return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
@@ -477,7 +549,7 @@ export const Timeline = ({
               <Popover key={ev.id}>
                 <PopoverTrigger asChild>
                   <div 
-                    style={{ left: `${pos}%` }}
+                    style={{ left: `${evPos}%` }}
                     className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
                     onClick={isTeamSwap ? (e) => {
                       e.preventDefault();
@@ -538,7 +610,6 @@ export const Timeline = ({
                       </button>
                     </div>
                   )}
-                  {/* Show resolution note for resolved flags */}
                   {isResolved && ev.resolutionNote && (
                     <div className="mt-2 p-2 bg-emerald-500/10 rounded-lg">
                       <p className="text-emerald-600 text-[10px] font-medium flex items-center gap-1">
@@ -556,7 +627,6 @@ export const Timeline = ({
                     </p>
                   )}
                   
-                  {/* Action buttons */}
                   <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
                     {ev.isFlag && onResolveFlag && (
                       <button
@@ -643,7 +713,7 @@ export const Timeline = ({
           {/* Hire Start Marker - only for non-transfers */}
           {!isTransfer && (
             <div 
-              style={{ left: `${getTimelinePosition(emp.joined)}%` }}
+              style={{ left: `${pos(emp.joined)}%` }}
               className="absolute inset-y-0 w-px bg-role-junior/50"
             >
               <div className="absolute bottom-full left-1/2 -translate-x-1/2 text-[9px] text-role-junior font-bold mb-1 uppercase whitespace-nowrap">
@@ -661,7 +731,6 @@ export const Timeline = ({
     const directEmployees = employees.filter(e => e.team === teamName);
     const missingRoles = getMissingRoles(teamName, directEmployees);
 
-    // Check if any team members have diffs
     const hasDiffs = teamMembers.some(({ employee }) => {
       const diff = employeeDiffMap?.get(employee.id);
       return diff && diff.status !== 'unchanged';
@@ -708,9 +777,7 @@ export const Timeline = ({
     );
   };
 
-  // Build full hierarchy structure: Department → Group → Team with managers on their own lines
   const renderHierarchySection = () => {
-    // Get all teams from hierarchy to identify team members vs managers
     const allTeams = hierarchy.flatMap(d => [...getAllDeptTeams(d)]);
     
     return hierarchy.map(dept => {
@@ -722,7 +789,6 @@ export const Timeline = ({
 
       return (
         <div key={dept.name} className="mb-10">
-          {/* Department Header */}
           <div className="flex items-center gap-3 mb-4 pb-2 border-b-2 border-primary/30">
             <Building2 size={18} className="text-primary" />
             <div className="flex-1">
@@ -735,7 +801,6 @@ export const Timeline = ({
             </div>
           </div>
 
-          {/* Department Manager - on their own line, not in any team */}
           {deptManager && (
             <div className="mb-4 ml-4">
               <div className="flex items-center gap-2 mb-2">
@@ -748,7 +813,6 @@ export const Timeline = ({
             </div>
           )}
 
-          {/* Direct Teams (under department, no group) */}
           {dept.directTeams && dept.directTeams.length > 0 && (
             <div className="ml-4 mb-6">
               <div className="flex items-center gap-2 mb-3 pb-1 border-b border-border/50">
@@ -783,7 +847,6 @@ export const Timeline = ({
             </div>
           )}
 
-          {/* Groups */}
           {dept.groups.map(group => {
             const groupManager = group.groupManagerId ? allEmployees.find(e => e.id === group.groupManagerId) : null;
             const groupEmployees = employees.filter(e => group.teams.includes(e.team));
@@ -792,7 +855,6 @@ export const Timeline = ({
 
             return (
               <div key={group.name} className="ml-4 mb-6">
-                {/* Group Header */}
                 <div className="flex items-center gap-3 mb-3 pb-1 border-b border-border/50">
                   <FolderTree size={14} className="text-blue-500" />
                   <div className="flex-1">
@@ -805,7 +867,6 @@ export const Timeline = ({
                   </div>
                 </div>
 
-                {/* Group Manager - on their own line, not in any team */}
                 {groupManager && (
                   <div className="mb-4 ml-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -818,9 +879,7 @@ export const Timeline = ({
                   </div>
                 )}
 
-                {/* Teams in Group */}
                 {group.teams.map(teamName => {
-                  // Filter out group manager from team members
                   const teamMembers = employees.filter(e => e.team === teamName && e.id !== groupManager?.id);
                   if (teamMembers.length === 0) return null;
 
@@ -853,68 +912,187 @@ export const Timeline = ({
     });
   };
 
+  // Handle scale change with range reset
+  const handleScaleChange = (scale: TimelineScale) => {
+    setTimelineScale(scale);
+    if (scale === 'years') {
+      const defaults = getDefaultYearsRange();
+      setYearsRangeStart(defaults.start.getFullYear());
+      setYearsRangeEnd(defaults.end.getFullYear());
+    } else {
+      const defaults = getDefaultQuartersRange();
+      setQuartersRangeStart(defaults.start);
+      setQuartersRangeEnd(defaults.end);
+    }
+  };
+
   return (
     <div className="glass-card p-8 overflow-x-auto animate-fade-in">
-      {/* Grouping Mode Toggle */}
-      <div className="flex items-center gap-4 mb-6">
-        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Group by:</span>
-        <div className="flex bg-secondary/50 rounded-lg p-1">
-          <button
-            onClick={() => setGroupingMode('team')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-              groupingMode === 'team' 
-                ? 'bg-primary text-primary-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Users size={12} className="inline mr-1.5" />
-            Team
-          </button>
-          <button
-            onClick={() => setGroupingMode('hierarchy')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
-              groupingMode === 'hierarchy' 
-                ? 'bg-primary text-primary-foreground shadow-sm' 
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Building2 size={12} className="inline mr-1.5" />
-            Hierarchy
-          </button>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        {/* Group by */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Group by:</span>
+          <div className="flex bg-secondary/50 rounded-lg p-1">
+            <button
+              onClick={() => setGroupingMode('team')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                groupingMode === 'team' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Users size={12} className="inline mr-1.5" />
+              Team
+            </button>
+            <button
+              onClick={() => setGroupingMode('hierarchy')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                groupingMode === 'hierarchy' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Building2 size={12} className="inline mr-1.5" />
+              Hierarchy
+            </button>
+          </div>
+        </div>
+
+        <div className="w-px h-6 bg-border" />
+
+        {/* Scale toggle */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Scale:</span>
+          <div className="flex bg-secondary/50 rounded-lg p-1">
+            <button
+              onClick={() => handleScaleChange('years')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                timelineScale === 'years' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Calendar size={12} className="inline mr-1.5" />
+              Years
+            </button>
+            <button
+              onClick={() => handleScaleChange('quarters')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                timelineScale === 'quarters' 
+                  ? 'bg-primary text-primary-foreground shadow-sm' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <ZoomIn size={12} className="inline mr-1.5" />
+              Quarters
+            </button>
+          </div>
+        </div>
+
+        <div className="w-px h-6 bg-border" />
+
+        {/* Range configuration */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Range:</span>
+          {timelineScale === 'years' ? (
+            <div className="flex items-center gap-1">
+              <Input
+                type="number"
+                value={yearsRangeStart}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val < yearsRangeEnd) setYearsRangeStart(val);
+                }}
+                className="w-20 h-8 text-xs"
+                min={2000}
+                max={yearsRangeEnd - 1}
+              />
+              <span className="text-xs text-muted-foreground">to</span>
+              <Input
+                type="number"
+                value={yearsRangeEnd}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val > yearsRangeStart) setYearsRangeEnd(val);
+                }}
+                className="w-20 h-8 text-xs"
+                min={yearsRangeStart + 1}
+                max={2050}
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-1">
+              <select
+                value={`${quartersRangeStart.getFullYear()}-Q${Math.floor(quartersRangeStart.getMonth() / 3) + 1}`}
+                onChange={(e) => {
+                  const [y, q] = e.target.value.split('-Q');
+                  setQuartersRangeStart(new Date(parseInt(y), (parseInt(q) - 1) * 3, 1));
+                }}
+                className="h-8 text-xs rounded-md border border-input bg-background px-2"
+              >
+                {Array.from({ length: 40 }, (_, i) => {
+                  const y = currentYear - 5 + Math.floor(i / 4);
+                  const q = (i % 4) + 1;
+                  return <option key={`s-${y}-${q}`} value={`${y}-Q${q}`}>Q{q} {y}</option>;
+                })}
+              </select>
+              <span className="text-xs text-muted-foreground">to</span>
+              <select
+                value={`${quartersRangeEnd.getFullYear()}-Q${Math.floor(quartersRangeEnd.getMonth() / 3) + 1}`}
+                onChange={(e) => {
+                  const [y, q] = e.target.value.split('-Q');
+                  const qNum = parseInt(q);
+                  setQuartersRangeEnd(new Date(parseInt(y), qNum * 3 - 1 + 1, 0)); // last day of quarter
+                }}
+                className="h-8 text-xs rounded-md border border-input bg-background px-2"
+              >
+                {Array.from({ length: 40 }, (_, i) => {
+                  const y = currentYear - 5 + Math.floor(i / 4);
+                  const q = (i % 4) + 1;
+                  return <option key={`e-${y}-${q}`} value={`${y}-Q${q}`}>Q{q} {y}</option>;
+                })}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="min-w-[1800px]">
+      <div style={{ minWidth: `${minWidth}px` }}>
         {/* Header Rulers */}
         <div className="flex border-b border-border pb-4 mb-6">
           <div className="w-72 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
             Strategic Unit
           </div>
-          <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${years.length}, 1fr)` }}>
-            {years.map(year => (
+          <div className="flex-1 grid relative" style={{ gridTemplateColumns: `repeat(${columnLabels.length}, 1fr)` }}>
+            {columnLabels.map((label, i) => (
               <div 
-                key={year} 
+                key={i} 
                 className={`text-center border-l border-border text-[10px] font-bold ${
-                  year === '2025' ? 'text-primary' : 'text-muted-foreground'
+                  (timelineScale === 'years' && label === String(currentYear)) ||
+                  (timelineScale === 'quarters' && label === `Q${Math.floor(currentDate.getMonth() / 3) + 1} ${currentYear}`)
+                    ? 'text-primary' : 'text-muted-foreground'
                 }`}
               >
-                {year}
+                {label}
               </div>
             ))}
             {/* Current date marker in header */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div 
-                  style={{ left: `${currentDatePos}%` }}
-                  className="absolute -bottom-2 w-0 h-0 cursor-help"
-                >
-                  <div className="absolute -left-1.5 w-3 h-3 bg-destructive rounded-full border-2 border-background" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent className="bg-popover border border-border p-2 rounded-lg">
-                <p className="text-xs font-medium text-destructive">Today: {formatDate(currentDate.toISOString().split('T')[0])}</p>
-              </TooltipContent>
-            </Tooltip>
+            {currentDatePos >= 0 && currentDatePos <= 100 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div 
+                    style={{ left: `${currentDatePos}%` }}
+                    className="absolute -bottom-2 w-0 h-0 cursor-help"
+                  >
+                    <div className="absolute -left-1.5 w-3 h-3 bg-destructive rounded-full border-2 border-background" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent className="bg-popover border border-border p-2 rounded-lg">
+                  <p className="text-xs font-medium text-destructive">Today: {formatDate(currentDate.toISOString().split('T')[0])}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </div>
         
@@ -923,10 +1101,8 @@ export const Timeline = ({
           {groupingMode === 'hierarchy' ? (
             renderHierarchySection()
           ) : shouldGroupByTeam && teams.length > 0 ? (
-            // Group by team
             teams.map(teamName => renderTeamSection(teamName))
           ) : (
-            // Single team view or flat list
             <div className="space-y-3">
               {employees.map(emp => renderEmployeeRow(emp))}
             </div>

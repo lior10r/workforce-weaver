@@ -476,6 +476,13 @@ export const getTimelinePosition = (dateStr: string): number => {
   return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
 };
 
+export const getTimelinePositionInRange = (dateStr: string, rangeStart: Date, rangeEnd: Date): number => {
+  const date = new Date(dateStr);
+  const totalDuration = rangeEnd.getTime() - rangeStart.getTime();
+  const elapsed = date.getTime() - rangeStart.getTime();
+  return Math.max(0, Math.min(100, (elapsed / totalDuration) * 100));
+};
+
 export const getStatusColor = (status: string): string => {
   switch (status) {
     case 'Active': return 'status-active';
