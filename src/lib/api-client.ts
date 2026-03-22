@@ -240,6 +240,24 @@ class ApiClient {
   async healthCheck() {
     return this.request<{ status: string; timestamp: string }>('/health');
   }
+
+  // Labels
+  async getLabels() {
+    return this.request<Label[]>('/labels');
+  }
+
+  async createLabel(data: { name: string; color?: string }) {
+    return this.request<Label>('/labels', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteLabel(id: number) {
+    return this.request<{ message: string }>(`/labels/${id}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
 // Types (re-export from workforce-data for convenience)
@@ -248,7 +266,8 @@ import type {
   WorkforceEvent, 
   TeamStructure, 
   Scenario,
-  HierarchyStructure 
+  HierarchyStructure,
+  Label
 } from './workforce-data';
 
 export interface User {
@@ -263,4 +282,4 @@ export interface User {
 // Export singleton instance
 export const apiClient = new ApiClient();
 
-export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure };
+export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure, Label };
