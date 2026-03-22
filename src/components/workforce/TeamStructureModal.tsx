@@ -243,7 +243,7 @@ export const TeamStructureModal = ({
 
             {/* Add Skill from existing labels */}
             {availableSkills.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex gap-2 flex-wrap mb-3">
                 {availableSkills.map(label => (
                   <button
                     key={label.id}
@@ -257,9 +257,46 @@ export const TeamStructureModal = ({
               </div>
             )}
 
-            {labels.length === 0 && (
+            {/* Create new skill inline */}
+            {onCreateLabel && (
+              <div className="flex gap-2">
+                <Input
+                  value={newSkillName}
+                  onChange={(e) => setNewSkillName(e.target.value)}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && newSkillName.trim()) {
+                      e.preventDefault();
+                      try {
+                        await onCreateLabel(newSkillName.trim());
+                        handleAddSkill(newSkillName.trim());
+                        setNewSkillName('');
+                      } catch {}
+                    }
+                  }}
+                  placeholder="Create new skill..."
+                  className="h-8 text-xs flex-1"
+                />
+                <button
+                  onClick={async () => {
+                    if (!newSkillName.trim()) return;
+                    try {
+                      await onCreateLabel(newSkillName.trim());
+                      handleAddSkill(newSkillName.trim());
+                      setNewSkillName('');
+                    } catch {}
+                  }}
+                  disabled={!newSkillName.trim()}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                >
+                  <Plus size={12} />
+                  Add
+                </button>
+              </div>
+            )}
+
+            {labels.length === 0 && !onCreateLabel && (
               <p className="text-xs text-muted-foreground italic">
-                No labels created yet. Add labels from the sidebar to define required skills.
+                No skills created yet.
               </p>
             )}
           </div>
