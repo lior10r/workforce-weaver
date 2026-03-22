@@ -1,4 +1,4 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX, Tag, Plus, X, Trash2 } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
