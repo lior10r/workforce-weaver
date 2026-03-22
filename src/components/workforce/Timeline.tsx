@@ -464,12 +464,26 @@ export const Timeline = ({
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
             const isResolved = ev.isResolved;
 
+            const scrollToTransferred = isTeamSwap ? () => {
+              const targetEl = document.querySelector(`[data-timeline-emp-id="transfer-${ev.empId}"]`);
+              if (targetEl) {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                targetEl.classList.add('ring-2', 'ring-primary', 'rounded');
+                setTimeout(() => targetEl.classList.remove('ring-2', 'ring-primary', 'rounded'), 2000);
+              }
+            } : undefined;
+
             return (
               <Popover key={ev.id}>
                 <PopoverTrigger asChild>
                   <div 
                     style={{ left: `${pos}%` }}
                     className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                    onClick={isTeamSwap ? (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      scrollToTransferred?.();
+                    } : undefined}
                   >
                     <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110
                       ${ev.isFlag 
