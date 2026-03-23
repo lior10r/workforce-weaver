@@ -1,43 +1,34 @@
 
 
-## Fix: Team Leader Showing Wrong Person After Transfer
+## Improve Employee Movement Visualization in Timeline
 
 ### Problem
+When an employee transfers between teams, they currently appear as separate rows in both their old and new teams. Even with the "History" toggle, the representation is confusing — two disconnected bars in two different team sections don't clearly communicate a single person's movement.
 
-The `TeamStructure.teamLeader` field stores a specific employee ID, but when that employee transfers to another team, the stored ID is never cleared. This causes:
+### Solution
 
-1. **Timeline** shows the old leader's name (lines 827, 887) — looks up `structure.teamLeader` from `allEmployees` without checking team membership
-2. **AlertsPanel** checks `structure.teamLeader` against `teamMembers` but silently falls through — should trigger a "No Team Leader" alert when the stored leader isn't on the team anymore
-3. **Roster** works correctly because it uses `autoDetectTeamLeader` which filters by `e.team === teamName`
+**1. Default to History Off (current team only)**
+- Change `showTransferHistory` default from `true` to `false` so employees only appear in their current team by default, reducing visual clutter.
 
-### Fix
+**2. Add a connected transfer indicator on the bar itself**
+- When an employee was transferred into a team, show a small "transfer-in" marker at the start of their bar (an arrow icon + "from [OldTeam]" label visible on hover).
+- When History is ON and an employee is shown in their old team, show a "transfer-out" marker at the end of their bar (arrow icon + "to [NewTeam]").
 
-**Two-pronged approach:**
+**3. Improve the History ON mode with visual connection**
+- When history is enabled, render the old-team row with a **dashed/faded bar** (instead of solid) to clearly distinguish "past membership" from "current membership."
+- Add a subtle connecting arrow or label between the two entries so it's obvious they're the same person.
 
-**1. Auto-clear `teamLeader` on team transfer (`src/pages/Index.tsx` or wherever employee updates are handled)**
-- When an employee's team changes, check if they were the `teamLeader` of their old team's structure and clear it
-
-**2. Validate stored leader in Timeline and AlertsPanel display**
-
-**`src/components/workforce/Timeline.tsx`** (lines ~827 and ~887):
-- Change leader lookup to verify the person is still on the team:
-```typescript
-const storedLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
-const teamLeader = storedLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
-```
-
-**`src/components/workforce/AlertsPanel.tsx`** (line ~139):
-- Update leader detection to validate team membership and fall back to role-based detection:
-```typescript
-const structLeader = structure?.teamLeader ? teamMembers.find(e => e.id === structure.teamLeader) : null;
-const teamLeader = structLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
-```
-
-**`src/pages/Index.tsx`** (in the employee update/move handler):
-- When moving an employee to a new team, clear `teamLeader` from the old team's structure if it matches the employee's ID
+**4. Add "Replaced by" / "Replacing" context**
+- In the employee tooltip (both name hover and bar hover), if the employee transferred out, show who (if anyone) joined the team around the same time as a replacement.
+- Similarly, if the employee transferred in, show who they replaced (employee who left the team around the same time).
+- This is done by cross-referencing Team Swap and Departure events for the same team within a configurable window (e.g., +/- 30 days).
 
 ### Files to modify
-- `src/components/workforce/Timeline.tsx` — validate leader is on team, fallback to role detection
-- `src/components/workforce/AlertsPanel.tsx` — same validation + trigger alert when no valid leader
-- `src/pages/Index.tsx` — clear stale `teamLeader` reference on team transfer
+
+- **`src/components/workforce/Timeline.tsx`**
+  - Change `showTransferHistory` default to `false`
+  - Add dashed/faded styling for historical (source team) bars
+  - Add replacement context to employee tooltips (cross-reference departures and arrivals)
+  - Add "From [team]" badge on transferred-in employees' name section (already partially exists, make more prominent)
+  - Add connecting visual cue between old and new team entries when history is ON
 
