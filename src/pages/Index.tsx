@@ -1395,6 +1395,7 @@ const Index = () => {
         prefill={employeePrefill}
         labels={labels}
         onCreateLabel={async (name) => { try { return await createLabel(name); } catch { return undefined; } }}
+        isBackendAvailable={isBackendAvailable}
       />
 
       <EventModal
