@@ -267,6 +267,52 @@ export const Timeline = ({
   const shouldGroupByTeam = selectedDept !== 'All' || selectedTeam === 'All';
   const teams = shouldGroupByTeam ? getTeamsFromEmployees(employees) : [];
 
+  const renderTeamTooltipContent = (teamName: string) => {
+    const structure = teamStructures.find(s => s.teamName === teamName);
+    const teamMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const hasRoles = structure?.requiredRoles && Object.keys(structure.requiredRoles).length > 0;
+    const hasSkills = structure?.requiredSkills && Object.keys(structure.requiredSkills).length > 0;
+    
+    if (!hasRoles && !hasSkills) return null;
+    
+    return (
+      <div className="space-y-2 text-sm min-w-[180px]">
+        <p className="font-bold text-foreground">{teamName}</p>
+        <p className="text-[10px] text-muted-foreground">{teamMembers.length}{structure?.targetSize ? `/${structure.targetSize}` : ''} members</p>
+        {hasRoles && (
+          <div>
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Required Roles</p>
+            {Object.entries(structure!.requiredRoles).map(([role, count]) => {
+              const have = teamMembers.filter(e => e.role === role).length;
+              const isMet = have >= count;
+              return (
+                <p key={role} className="text-xs text-muted-foreground flex justify-between">
+                  <span>{role}</span>
+                  <span className={isMet ? 'text-emerald-500' : 'text-destructive'}>{have}/{count}</span>
+                </p>
+              );
+            })}
+          </div>
+        )}
+        {hasSkills && (
+          <div>
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Required Skills</p>
+            {Object.entries(structure!.requiredSkills!).map(([skill, count]) => {
+              const have = teamMembers.filter(e => (e.skills || []).includes(skill)).length;
+              const isMet = have >= count;
+              return (
+                <p key={skill} className="text-xs text-muted-foreground flex justify-between">
+                  <span>{skill}</span>
+                  <span className={isMet ? 'text-emerald-500' : 'text-destructive'}>{have}/{count}</span>
+                </p>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderEmployeeRow = (
     emp: Employee, 
     transferInfo?: TransferInfo,
@@ -380,6 +426,18 @@ export const Timeline = ({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">{emp.team} • {emp.dept}</p>
+                {emp.skills && emp.skills.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Skills</p>
+                    <div className="flex flex-wrap gap-1">
+                      {emp.skills.map(skill => (
+                        <span key={skill} className="px-1.5 py-0.5 rounded-full text-[10px] bg-primary/10 text-primary font-medium">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
@@ -740,7 +798,16 @@ export const Timeline = ({
       <div key={teamName} className="mb-8">
         <div className={`flex items-center gap-3 mb-4 pb-2 border-b border-border/50 ${hasDiffs ? 'border-b-amber-500/50' : ''}`}>
           <div className={`w-2 h-2 rounded-full ${hasDiffs ? 'bg-amber-500' : 'bg-primary'}`} />
-          <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">{teamName}</h3>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide cursor-help">{teamName}</h3>
+            </TooltipTrigger>
+            {renderTeamTooltipContent(teamName) && (
+              <TooltipContent side="bottom" className="bg-popover border border-border p-3 rounded-xl">
+                {renderTeamTooltipContent(teamName)}
+              </TooltipContent>
+            )}
+          </Tooltip>
           <span className="text-xs text-muted-foreground">({teamMembers.length} members)</span>
           {hasDiffs && (
             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500">
@@ -831,7 +898,16 @@ export const Timeline = ({
                   <div key={teamName} className="mb-4 ml-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                      <span className="text-xs font-medium text-foreground">{teamName}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs font-medium text-foreground cursor-help">{teamName}</span>
+                        </TooltipTrigger>
+                        {renderTeamTooltipContent(teamName) && (
+                          <TooltipContent side="bottom" className="bg-popover border border-border p-3 rounded-xl">
+                            {renderTeamTooltipContent(teamName)}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                       <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
                       {teamLeader && (
                         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
@@ -892,7 +968,16 @@ export const Timeline = ({
                     <div key={teamName} className="mb-4 ml-6">
                       <div className="flex items-center gap-2 mb-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                        <span className="text-xs font-medium text-foreground">{teamName}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-xs font-medium text-foreground cursor-help">{teamName}</span>
+                          </TooltipTrigger>
+                          {renderTeamTooltipContent(teamName) && (
+                            <TooltipContent side="bottom" className="bg-popover border border-border p-3 rounded-xl">
+                              {renderTeamTooltipContent(teamName)}
+                            </TooltipContent>
+                          )}
+                        </Tooltip>
                         <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
                         {teamLeader && (
                           <span className="text-[10px] text-muted-foreground flex items-center gap-1">
