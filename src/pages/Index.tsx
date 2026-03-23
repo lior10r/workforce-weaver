@@ -318,29 +318,27 @@ const Index = () => {
   // Helper: check if employee has departed
   const isEmployeeDeparted = useCallback((emp: Employee) => {
     const today = new Date();
-    // Check departureDate
     if (emp.departureDate && new Date(emp.departureDate) <= today) return true;
-    // Check departure events
     const hasDepartureEvent = events.some(ev => 
       ev.empId === emp.id && ev.type === 'Departure' && new Date(ev.date) <= today
     );
     return hasDepartureEvent;
   }, [events]);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter(e => {
-      const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchTeam = scopeFilter.teams.includes(e.team);
-      const isDeptLevel = !allTeamsList.includes(e.team);
-      const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
-      const matchScope = matchTeam || matchDeptLevel;
-      
-      // Filter out departed employees unless toggle is on
-      if (!showDeparted && isEmployeeDeparted(e)) return false;
-      
-      return matchSearch && matchScope;
-    });
-  }, [employees, searchQuery, scopeFilter, allTeamsList, showDeparted, isEmployeeDeparted]);
+  const matchesEmployeeFilters = useCallback((emp: Employee) => {
+    const matchSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchTeam = scopeFilter.teams.includes(emp.team);
+    const isDeptLevel = !allTeamsList.includes(emp.team);
+    const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(emp.dept);
+    const matchScope = matchTeam || matchDeptLevel;
+
+    if (!showDeparted && isEmployeeDeparted(emp)) return false;
+
+    return matchSearch && matchScope;
+  }, [searchQuery, scopeFilter, allTeamsList, showDeparted, isEmployeeDeparted]);
+
+  const filteredEmployees = useMemo(() => employees.filter(matchesEmployeeFilters), [employees, matchesEmployeeFilters]);
+  const filteredTimelineEmployees = useMemo(() => rawEmployees.filter(matchesEmployeeFilters), [rawEmployees, matchesEmployeeFilters]);
 
   // Stats
   const stats = useMemo(() => ({
