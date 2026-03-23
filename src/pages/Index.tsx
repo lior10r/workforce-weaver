@@ -1017,6 +1017,15 @@ const Index = () => {
                     />
                 )}
                 
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-lg border border-border bg-accent/50 hover:bg-accent transition-colors"
+                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
+                </button>
+                
                 {/* Backend/Auth Status */}
                 {!isBackendAvailable && (
                   <Badge variant="outline" className="gap-1 text-muted-foreground">
