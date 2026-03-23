@@ -49,6 +49,7 @@ export const EmployeeModal = ({
   prefill,
   labels = [],
   onCreateLabel,
+  isBackendAvailable = false,
 }: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDept, setSelectedDept] = useState(DEPARTMENT_NAMES[0]);
