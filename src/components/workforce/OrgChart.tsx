@@ -431,8 +431,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
                       {dept.directTeams.map(teamName => {
                         const teamMembers = employees.filter(e => e.team === teamName);
                         const structure = teamStructures.find(s => s.teamName === teamName);
-                        const storedLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
-                        const teamLeader = storedLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead') || null;
+                        const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
                         const eligibleLeaders = getEligibleManagers(dept.name, undefined, teamName);
 
                         return (
@@ -568,8 +567,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
                           {group.teams.map(teamName => {
                             const teamMembers = employees.filter(e => e.team === teamName);
                             const structure = teamStructures.find(s => s.teamName === teamName);
-                            const storedLeader2 = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
-                            const teamLeader = storedLeader2 || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead') || null;
+                            const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
                             const eligibleLeaders = getEligibleManagers(dept.name, group.name, teamName);
 
                             return (
@@ -649,7 +647,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
     <div className="space-y-6">
       {Object.entries(teamGroups).map(([team, emps]) => {
         const structure = teamStructures.find(s => s.teamName === team);
-        const leader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+        const leader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === team) || null : null;
         
         return (
           <div key={team} className="glass-card p-6">

@@ -135,10 +135,9 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         }
       }
 
-      // 5. No team leader — validate stored leader is actually on this team
+      // 5. No team leader — only a valid stored team leader counts
       const structLeader = structure?.teamLeader ? teamMembers.find(e => e.id === structure.teamLeader) : null;
-      const roleLeader = teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
-      if (!structLeader && !roleLeader && teamMembers.length > 0) {
+      if (!structLeader && teamMembers.length > 0) {
         result.push({
           id: `leader-${teamName}`,
           type: 'no_leader',
