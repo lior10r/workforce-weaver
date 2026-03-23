@@ -364,7 +364,7 @@ export const Roster = ({
   // Auto-detect team leader with same active-first logic
   const autoDetectTeamLeader = (teamName: string) => {
     const candidates = employees.filter(e => 
-      !e.isPotential && e.team === teamName && (e.managerLevel === 'team' || e.role === 'Team Lead')
+      !e.isPotential && e.team === teamName && (e.managerLevel === 'team' || e.managerLevel === 'group' || e.managerLevel === 'department' || e.role === 'Team Lead')
     );
     if (candidates.length === 0) return { leader: null, duplicates: false };
 
