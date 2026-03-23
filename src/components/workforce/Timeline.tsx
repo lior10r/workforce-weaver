@@ -119,6 +119,7 @@ export const Timeline = ({
   events, 
   openPlannerForUser, 
   allEmployees = [], 
+  effectiveEmployees: effectiveEmployeesProp,
   selectedTeam = 'All', 
   selectedDept = 'All',
   teamStructures = [],
@@ -130,6 +131,9 @@ export const Timeline = ({
   onEditEmployee,
   
 }: TimelineProps) => {
+  // effectiveEmployees: used for alerts, leader checks, team membership counts
+  // Falls back to `employees` if not provided
+  const effectiveEmployees = effectiveEmployeesProp || employees;
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
