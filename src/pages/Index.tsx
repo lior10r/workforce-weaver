@@ -21,6 +21,7 @@ import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
+import { AlertsPanel } from '@/components/workforce/AlertsPanel';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { useLabels } from '@/hooks/use-labels';
 import { toast } from 'sonner';
