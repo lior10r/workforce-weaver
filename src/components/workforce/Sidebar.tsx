@@ -1,11 +1,10 @@
-import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX, Sun, Moon } from 'lucide-react';
+import { TrendingUp, Users, Calendar, UserCheck, ArrowRightLeft, BarChart3, ChevronDown, ChevronRight, FolderTree, Settings, ClipboardList, FileBarChart, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { LucideIcon } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { HierarchyStructure, GroupStructure } from '@/lib/workforce-data';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/use-theme';
 
 interface SidebarItemProps {
   icon: LucideIcon;
@@ -51,7 +50,6 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
@@ -236,17 +234,8 @@ export const Sidebar = ({
         )}
       </nav>
 
-      {/* Theme Toggle & Show Departed */}
+      {/* Show Departed */}
       <div className="mt-auto" />
-      <div className="flex gap-2 mb-2">
-        <button
-          onClick={toggleTheme}
-          className="flex items-center gap-2 flex-1 p-3 bg-accent/50 rounded-xl border border-border hover:bg-accent transition-colors"
-        >
-          {theme === 'dark' ? <Sun size={14} className="text-muted-foreground" /> : <Moon size={14} className="text-muted-foreground" />}
-          <span className="text-xs text-muted-foreground font-medium">{theme === 'dark' ? 'Light' : 'Dark'}</span>
-        </button>
-      </div>
       <div className="p-3 bg-accent/50 rounded-xl border border-border">
         <button
           onClick={() => setShowDeparted(!showDeparted)}

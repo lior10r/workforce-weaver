@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, UserPlus, ChevronRight, Lock, LogOut, Users, Shield } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Lock, LogOut, Users, Shield, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/hooks/use-theme';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/workforce/Sidebar';
@@ -60,6 +61,7 @@ interface ScopeFilter {
 const Index = () => {
   const navigate = useNavigate();
   const { user, logout, isAdmin, isBackendAvailable, linkedEmployee, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   // Use the workforce data hook for persistence and undo/redo
   const {
     masterEmployees,
@@ -1014,6 +1016,15 @@ const Index = () => {
                       orgChartRef={undefined}
                     />
                 )}
+                
+                {/* Theme Toggle */}
+                <button
+                  onClick={toggleTheme}
+                  className="p-2 rounded-lg border border-border bg-accent/50 hover:bg-accent transition-colors"
+                  title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                  {theme === 'dark' ? <Sun size={16} className="text-muted-foreground" /> : <Moon size={16} className="text-muted-foreground" />}
+                </button>
                 
                 {/* Backend/Auth Status */}
                 {!isBackendAvailable && (
