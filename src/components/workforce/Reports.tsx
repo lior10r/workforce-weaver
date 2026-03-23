@@ -38,7 +38,7 @@ const sectionConfig: Record<ReportSection, { label: string; icon: typeof Users }
 
 export const Reports = ({ employees, events, teamStructures, hierarchy }: ReportsProps) => {
   const [sections, setSections] = useState<Record<ReportSection, boolean>>({
-    headcount: true, gaps: true, events: true, roles: true, tenure: true,
+    headcount: true, gaps: true, forecast: true, events: true, roles: true, tenure: true,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
