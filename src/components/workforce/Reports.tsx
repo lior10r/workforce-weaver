@@ -426,6 +426,74 @@ export const Reports = ({ employees, events, teamStructures, hierarchy }: Report
           </Card>
         )}
 
+        {sections.forecast && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingDown size={16} className="text-primary" /> Staffing Forecast — First Gap Date
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {forecastData.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-sm text-emerald-500 font-medium">✅ No staffing gaps predicted</p>
+                  <p className="text-xs text-muted-foreground mt-1">All teams will remain fully staffed based on current plans</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-4 mb-4">
+                    <div className="flex-1 p-3 bg-accent/30 rounded-lg">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Teams at Risk</p>
+                      <p className="text-2xl font-bold text-destructive">{forecastData.length}</p>
+                    </div>
+                    <div className="flex-1 p-3 bg-accent/30 rounded-lg">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Currently Missing</p>
+                      <p className="text-2xl font-bold text-amber-500">{forecastData.filter(f => f.isCurrentlyMissing).length}</p>
+                    </div>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Team</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>First Gap Date</TableHead>
+                        <TableHead>Missing Roles</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {forecastData.map(row => (
+                        <TableRow key={row.teamName}>
+                          <TableCell className="font-medium">{row.teamName}</TableCell>
+                          <TableCell>{row.department}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              {row.isCurrentlyMissing && (
+                                <AlertTriangle size={12} className="text-destructive" />
+                              )}
+                              <span className={row.isCurrentlyMissing ? 'text-destructive font-semibold' : ''}>
+                                {row.isCurrentlyMissing ? 'Now' : formatDate(row.firstGapDate)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {row.missingRoles.map(mr => (
+                                <Badge key={mr.role} variant="outline" className="text-[10px]">
+                                  {mr.role} ({mr.have}/{mr.need})
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {sections.events && (
           <Card>
             <CardHeader><CardTitle className="text-base flex items-center gap-2"><Calendar size={16} className="text-primary" /> Upcoming Events (Next 90 Days)</CardTitle></CardHeader>
