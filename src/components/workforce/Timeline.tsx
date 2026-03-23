@@ -227,6 +227,71 @@ export const Timeline = ({
     return missing;
   };
 
+  // Find replacement context for an employee in a given team
+  const getReplacementContext = (empId: number, teamName: string, isSourceTeam: boolean, isTransfer: boolean, transferInfo?: TransferInfo) => {
+    const replacementWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const emp = allEmployees.find(e => e.id === empId);
+    if (!emp) return null;
+
+    // Employee transferred out or is in source team — find who replaced them
+    if (isSourceTeam) {
+      const teamSwapEvent = events.find(e => e.empId === empId && e.type === 'Team Swap');
+      if (teamSwapEvent) {
+        const swapDate = new Date(teamSwapEvent.date).getTime();
+        // Look for someone who joined this team around the same time
+        const replacementEvent = events
+          .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || (e.type === 'New Joiner'))
+          .filter(e => e.empId !== empId)
+          .find(e => {
+            const eDate = new Date(e.date).getTime();
+            if (e.type === 'New Joiner') {
+              const joinerEmp = allEmployees.find(em => em.id === e.empId);
+              return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
+            }
+            return Math.abs(eDate - swapDate) <= replacementWindow;
+          });
+        if (replacementEvent) {
+          const replacementEmp = allEmployees.find(e => e.id === replacementEvent.empId);
+          return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
+        }
+        return { type: 'needs_replacement' as const, person: null, role: emp.role };
+      }
+    }
+
+    // Employee transferred in — find who they replaced
+    if (isTransfer && transferInfo) {
+      const transferDate = new Date(transferInfo.transferDate).getTime();
+      const replacedEvent = events
+        .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== empId)
+        .filter(e => {
+          const srcEmp = allEmployees.find(em => em.id === e.empId);
+          if (e.type === 'Team Swap') return srcEmp?.team === teamName;
+          if (e.type === 'Departure') return srcEmp?.team === teamName;
+          return false;
+        })
+        .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
+      if (replacedEvent) {
+        const replacedEmp = allEmployees.find(e => e.id === replacedEvent.empId);
+        return { type: 'replacing' as const, person: replacedEmp || null, role: replacedEmp?.role };
+      }
+    }
+
+    // Check departed employees who have no replacement
+    const departureEvent = events.find(e => e.empId === empId && e.type === 'Departure');
+    if (departureEvent && new Date(departureEvent.date) <= new Date()) {
+      const depDate = new Date(departureEvent.date).getTime();
+      const replacementEvent = events
+        .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
+        .filter(e => e.empId !== empId)
+        .find(e => Math.abs(new Date(e.date).getTime() - depDate) <= replacementWindow);
+      if (!replacementEvent) {
+        return { type: 'needs_replacement' as const, person: null, role: emp.role };
+      }
+    }
+
+    return null;
+  };
+
   const getTeamAlerts = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
     const activeMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
@@ -245,11 +310,45 @@ export const Timeline = ({
         if (have < needed) missingSkills.push({ skill, have, need: needed });
       }
     }
-    return { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills };
+
+    // Count people who left/transferred out without replacement
+    const replacementWindow = 30 * 24 * 60 * 60 * 1000;
+    const today = new Date();
+    let needsReplacementCount = 0;
+    const needsReplacementNames: { name: string; role: string }[] = [];
+
+    // Check team swaps out
+    const swapsOut = events.filter(e => e.type === 'Team Swap' && new Date(e.date) <= today);
+    swapsOut.forEach(swap => {
+      const swapEmp = allEmployees.find(em => em.id === swap.empId);
+      if (swapEmp?.team !== teamName) return; // only care about people who were in this team originally
+      // Actually check if this employee's original team is this team
+      const origEmp = employees.find(em => em.id === swap.empId && em.team === teamName);
+      if (!origEmp) return;
+      
+      const swapDate = new Date(swap.date).getTime();
+      const hasReplacement = events
+        .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
+        .filter(e => e.empId !== swap.empId)
+        .some(e => {
+          const eDate = new Date(e.date).getTime();
+          if (e.type === 'New Joiner') {
+            const joinerEmp = allEmployees.find(em => em.id === e.empId);
+            return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
+          }
+          return Math.abs(eDate - swapDate) <= replacementWindow;
+        });
+      if (!hasReplacement) {
+        needsReplacementCount++;
+        needsReplacementNames.push({ name: origEmp.name, role: origEmp.role });
+      }
+    });
+
+    return { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills, needsReplacementCount, needsReplacementNames };
   };
 
   const renderTeamAlertBadges = (teamName: string) => {
-    const { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills } = getTeamAlerts(teamName);
+    const { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills, needsReplacementCount, needsReplacementNames } = getTeamAlerts(teamName);
     return (
       <>
         {hasNoLeader && (
@@ -269,6 +368,26 @@ export const Timeline = ({
             <Users size={12} />
             <span className="text-[10px] font-bold">+{Math.abs(staffDiff)} overstaffed</span>
           </div>
+        )}
+        {needsReplacementCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-destructive/10 text-destructive rounded-full cursor-help">
+                <UserPlus size={12} />
+                <span className="text-[10px] font-bold">{needsReplacementCount} need replacement</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+              <div className="space-y-1">
+                <p className="font-bold text-destructive text-sm">Needs Replacement</p>
+                {needsReplacementNames.map(({ name, role }) => (
+                  <p key={name} className="text-sm text-muted-foreground">
+                    {name} <span className="text-muted-foreground/60">({role})</span>
+                  </p>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         )}
         {missingSkills.length > 0 && (
           <Tooltip>
@@ -407,7 +526,8 @@ export const Timeline = ({
     isTransfer = false,
     isManagerRow = false,
     managerLevel?: 'dept' | 'group',
-    isSourceTeam = false
+    isSourceTeam = false,
+    teamNameForContext?: string
   ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
@@ -483,6 +603,42 @@ export const Timeline = ({
                     </p>
                   </div>
                 )}
+                {/* Inline replacement badge */}
+                {teamNameForContext && (() => {
+                  const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                  if (!ctx) return null;
+                  if (ctx.type === 'replaced_by' && ctx.person) {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <UserPlus size={10} className="text-emerald-500" />
+                        <p className="text-[9px] text-emerald-500 font-medium">
+                          Replaced by {ctx.person.name} <span className="text-emerald-500/60">({ctx.role})</span>
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'needs_replacement') {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <AlertTriangle size={10} className="text-destructive" />
+                        <p className="text-[9px] text-destructive font-bold">
+                          No replacement yet — needs {ctx.role}
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'replacing' && ctx.person) {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <ArrowRight size={10} className="text-accent-blue" />
+                        <p className="text-[9px] text-accent-blue font-medium">
+                          Replacing {ctx.person.name} <span className="text-accent-blue/60">({ctx.role})</span>
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {isPotential && (
                   <p className="text-[9px] text-potential font-medium mt-0.5">
                     Potential hire
@@ -527,8 +683,40 @@ export const Timeline = ({
                   </div>
                 )}
                 {isSourceTeam && (
-                  <p className="text-amber-500 text-xs font-medium mt-1">📤 Past team member (transferred out)</p>
+                  <p className="text-amber-500 text-sm font-medium mt-1">📤 Past team member (transferred out)</p>
                 )}
+                {teamNameForContext && (() => {
+                  const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                  if (!ctx) return null;
+                  if (ctx.type === 'replaced_by' && ctx.person) {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                        <p className="text-sm text-emerald-500 font-medium">
+                          ✅ Replaced by {ctx.person.name} ({ctx.role})
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'needs_replacement') {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-destructive/10 border border-destructive/20">
+                        <p className="text-sm text-destructive font-bold">
+                          ⚠️ No replacement yet — needs {ctx.role}
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'replacing' && ctx.person) {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-accent-blue/10 border border-accent-blue/20">
+                        <p className="text-sm text-accent-blue font-medium">
+                          🔄 Replacing {ctx.person.name} ({ctx.role})
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </TooltipContent>
           </Tooltip>
@@ -647,44 +835,35 @@ export const Timeline = ({
                         <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
                       </p>
                     )}
-                    {(() => {
-                      // Replacement context
-                      const replacementWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
-                      if (isSourceTeam && teamSwapEvent) {
-                        const swapDate = new Date(teamSwapEvent.date).getTime();
-                        const replacement = events
-                          .filter(e => e.type === 'Team Swap' && e.targetTeam === emp.team && e.empId !== emp.id)
-                          .find(e => Math.abs(new Date(e.date).getTime() - swapDate) <= replacementWindow);
-                        if (replacement) {
-                          const replacementEmp = allEmployees.find(e => e.id === replacement.empId);
-                          if (replacementEmp) {
-                            return (
-                              <p className="text-emerald-500 text-xs">
-                                <span className="font-medium">Replaced by:</span> {replacementEmp.name}
-                              </p>
-                            );
-                          }
-                        }
+                    {teamNameForContext && (() => {
+                      const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                      if (!ctx) return null;
+                      if (ctx.type === 'replaced_by' && ctx.person) {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                            <p className="text-sm text-emerald-500 font-medium">
+                              ✅ Replaced by {ctx.person.name} ({ctx.role})
+                            </p>
+                          </div>
+                        );
                       }
-                      if (isTransfer && transferInfo) {
-                        const transferDate = new Date(transferInfo.transferDate).getTime();
-                        const replaced = events
-                          .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== emp.id)
-                          .filter(e => {
-                            const srcEmp = allEmployees.find(em => em.id === e.empId);
-                            return srcEmp?.team === emp.team || e.type === 'Departure';
-                          })
-                          .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
-                        if (replaced) {
-                          const replacedEmp = allEmployees.find(e => e.id === replaced.empId);
-                          if (replacedEmp) {
-                            return (
-                              <p className="text-amber-500 text-xs">
-                                <span className="font-medium">Replacing:</span> {replacedEmp.name}
-                              </p>
-                            );
-                          }
-                        }
+                      if (ctx.type === 'needs_replacement') {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-destructive/10 border border-destructive/20">
+                            <p className="text-sm text-destructive font-bold">
+                              ⚠️ No replacement yet — needs {ctx.role}
+                            </p>
+                          </div>
+                        );
+                      }
+                      if (ctx.type === 'replacing' && ctx.person) {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-accent-blue/10 border border-accent-blue/20">
+                            <p className="text-sm text-accent-blue font-medium">
+                              🔄 Replacing {ctx.person.name} ({ctx.role})
+                            </p>
+                          </div>
+                        );
                       }
                       return null;
                     })()}
@@ -977,7 +1156,7 @@ export const Timeline = ({
         </div>
         <div className="space-y-3">
           {teamMembers.map(({ employee, transferInfo, isTransfer, isSourceTeam }) => 
-            renderEmployeeRow(employee, transferInfo, isTransfer, false, undefined, isSourceTeam)
+            renderEmployeeRow(employee, transferInfo, isTransfer, false, undefined, isSourceTeam, teamName)
           )}
         </div>
       </div>
@@ -1056,7 +1235,7 @@ export const Timeline = ({
                       {renderTeamAlertBadges(teamName)}
                     </div>
                     <div className="space-y-3 ml-3">
-                      {teamMembers.map(emp => renderEmployeeRow(emp))}
+                      {teamMembers.map(emp => renderEmployeeRow(emp, undefined, false, false, undefined, false, teamName))}
                     </div>
                   </div>
                 );
@@ -1126,7 +1305,7 @@ export const Timeline = ({
                         {renderTeamAlertBadges(teamName)}
                       </div>
                       <div className="space-y-3 ml-3">
-                        {teamMembers.map(emp => renderEmployeeRow(emp))}
+                        {teamMembers.map(emp => renderEmployeeRow(emp, undefined, false, false, undefined, false, teamName))}
                       </div>
                     </div>
                   );
