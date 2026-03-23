@@ -1118,12 +1118,6 @@ const Index = () => {
 
           {view === 'timeline' && (
             <div className="space-y-6">
-              <AlertsPanel
-                employees={filteredEmployees}
-                events={events}
-                teamStructures={teamStructures}
-                hierarchy={hierarchy}
-              />
               <div className="flex flex-wrap gap-3 justify-between items-center">
                 <MissingRolesForecast 
                   employees={employees}
