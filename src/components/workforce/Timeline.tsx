@@ -221,6 +221,71 @@ export const Timeline = ({
     return missing;
   };
 
+  const getTeamAlerts = (teamName: string) => {
+    const structure = teamStructures.find(s => s.teamName === teamName);
+    const activeMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const storedLeader = structure?.teamLeader ? activeMembers.find(e => e.id === structure.teamLeader) : null;
+    const hasNoLeader = activeMembers.length > 0 && !storedLeader;
+    const targetSize = structure?.targetSize;
+    const staffDiff = targetSize ? targetSize - activeMembers.length : 0;
+    const isUnderstaffed = staffDiff > 0;
+    const isOverstaffed = staffDiff < -2;
+    const missingSkills: { skill: string; have: number; need: number }[] = [];
+    if (structure?.requiredSkills) {
+      for (const [skill, needed] of Object.entries(structure.requiredSkills)) {
+        const have = activeMembers.filter(e => (e.skills || []).includes(skill)).length;
+        if (have < needed) missingSkills.push({ skill, have, need: needed });
+      }
+    }
+    return { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills };
+  };
+
+  const renderTeamAlertBadges = (teamName: string) => {
+    const { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills } = getTeamAlerts(teamName);
+    return (
+      <>
+        {hasNoLeader && (
+          <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full">
+            <Shield size={12} />
+            <span className="text-[10px] font-bold">No leader</span>
+          </div>
+        )}
+        {isUnderstaffed && (
+          <div className="flex items-center gap-1 px-2 py-0.5 bg-destructive/10 text-destructive rounded-full">
+            <Users size={12} />
+            <span className="text-[10px] font-bold">-{staffDiff} understaffed</span>
+          </div>
+        )}
+        {isOverstaffed && (
+          <div className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary rounded-full">
+            <Users size={12} />
+            <span className="text-[10px] font-bold">+{Math.abs(staffDiff)} overstaffed</span>
+          </div>
+        )}
+        {missingSkills.length > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 text-amber-600 dark:text-amber-400 rounded-full cursor-help">
+                <Tag size={12} />
+                <span className="text-[10px] font-bold">Missing skills</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+              <div className="space-y-1">
+                <p className="font-bold text-amber-500 text-sm">Missing Skills</p>
+                {missingSkills.map(({ skill, have, need }) => (
+                  <p key={skill} className="text-xs text-muted-foreground">
+                    {skill}: <span className="text-amber-500 font-medium">{have}/{need}</span>
+                  </p>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </>
+    );
+  };
+
   // Build map of employees who are/were in each team (including source team for swaps)
   const getEmployeesInTeam = (teamName: string) => {
     const directMembers = employees.filter(e => e.team === teamName);
