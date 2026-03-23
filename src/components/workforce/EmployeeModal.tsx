@@ -33,6 +33,7 @@ interface EmployeeModalProps {
   prefill?: { dept: string; team: string; group?: string | null };
   labels?: Label[];
   onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  isBackendAvailable?: boolean;
 }
 
 export const EmployeeModal = ({
