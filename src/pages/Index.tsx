@@ -1103,7 +1103,7 @@ const Index = () => {
               setHierarchy={() => {}}
               departments={departments}
               teamStructures={teamStructures}
-              fullHierarchy={hierarchyStructure}
+              fullHierarchy={hierarchy}
             />
           )}
 
