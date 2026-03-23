@@ -798,7 +798,16 @@ export const Timeline = ({
       <div key={teamName} className="mb-8">
         <div className={`flex items-center gap-3 mb-4 pb-2 border-b border-border/50 ${hasDiffs ? 'border-b-amber-500/50' : ''}`}>
           <div className={`w-2 h-2 rounded-full ${hasDiffs ? 'bg-amber-500' : 'bg-primary'}`} />
-          <h3 className="text-sm font-bold text-foreground uppercase tracking-wide">{teamName}</h3>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wide cursor-help">{teamName}</h3>
+            </TooltipTrigger>
+            {renderTeamTooltipContent(teamName) && (
+              <TooltipContent side="bottom" className="bg-popover border border-border p-3 rounded-xl">
+                {renderTeamTooltipContent(teamName)}
+              </TooltipContent>
+            )}
+          </Tooltip>
           <span className="text-xs text-muted-foreground">({teamMembers.length} members)</span>
           {hasDiffs && (
             <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-500">
