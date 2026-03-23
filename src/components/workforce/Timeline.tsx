@@ -229,7 +229,7 @@ export const Timeline = ({
 
   const getTeamAlerts = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
-    const activeMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const activeMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
     const storedLeader = structure?.teamLeader ? activeMembers.find(e => e.id === structure.teamLeader) : null;
     const roleLeader = activeMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
     const hasManagerLeader = activeMembers.some(e => e.managerLevel === 'group' || e.managerLevel === 'department');
