@@ -824,7 +824,8 @@ export const Timeline = ({
                 if (teamMembers.length === 0) return null;
                 
                 const structure = teamStructures.find(s => s.teamName === teamName);
-                const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader) : null;
+                const storedLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
+                const teamLeader = storedLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead') || null;
 
                 return (
                   <div key={teamName} className="mb-4 ml-4">
