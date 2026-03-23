@@ -137,7 +137,7 @@ export const Timeline = ({
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
-  const [showTransferHistory, setShowTransferHistory] = useState(true);
+  const [showTransferHistory, setShowTransferHistory] = useState(false);
   
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
