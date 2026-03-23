@@ -285,14 +285,14 @@ class ApiClient {
   }
 }
 
-// Types (re-export from workforce-data for convenience)
 import type { 
   Employee, 
   WorkforceEvent, 
   TeamStructure, 
   Scenario,
   HierarchyStructure,
-  Label
+  Label,
+  EmployeeNote,
 } from './workforce-data';
 
 export interface User {
@@ -307,4 +307,4 @@ export interface User {
 // Export singleton instance
 export const apiClient = new ApiClient();
 
-export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure, Label };
+export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure, Label, EmployeeNote };
