@@ -224,6 +224,7 @@ export const Timeline = ({
   // Build map of employees who are/were in each team (including source team for swaps)
   const getEmployeesInTeam = (teamName: string) => {
     const directMembers = employees.filter(e => e.team === teamName);
+    const today = new Date();
     
     // Find employees who transferred INTO this team
     const transfersIn = events
@@ -244,6 +245,10 @@ export const Timeline = ({
 
     directMembers.forEach(emp => {
       const transferOutEvent = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
+      // If history is hidden and this person has already transferred out (past date), skip them in this team
+      if (!showTransferHistory && transferOutEvent && new Date(transferOutEvent.date) <= today) {
+        return;
+      }
       allTeamMembers.push({ 
         employee: emp, 
         isTransfer: false,
@@ -253,11 +258,19 @@ export const Timeline = ({
 
     transfersIn.forEach(({ employee, movement }) => {
       if (!directMembers.some(e => e.id === employee.id)) {
-        allTeamMembers.push({ 
-          employee: { ...employee, team: teamName, dept: employee.dept },
-          transferInfo: { fromTeam: employee.team, transferDate: movement.date },
-          isTransfer: true
-        });
+        // If history is hidden and the transfer already happened (past date), show them here as current member
+        if (!showTransferHistory && new Date(movement.date) <= today) {
+          allTeamMembers.push({ 
+            employee: { ...employee, team: teamName, dept: employee.dept },
+            isTransfer: false
+          });
+        } else {
+          allTeamMembers.push({ 
+            employee: { ...employee, team: teamName, dept: employee.dept },
+            transferInfo: { fromTeam: employee.team, transferDate: movement.date },
+            isTransfer: true
+          });
+        }
       }
     });
 
