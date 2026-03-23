@@ -131,6 +131,7 @@ export const Timeline = ({
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
+  const [showTransferHistory, setShowTransferHistory] = useState(true);
   
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
@@ -223,6 +224,7 @@ export const Timeline = ({
   // Build map of employees who are/were in each team (including source team for swaps)
   const getEmployeesInTeam = (teamName: string) => {
     const directMembers = employees.filter(e => e.team === teamName);
+    const today = new Date();
     
     // Find employees who transferred INTO this team
     const transfersIn = events
@@ -243,6 +245,10 @@ export const Timeline = ({
 
     directMembers.forEach(emp => {
       const transferOutEvent = events.find(e => e.empId === emp.id && e.type === 'Team Swap');
+      // If history is hidden and this person has already transferred out (past date), skip them in this team
+      if (!showTransferHistory && transferOutEvent && new Date(transferOutEvent.date) <= today) {
+        return;
+      }
       allTeamMembers.push({ 
         employee: emp, 
         isTransfer: false,
@@ -252,11 +258,19 @@ export const Timeline = ({
 
     transfersIn.forEach(({ employee, movement }) => {
       if (!directMembers.some(e => e.id === employee.id)) {
-        allTeamMembers.push({ 
-          employee: { ...employee, team: teamName, dept: employee.dept },
-          transferInfo: { fromTeam: employee.team, transferDate: movement.date },
-          isTransfer: true
-        });
+        // If history is hidden and the transfer already happened (past date), show them here as current member
+        if (!showTransferHistory && new Date(movement.date) <= today) {
+          allTeamMembers.push({ 
+            employee: { ...employee, team: teamName, dept: employee.dept },
+            isTransfer: false
+          });
+        } else {
+          allTeamMembers.push({ 
+            employee: { ...employee, team: teamName, dept: employee.dept },
+            transferInfo: { fromTeam: employee.team, transferDate: movement.date },
+            isTransfer: true
+          });
+        }
       }
     });
 
@@ -1074,6 +1088,22 @@ export const Timeline = ({
             </button>
           </div>
         </div>
+
+        <div className="w-px h-6 bg-border" />
+
+        {/* Transfer history toggle */}
+        <button
+          onClick={() => setShowTransferHistory(prev => !prev)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+            showTransferHistory
+              ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/30'
+              : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
+          }`}
+          title={showTransferHistory ? 'Showing employees in previous teams — click to hide' : 'Showing current teams only — click to show transfer history'}
+        >
+          <ArrowRightLeft size={12} />
+          {showTransferHistory ? 'History On' : 'History Off'}
+        </button>
 
         <div className="w-px h-6 bg-border" />
 
