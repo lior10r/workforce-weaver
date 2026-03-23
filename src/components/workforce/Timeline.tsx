@@ -835,44 +835,35 @@ export const Timeline = ({
                         <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
                       </p>
                     )}
-                    {(() => {
-                      // Replacement context
-                      const replacementWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
-                      if (isSourceTeam && teamSwapEvent) {
-                        const swapDate = new Date(teamSwapEvent.date).getTime();
-                        const replacement = events
-                          .filter(e => e.type === 'Team Swap' && e.targetTeam === emp.team && e.empId !== emp.id)
-                          .find(e => Math.abs(new Date(e.date).getTime() - swapDate) <= replacementWindow);
-                        if (replacement) {
-                          const replacementEmp = allEmployees.find(e => e.id === replacement.empId);
-                          if (replacementEmp) {
-                            return (
-                              <p className="text-emerald-500 text-xs">
-                                <span className="font-medium">Replaced by:</span> {replacementEmp.name}
-                              </p>
-                            );
-                          }
-                        }
+                    {teamNameForContext && (() => {
+                      const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                      if (!ctx) return null;
+                      if (ctx.type === 'replaced_by' && ctx.person) {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                            <p className="text-sm text-emerald-500 font-medium">
+                              ✅ Replaced by {ctx.person.name} ({ctx.role})
+                            </p>
+                          </div>
+                        );
                       }
-                      if (isTransfer && transferInfo) {
-                        const transferDate = new Date(transferInfo.transferDate).getTime();
-                        const replaced = events
-                          .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== emp.id)
-                          .filter(e => {
-                            const srcEmp = allEmployees.find(em => em.id === e.empId);
-                            return srcEmp?.team === emp.team || e.type === 'Departure';
-                          })
-                          .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
-                        if (replaced) {
-                          const replacedEmp = allEmployees.find(e => e.id === replaced.empId);
-                          if (replacedEmp) {
-                            return (
-                              <p className="text-amber-500 text-xs">
-                                <span className="font-medium">Replacing:</span> {replacedEmp.name}
-                              </p>
-                            );
-                          }
-                        }
+                      if (ctx.type === 'needs_replacement') {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-destructive/10 border border-destructive/20">
+                            <p className="text-sm text-destructive font-bold">
+                              ⚠️ No replacement yet — needs {ctx.role}
+                            </p>
+                          </div>
+                        );
+                      }
+                      if (ctx.type === 'replacing' && ctx.person) {
+                        return (
+                          <div className="mt-1 p-1.5 rounded bg-accent-blue/10 border border-accent-blue/20">
+                            <p className="text-sm text-accent-blue font-medium">
+                              🔄 Replacing {ctx.person.name} ({ctx.role})
+                            </p>
+                          </div>
+                        );
                       }
                       return null;
                     })()}
