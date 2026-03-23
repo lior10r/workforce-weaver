@@ -137,7 +137,7 @@ export const Timeline = ({
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
-  const [showTransferHistory, setShowTransferHistory] = useState(true);
+  const [showTransferHistory, setShowTransferHistory] = useState(false);
   
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
@@ -525,6 +525,9 @@ export const Timeline = ({
                     </div>
                   </div>
                 )}
+                {isSourceTeam && (
+                  <p className="text-amber-500 text-xs font-medium mt-1">📤 Past team member (transferred out)</p>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
@@ -609,12 +612,19 @@ export const Timeline = ({
                       left: `${joinedPos}%`, 
                       width: `${durationWidth}%` 
                     }}
-                    className={`absolute inset-y-2 cursor-help ${getRoleColor(emp.role)} opacity-60 rounded-md border border-foreground/10`}
+                    className={`absolute inset-y-2 cursor-help ${getRoleColor(emp.role)} rounded-md border border-foreground/10 ${
+                      isSourceTeam 
+                        ? 'opacity-30 border-dashed border-foreground/20' 
+                        : 'opacity-60'
+                    }`}
                   />
                 </TooltipTrigger>
                 <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
                   <div className="space-y-1 text-sm">
                     <p className="font-bold text-foreground">{emp.name}</p>
+                    {isSourceTeam && (
+                      <p className="text-amber-500 text-xs font-medium">📤 Past membership (transferred out)</p>
+                    )}
                     <p className="text-muted-foreground">
                       <span className="text-primary font-medium">Role:</span> {emp.role}
                     </p>
@@ -636,6 +646,47 @@ export const Timeline = ({
                         <span className="text-destructive font-medium">Departure:</span> {formatDate(departureEvent.date)}
                       </p>
                     )}
+                    {(() => {
+                      // Replacement context
+                      const replacementWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
+                      if (isSourceTeam && teamSwapEvent) {
+                        const swapDate = new Date(teamSwapEvent.date).getTime();
+                        const replacement = events
+                          .filter(e => e.type === 'Team Swap' && e.targetTeam === emp.team && e.empId !== emp.id)
+                          .find(e => Math.abs(new Date(e.date).getTime() - swapDate) <= replacementWindow);
+                        if (replacement) {
+                          const replacementEmp = allEmployees.find(e => e.id === replacement.empId);
+                          if (replacementEmp) {
+                            return (
+                              <p className="text-emerald-500 text-xs">
+                                <span className="font-medium">Replaced by:</span> {replacementEmp.name}
+                              </p>
+                            );
+                          }
+                        }
+                      }
+                      if (isTransfer && transferInfo) {
+                        const transferDate = new Date(transferInfo.transferDate).getTime();
+                        const replaced = events
+                          .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== emp.id)
+                          .filter(e => {
+                            const srcEmp = allEmployees.find(em => em.id === e.empId);
+                            return srcEmp?.team === emp.team || e.type === 'Departure';
+                          })
+                          .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
+                        if (replaced) {
+                          const replacedEmp = allEmployees.find(e => e.id === replaced.empId);
+                          if (replacedEmp) {
+                            return (
+                              <p className="text-amber-500 text-xs">
+                                <span className="font-medium">Replacing:</span> {replacedEmp.name}
+                              </p>
+                            );
+                          }
+                        }
+                      }
+                      return null;
+                    })()}
                   </div>
                 </TooltipContent>
               </Tooltip>
