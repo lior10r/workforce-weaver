@@ -18,6 +18,7 @@ interface TimelineProps {
   events: WorkforceEvent[];
   openPlannerForUser: (empId: number, asFlag?: boolean) => void;
   allEmployees?: Employee[];
+  effectiveEmployees?: Employee[]; // employees with past Team Swap applied — used for alerts/leader checks
   selectedTeam?: string;
   selectedDept?: string;
   teamStructures?: TeamStructure[];
@@ -118,6 +119,7 @@ export const Timeline = ({
   events, 
   openPlannerForUser, 
   allEmployees = [], 
+  effectiveEmployees: effectiveEmployeesProp,
   selectedTeam = 'All', 
   selectedDept = 'All',
   teamStructures = [],
@@ -129,6 +131,9 @@ export const Timeline = ({
   onEditEmployee,
   
 }: TimelineProps) => {
+  // effectiveEmployees: used for alerts, leader checks, team membership counts
+  // Falls back to `employees` if not provided
+  const effectiveEmployees = effectiveEmployeesProp || employees;
   const departments = getDepartmentsFlat(hierarchy);
   const [groupingMode, setGroupingMode] = useState<GroupingMode>('team');
   const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
@@ -224,7 +229,7 @@ export const Timeline = ({
 
   const getTeamAlerts = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
-    const activeMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const activeMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
     const storedLeader = structure?.teamLeader ? activeMembers.find(e => e.id === structure.teamLeader) : null;
     const roleLeader = activeMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
     const hasManagerLeader = activeMembers.some(e => e.managerLevel === 'group' || e.managerLevel === 'department');
@@ -351,7 +356,7 @@ export const Timeline = ({
 
   const renderTeamTooltipContent = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
-    const teamMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const teamMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
     const hasRoles = structure?.requiredRoles && Object.keys(structure.requiredRoles).length > 0;
     const hasSkills = structure?.requiredSkills && Object.keys(structure.requiredSkills).length > 0;
     
@@ -974,7 +979,7 @@ export const Timeline = ({
                 if (teamMembers.length === 0) return null;
                 
                 const structure = teamStructures.find(s => s.teamName === teamName);
-                const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
+                const teamLeader = structure?.teamLeader ? effectiveEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
 
                 return (
                   <div key={teamName} className="mb-4 ml-4">
@@ -1044,7 +1049,7 @@ export const Timeline = ({
                   if (teamMembers.length === 0) return null;
 
                   const structure = teamStructures.find(s => s.teamName === teamName);
-                  const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
+                  const teamLeader = structure?.teamLeader ? effectiveEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
 
                   return (
                     <div key={teamName} className="mb-4 ml-6">
