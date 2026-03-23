@@ -1165,7 +1165,7 @@ export const Timeline = ({
         </div>
         <div className="space-y-3">
           {teamMembers.map(({ employee, transferInfo, isTransfer, isSourceTeam }) => 
-            renderEmployeeRow(employee, transferInfo, isTransfer, false, undefined, isSourceTeam)
+            renderEmployeeRow(employee, transferInfo, isTransfer, false, undefined, isSourceTeam, teamName)
           )}
         </div>
       </div>
