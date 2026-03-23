@@ -356,7 +356,7 @@ export const Timeline = ({
 
   const renderTeamTooltipContent = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
-    const teamMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const teamMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
     const hasRoles = structure?.requiredRoles && Object.keys(structure.requiredRoles).length > 0;
     const hasSkills = structure?.requiredSkills && Object.keys(structure.requiredSkills).length > 0;
     
