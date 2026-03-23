@@ -565,6 +565,13 @@ const Index = () => {
   };
 
   const handleSaveTeamStructure = (structure: TeamStructure) => {
+    // Validate: if teamLeader is set, ensure they're actually on this team
+    if (structure.teamLeader) {
+      const leaderOnTeam = employees.find(e => e.id === structure.teamLeader && e.team === structure.teamName && e.status !== 'Departed');
+      if (!leaderOnTeam) {
+        structure = { ...structure, teamLeader: undefined };
+      }
+    }
     // Team structures always save to master (structural config, not scenario-specific)
     setMasterTeamStructures(prev => {
       const existing = prev.findIndex(s => s.teamName === structure.teamName);
