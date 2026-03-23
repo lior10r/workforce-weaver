@@ -267,6 +267,52 @@ export const Timeline = ({
   const shouldGroupByTeam = selectedDept !== 'All' || selectedTeam === 'All';
   const teams = shouldGroupByTeam ? getTeamsFromEmployees(employees) : [];
 
+  const renderTeamTooltipContent = (teamName: string) => {
+    const structure = teamStructures.find(s => s.teamName === teamName);
+    const teamMembers = employees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
+    const hasRoles = structure?.requiredRoles && Object.keys(structure.requiredRoles).length > 0;
+    const hasSkills = structure?.requiredSkills && Object.keys(structure.requiredSkills).length > 0;
+    
+    if (!hasRoles && !hasSkills) return null;
+    
+    return (
+      <div className="space-y-2 text-sm min-w-[180px]">
+        <p className="font-bold text-foreground">{teamName}</p>
+        <p className="text-[10px] text-muted-foreground">{teamMembers.length}{structure?.targetSize ? `/${structure.targetSize}` : ''} members</p>
+        {hasRoles && (
+          <div>
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Required Roles</p>
+            {Object.entries(structure!.requiredRoles).map(([role, count]) => {
+              const have = teamMembers.filter(e => e.role === role).length;
+              const isMet = have >= count;
+              return (
+                <p key={role} className="text-xs text-muted-foreground flex justify-between">
+                  <span>{role}</span>
+                  <span className={isMet ? 'text-emerald-500' : 'text-destructive'}>{have}/{count}</span>
+                </p>
+              );
+            })}
+          </div>
+        )}
+        {hasSkills && (
+          <div>
+            <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Required Skills</p>
+            {Object.entries(structure!.requiredSkills!).map(([skill, count]) => {
+              const have = teamMembers.filter(e => (e.skills || []).includes(skill)).length;
+              const isMet = have >= count;
+              return (
+                <p key={skill} className="text-xs text-muted-foreground flex justify-between">
+                  <span>{skill}</span>
+                  <span className={isMet ? 'text-emerald-500' : 'text-destructive'}>{have}/{count}</span>
+                </p>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderEmployeeRow = (
     emp: Employee, 
     transferInfo?: TransferInfo,
