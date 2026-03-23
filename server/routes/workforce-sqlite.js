@@ -343,4 +343,123 @@ router.delete('/labels/:id', (req, res) => {
   }
 });
 
+// ============== EMPLOYEE NOTES ==============
+
+// Get notes for an employee (only if user is their manager or admin)
+router.get('/employees/:id/notes', (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const employee = db.getEmployeeById(empId);
+    if (!employee) return res.status(404).json({ error: 'Employee not found' });
+    
+    // Check access: admin, or the user's linked employee is the manager of this employee
+    if (req.user.role !== 'admin') {
+      const user = db.getUserById(req.user.userId);
+      if (!user?.employeeId) return res.status(403).json({ error: 'Not authorized' });
+      
+      // Check if user's employee is the direct manager, or manages the team/group/dept
+      const userEmp = db.getEmployeeById(user.employeeId);
+      if (!userEmp) return res.status(403).json({ error: 'Not authorized' });
+      
+      const isDirectManager = employee.managerId === user.employeeId;
+      const isTeamLead = userEmp.managerLevel === 'team' && userEmp.team === employee.team;
+      const isGroupManager = userEmp.managerLevel === 'group' && userEmp.dept === employee.dept && userEmp.group === employee.group;
+      const isDeptManager = userEmp.managerLevel === 'department' && userEmp.dept === employee.dept;
+      
+      if (!isDirectManager && !isTeamLead && !isGroupManager && !isDeptManager) {
+        return res.status(403).json({ error: 'Notes are only visible to the employee\'s managers' });
+      }
+    }
+    
+    const notes = db.getNotesByEmployee(empId);
+    res.json(notes);
+  } catch (error) {
+    console.error('Get notes error:', error);
+    res.status(500).json({ error: 'Failed to get notes' });
+  }
+});
+
+// Create a note for an employee
+router.post('/employees/:id/notes', (req, res) => {
+  try {
+    const empId = parseInt(req.params.id);
+    const employee = db.getEmployeeById(empId);
+    if (!employee) return res.status(404).json({ error: 'Employee not found' });
+    
+    // Check access
+    if (req.user.role !== 'admin') {
+      const user = db.getUserById(req.user.userId);
+      if (!user?.employeeId) return res.status(403).json({ error: 'Not authorized' });
+      
+      const userEmp = db.getEmployeeById(user.employeeId);
+      if (!userEmp) return res.status(403).json({ error: 'Not authorized' });
+      
+      const isDirectManager = employee.managerId === user.employeeId;
+      const isTeamLead = userEmp.managerLevel === 'team' && userEmp.team === employee.team;
+      const isGroupManager = userEmp.managerLevel === 'group' && userEmp.dept === employee.dept && userEmp.group === employee.group;
+      const isDeptManager = userEmp.managerLevel === 'department' && userEmp.dept === employee.dept;
+      
+      if (!isDirectManager && !isTeamLead && !isGroupManager && !isDeptManager) {
+        return res.status(403).json({ error: 'Only managers can add notes for their reports' });
+      }
+    }
+    
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: 'Note content is required' });
+    
+    const user = db.getUserById(req.user.userId);
+    const note = db.createNote({
+      employeeId: empId,
+      authorId: req.user.userId,
+      authorName: user?.name || 'Unknown',
+      content: content.trim(),
+    });
+    res.status(201).json(note);
+  } catch (error) {
+    console.error('Create note error:', error);
+    res.status(500).json({ error: 'Failed to create note' });
+  }
+});
+
+// Update a note (only author or admin)
+router.put('/notes/:id', (req, res) => {
+  try {
+    const noteId = parseInt(req.params.id);
+    const note = db.getNoteById(noteId);
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+    
+    if (req.user.role !== 'admin' && note.authorId !== req.user.userId) {
+      return res.status(403).json({ error: 'Only the author can edit this note' });
+    }
+    
+    const { content } = req.body;
+    if (!content?.trim()) return res.status(400).json({ error: 'Note content is required' });
+    
+    const updated = db.updateNote(noteId, content.trim());
+    res.json(updated);
+  } catch (error) {
+    console.error('Update note error:', error);
+    res.status(500).json({ error: 'Failed to update note' });
+  }
+});
+
+// Delete a note (only author or admin)
+router.delete('/notes/:id', (req, res) => {
+  try {
+    const noteId = parseInt(req.params.id);
+    const note = db.getNoteById(noteId);
+    if (!note) return res.status(404).json({ error: 'Note not found' });
+    
+    if (req.user.role !== 'admin' && note.authorId !== req.user.userId) {
+      return res.status(403).json({ error: 'Only the author can delete this note' });
+    }
+    
+    db.deleteNote(noteId);
+    res.json({ message: 'Note deleted successfully' });
+  } catch (error) {
+    console.error('Delete note error:', error);
+    res.status(500).json({ error: 'Failed to delete note' });
+  }
+});
+
 module.exports = router;
