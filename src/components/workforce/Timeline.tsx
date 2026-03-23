@@ -18,6 +18,7 @@ interface TimelineProps {
   events: WorkforceEvent[];
   openPlannerForUser: (empId: number, asFlag?: boolean) => void;
   allEmployees?: Employee[];
+  effectiveEmployees?: Employee[]; // employees with past Team Swap applied — used for alerts/leader checks
   selectedTeam?: string;
   selectedDept?: string;
   teamStructures?: TeamStructure[];
