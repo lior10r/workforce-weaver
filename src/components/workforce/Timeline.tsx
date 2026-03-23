@@ -526,7 +526,8 @@ export const Timeline = ({
     isTransfer = false,
     isManagerRow = false,
     managerLevel?: 'dept' | 'group',
-    isSourceTeam = false
+    isSourceTeam = false,
+    teamNameForContext?: string
   ) => {
     const empEvents = events.filter(e => e.empId === emp.id);
     const departureEvent = empEvents.find(e => e.type === 'Departure');
