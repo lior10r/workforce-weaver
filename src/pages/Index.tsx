@@ -666,6 +666,9 @@ const Index = () => {
 
     setMasterEmployeesDirect(updatedEmployees);
     setMasterEventsDirect(updatedEvents);
+    // Clean stale team leaders after selective merge
+    const { cleaned, changed } = cleanStaleTeamLeaders(updatedEmployees, masterTeamStructures);
+    if (changed) setMasterTeamStructuresDirect(cleaned);
 
     // Remove merged entries from scenario, or delete scenario if all merged
     const remainingChangelog = scenario.changelog.filter(c => !selectedChangeIds.includes(c.id));
