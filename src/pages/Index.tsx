@@ -61,6 +61,7 @@ interface ScopeFilter {
 const Index = () => {
   const navigate = useNavigate();
   const { user, logout, isAdmin, isBackendAvailable, linkedEmployee, isAuthenticated } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   // Use the workforce data hook for persistence and undo/redo
   const {
     masterEmployees,
