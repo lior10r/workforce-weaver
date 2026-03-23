@@ -143,6 +143,14 @@ const Index = () => {
     return { cleaned, changed };
   }, []);
 
+  // Proactively clean stale team leaders whenever master data changes
+  useEffect(() => {
+    const { cleaned, changed } = cleanStaleTeamLeaders(masterEmployees, masterTeamStructures);
+    if (changed) {
+      setMasterTeamStructuresDirect(cleaned);
+    }
+  }, [masterEmployees, masterTeamStructures, cleanStaleTeamLeaders, setMasterTeamStructuresDirect]);
+
 
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
