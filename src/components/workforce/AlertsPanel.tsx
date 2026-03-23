@@ -135,10 +135,11 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         }
       }
 
-      // 5. No team leader — only a valid stored team leader counts; group/dept managers also count as leaders
+      // 5. No team leader — stored leader, role-based leader, or group/dept manager all count
       const structLeader = structure?.teamLeader ? teamMembers.find(e => e.id === structure.teamLeader) : null;
+      const roleLeader = teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
       const hasManagerLeader = teamMembers.some(e => e.managerLevel === 'group' || e.managerLevel === 'department');
-      if (!structLeader && !hasManagerLeader && teamMembers.length > 0) {
+      if (!structLeader && !roleLeader && !hasManagerLeader && teamMembers.length > 0) {
         result.push({
           id: `leader-${teamName}`,
           type: 'no_leader',
