@@ -1064,6 +1064,7 @@ export const Timeline = ({
                             • <Crown size={8} className="text-green-500" /> {teamLeader.name}
                           </span>
                         )}
+                        {renderTeamAlertBadges(teamName)}
                       </div>
                       <div className="space-y-3 ml-3">
                         {teamMembers.map(emp => renderEmployeeRow(emp))}
