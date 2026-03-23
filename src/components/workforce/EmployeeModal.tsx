@@ -726,6 +726,17 @@ export const EmployeeModal = ({
             </label>
           </div>
 
+          {/* Manager Notes — only shown when editing an existing employee */}
+          {editingEmployee && !editingEmployee.isPotential && (
+            <div className="border-t border-border pt-4">
+              <EmployeeNotes
+                employeeId={editingEmployee.id}
+                employeeName={editingEmployee.name}
+                isBackendAvailable={isBackendAvailable}
+              />
+            </div>
+          )}
+
           <div className="flex gap-3 pt-4">
             {editingEmployee && onDelete && (
               showDeleteConfirm ? (
