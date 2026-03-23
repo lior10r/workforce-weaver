@@ -1,34 +1,29 @@
 
 
-## Improve Employee Movement Visualization in Timeline
+## Make Replacement Info More Visible in Timeline
 
 ### Problem
-When an employee transfers between teams, they currently appear as separate rows in both their old and new teams. Even with the "History" toggle, the representation is confusing — two disconnected bars in two different team sections don't clearly communicate a single person's movement.
+Replacement context ("Replaced by" / "Replacing") is currently buried in small tooltip text. The user wants to clearly see when someone left and needs replacing, or when someone is a replacement, directly on the timeline without hovering.
 
-### Solution
+### Changes
 
-**1. Default to History Off (current team only)**
-- Change `showTransferHistory` default from `true` to `false` so employees only appear in their current team by default, reducing visual clutter.
+**`src/components/workforce/Timeline.tsx`**
 
-**2. Add a connected transfer indicator on the bar itself**
-- When an employee was transferred into a team, show a small "transfer-in" marker at the start of their bar (an arrow icon + "from [OldTeam]" label visible on hover).
-- When History is ON and an employee is shown in their old team, show a "transfer-out" marker at the end of their bar (arrow icon + "to [NewTeam]").
+**1. Show replacement badges inline on the employee name area (left panel)**
+- Below the existing "From [team]" / "Transfers to [team]" badges, add visible replacement labels:
+  - For employees who transferred out (source team, history ON): show an orange badge "Replaced by: [Name]" or a red badge "No replacement yet" if nobody joined within 30 days
+  - For employees who transferred in: show a blue badge "Replacing: [Name]"
+  - For departed employees: show "No replacement yet" if nobody joined the team within 30 days of their departure
 
-**3. Improve the History ON mode with visual connection**
-- When history is enabled, render the old-team row with a **dashed/faded bar** (instead of solid) to clearly distinguish "past membership" from "current membership."
-- Add a subtle connecting arrow or label between the two entries so it's obvious they're the same person.
+**2. Add "Needs replacement" alert to team header alerts**
+- In `getTeamAlerts`, detect employees who departed or transferred out without a replacement within the ±30-day window
+- Show a warning badge on the team header: "X person(s) need replacement"
 
-**4. Add "Replaced by" / "Replacing" context**
-- In the employee tooltip (both name hover and bar hover), if the employee transferred out, show who (if anyone) joined the team around the same time as a replacement.
-- Similarly, if the employee transferred in, show who they replaced (employee who left the team around the same time).
-- This is done by cross-referencing Team Swap and Departure events for the same team within a configurable window (e.g., +/- 30 days).
+**3. Make tooltip replacement info more prominent**
+- Increase the replacement text size from `text-xs` to `text-sm`
+- Add the replaced/replacing person's role alongside their name
+- Show "Needs a new position" for transferred-out employees who haven't been placed in a new role yet
 
 ### Files to modify
-
-- **`src/components/workforce/Timeline.tsx`**
-  - Change `showTransferHistory` default to `false`
-  - Add dashed/faded styling for historical (source team) bars
-  - Add replacement context to employee tooltips (cross-reference departures and arrivals)
-  - Add "From [team]" badge on transferred-in employees' name section (already partially exists, make more prominent)
-  - Add connecting visual cue between old and new team entries when history is ON
+- `src/components/workforce/Timeline.tsx` — inline badges, team alert, enhanced tooltips
 
