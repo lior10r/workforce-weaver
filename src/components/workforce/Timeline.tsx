@@ -603,6 +603,42 @@ export const Timeline = ({
                     </p>
                   </div>
                 )}
+                {/* Inline replacement badge */}
+                {teamNameForContext && (() => {
+                  const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                  if (!ctx) return null;
+                  if (ctx.type === 'replaced_by' && ctx.person) {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <UserPlus size={10} className="text-emerald-500" />
+                        <p className="text-[9px] text-emerald-500 font-medium">
+                          Replaced by {ctx.person.name} <span className="text-emerald-500/60">({ctx.role})</span>
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'needs_replacement') {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <AlertTriangle size={10} className="text-destructive" />
+                        <p className="text-[9px] text-destructive font-bold">
+                          No replacement yet — needs {ctx.role}
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'replacing' && ctx.person) {
+                    return (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <ArrowRight size={10} className="text-accent-blue" />
+                        <p className="text-[9px] text-accent-blue font-medium">
+                          Replacing {ctx.person.name} <span className="text-accent-blue/60">({ctx.role})</span>
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {isPotential && (
                   <p className="text-[9px] text-potential font-medium mt-0.5">
                     Potential hire
