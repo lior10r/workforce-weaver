@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Search, UserPlus, ChevronRight, Lock, LogOut, Users, Shield } from 'lucide-react';
+import { Search, UserPlus, ChevronRight, Lock, LogOut, Users, Shield, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/hooks/use-theme';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Sidebar } from '@/components/workforce/Sidebar';
