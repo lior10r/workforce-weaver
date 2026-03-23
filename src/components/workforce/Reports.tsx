@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { FileText, Download, Check, Users, TrendingUp, Calendar, BarChart3, Clock } from 'lucide-react';
+import { FileText, Download, Check, Users, TrendingUp, TrendingDown, Calendar, BarChart3, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,12 @@ const CHART_COLORS = [
   'hsl(330, 60%, 55%)', 'hsl(90, 50%, 45%)',
 ];
 
-type ReportSection = 'headcount' | 'gaps' | 'events' | 'roles' | 'tenure';
+type ReportSection = 'headcount' | 'gaps' | 'forecast' | 'events' | 'roles' | 'tenure';
 
 const sectionConfig: Record<ReportSection, { label: string; icon: typeof Users }> = {
   headcount: { label: 'Headcount Summary', icon: Users },
   gaps: { label: 'Staffing Gaps', icon: TrendingUp },
+  forecast: { label: 'Staffing Forecast', icon: TrendingDown },
   events: { label: 'Upcoming Events', icon: Calendar },
   roles: { label: 'Role Distribution', icon: BarChart3 },
   tenure: { label: 'Tenure Analysis', icon: Clock },
