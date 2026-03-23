@@ -348,7 +348,7 @@ export const Timeline = ({
   };
 
   const renderTeamAlertBadges = (teamName: string) => {
-    const { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills } = getTeamAlerts(teamName);
+    const { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills, needsReplacementCount, needsReplacementNames } = getTeamAlerts(teamName);
     return (
       <>
         {hasNoLeader && (
@@ -368,6 +368,26 @@ export const Timeline = ({
             <Users size={12} />
             <span className="text-[10px] font-bold">+{Math.abs(staffDiff)} overstaffed</span>
           </div>
+        )}
+        {needsReplacementCount > 0 && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-destructive/10 text-destructive rounded-full cursor-help">
+                <UserPlus size={12} />
+                <span className="text-[10px] font-bold">{needsReplacementCount} need replacement</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-popover border border-border p-3 rounded-xl">
+              <div className="space-y-1">
+                <p className="font-bold text-destructive text-sm">Needs Replacement</p>
+                {needsReplacementNames.map(({ name, role }) => (
+                  <p key={name} className="text-sm text-muted-foreground">
+                    {name} <span className="text-muted-foreground/60">({role})</span>
+                  </p>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         )}
         {missingSkills.length > 0 && (
           <Tooltip>
