@@ -335,7 +335,8 @@ export const Timeline = ({
         if (!showTransferHistory && new Date(movement.date) <= today) {
           allTeamMembers.push({ 
             employee: { ...employee, team: teamName, dept: employee.dept },
-            isTransfer: false
+            transferInfo: { fromTeam: employee.team, transferDate: movement.date },
+            isTransfer: true
           });
         } else {
           allTeamMembers.push({ 
