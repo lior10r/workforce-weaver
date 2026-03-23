@@ -50,7 +50,8 @@ import {
   getEmployeeDiffs,
   getEventDiffs,
   addScenarioChangelogEntry,
-  createScenario
+  createScenario,
+  getTeamParent
 } from '@/lib/workforce-data';
 
 interface ScopeFilter {
