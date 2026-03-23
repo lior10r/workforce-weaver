@@ -227,6 +227,71 @@ export const Timeline = ({
     return missing;
   };
 
+  // Find replacement context for an employee in a given team
+  const getReplacementContext = (empId: number, teamName: string, isSourceTeam: boolean, isTransfer: boolean, transferInfo?: TransferInfo) => {
+    const replacementWindow = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const emp = allEmployees.find(e => e.id === empId);
+    if (!emp) return null;
+
+    // Employee transferred out or is in source team — find who replaced them
+    if (isSourceTeam) {
+      const teamSwapEvent = events.find(e => e.empId === empId && e.type === 'Team Swap');
+      if (teamSwapEvent) {
+        const swapDate = new Date(teamSwapEvent.date).getTime();
+        // Look for someone who joined this team around the same time
+        const replacementEvent = events
+          .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || (e.type === 'New Joiner'))
+          .filter(e => e.empId !== empId)
+          .find(e => {
+            const eDate = new Date(e.date).getTime();
+            if (e.type === 'New Joiner') {
+              const joinerEmp = allEmployees.find(em => em.id === e.empId);
+              return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
+            }
+            return Math.abs(eDate - swapDate) <= replacementWindow;
+          });
+        if (replacementEvent) {
+          const replacementEmp = allEmployees.find(e => e.id === replacementEvent.empId);
+          return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
+        }
+        return { type: 'needs_replacement' as const, person: null, role: emp.role };
+      }
+    }
+
+    // Employee transferred in — find who they replaced
+    if (isTransfer && transferInfo) {
+      const transferDate = new Date(transferInfo.transferDate).getTime();
+      const replacedEvent = events
+        .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== empId)
+        .filter(e => {
+          const srcEmp = allEmployees.find(em => em.id === e.empId);
+          if (e.type === 'Team Swap') return srcEmp?.team === teamName;
+          if (e.type === 'Departure') return srcEmp?.team === teamName;
+          return false;
+        })
+        .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
+      if (replacedEvent) {
+        const replacedEmp = allEmployees.find(e => e.id === replacedEvent.empId);
+        return { type: 'replacing' as const, person: replacedEmp || null, role: replacedEmp?.role };
+      }
+    }
+
+    // Check departed employees who have no replacement
+    const departureEvent = events.find(e => e.empId === empId && e.type === 'Departure');
+    if (departureEvent && new Date(departureEvent.date) <= new Date()) {
+      const depDate = new Date(departureEvent.date).getTime();
+      const replacementEvent = events
+        .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
+        .filter(e => e.empId !== empId)
+        .find(e => Math.abs(new Date(e.date).getTime() - depDate) <= replacementWindow);
+      if (!replacementEvent) {
+        return { type: 'needs_replacement' as const, person: null, role: emp.role };
+      }
+    }
+
+    return null;
+  };
+
   const getTeamAlerts = (teamName: string) => {
     const structure = teamStructures.find(s => s.teamName === teamName);
     const activeMembers = effectiveEmployees.filter(e => e.team === teamName && (e.status === 'Active' || e.status === 'On Course' || e.status === 'Parental Leave') && !e.isPotential);
@@ -245,7 +310,41 @@ export const Timeline = ({
         if (have < needed) missingSkills.push({ skill, have, need: needed });
       }
     }
-    return { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills };
+
+    // Count people who left/transferred out without replacement
+    const replacementWindow = 30 * 24 * 60 * 60 * 1000;
+    const today = new Date();
+    let needsReplacementCount = 0;
+    const needsReplacementNames: { name: string; role: string }[] = [];
+
+    // Check team swaps out
+    const swapsOut = events.filter(e => e.type === 'Team Swap' && new Date(e.date) <= today);
+    swapsOut.forEach(swap => {
+      const swapEmp = allEmployees.find(em => em.id === swap.empId);
+      if (swapEmp?.team !== teamName) return; // only care about people who were in this team originally
+      // Actually check if this employee's original team is this team
+      const origEmp = employees.find(em => em.id === swap.empId && em.team === teamName);
+      if (!origEmp) return;
+      
+      const swapDate = new Date(swap.date).getTime();
+      const hasReplacement = events
+        .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
+        .filter(e => e.empId !== swap.empId)
+        .some(e => {
+          const eDate = new Date(e.date).getTime();
+          if (e.type === 'New Joiner') {
+            const joinerEmp = allEmployees.find(em => em.id === e.empId);
+            return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
+          }
+          return Math.abs(eDate - swapDate) <= replacementWindow;
+        });
+      if (!hasReplacement) {
+        needsReplacementCount++;
+        needsReplacementNames.push({ name: origEmp.name, role: origEmp.role });
+      }
+    });
+
+    return { hasNoLeader, isUnderstaffed, isOverstaffed, staffDiff, missingSkills, needsReplacementCount, needsReplacementNames };
   };
 
   const renderTeamAlertBadges = (teamName: string) => {
