@@ -1,4 +1,5 @@
 import { X, Building2, Trash2, AlertTriangle, Clock, CalendarIcon, Tag, Plus } from 'lucide-react';
+import { EmployeeNotes } from './EmployeeNotes';
 import {
   Employee,
   DEPARTMENT_NAMES,
