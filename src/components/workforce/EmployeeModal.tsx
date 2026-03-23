@@ -1,4 +1,5 @@
 import { X, Building2, Trash2, AlertTriangle, Clock, CalendarIcon, Tag, Plus } from 'lucide-react';
+import { EmployeeNotes } from './EmployeeNotes';
 import {
   Employee,
   DEPARTMENT_NAMES,
@@ -32,6 +33,7 @@ interface EmployeeModalProps {
   prefill?: { dept: string; team: string; group?: string | null };
   labels?: Label[];
   onCreateLabel?: (name: string) => Promise<Label | undefined>;
+  isBackendAvailable?: boolean;
 }
 
 export const EmployeeModal = ({
@@ -47,6 +49,7 @@ export const EmployeeModal = ({
   prefill,
   labels = [],
   onCreateLabel,
+  isBackendAvailable = false,
 }: EmployeeModalProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedDept, setSelectedDept] = useState(DEPARTMENT_NAMES[0]);
@@ -722,6 +725,17 @@ export const EmployeeModal = ({
               <span className="font-medium text-foreground">Potential hire</span> — uncertain/planning only
             </label>
           </div>
+
+          {/* Manager Notes — only shown when editing an existing employee */}
+          {editingEmployee && !editingEmployee.isPotential && (
+            <div className="border-t border-border pt-4">
+              <EmployeeNotes
+                employeeId={editingEmployee.id}
+                employeeName={editingEmployee.name}
+                isBackendAvailable={isBackendAvailable}
+              />
+            </div>
+          )}
 
           <div className="flex gap-3 pt-4">
             {editingEmployee && onDelete && (

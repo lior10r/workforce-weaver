@@ -77,6 +77,18 @@ db.exec(`
     color TEXT,
     created_by TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS employee_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 // Add skills column to employees if not exists
@@ -317,6 +329,46 @@ const deleteLabel = (id) => {
   return db.prepare('DELETE FROM labels WHERE id = ?').run(id);
 };
 
+// ============== EMPLOYEE NOTES OPERATIONS ==============
+
+const getNotesByEmployee = (employeeId) => {
+  return db.prepare('SELECT * FROM employee_notes WHERE employee_id = ? ORDER BY created_at DESC').all(employeeId).map(rowToNote);
+};
+
+const createNote = (note) => {
+  const now = new Date().toISOString();
+  const result = db.prepare(`
+    INSERT INTO employee_notes (employee_id, author_id, author_name, content, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(note.employeeId, note.authorId, note.authorName, note.content, now, now);
+  return { id: result.lastInsertRowid, ...note, createdAt: now, updatedAt: now };
+};
+
+const updateNote = (id, content) => {
+  const now = new Date().toISOString();
+  db.prepare('UPDATE employee_notes SET content = ?, updated_at = ? WHERE id = ?').run(content, now, id);
+  return db.prepare('SELECT * FROM employee_notes WHERE id = ?').get(id);
+};
+
+const deleteNote = (id) => {
+  return db.prepare('DELETE FROM employee_notes WHERE id = ?').run(id);
+};
+
+const getNoteById = (id) => {
+  const row = db.prepare('SELECT * FROM employee_notes WHERE id = ?').get(id);
+  return row ? rowToNote(row) : null;
+};
+
+const rowToNote = (row) => ({
+  id: row.id,
+  employeeId: row.employee_id,
+  authorId: row.author_id,
+  authorName: row.author_name,
+  content: row.content,
+  createdAt: row.created_at,
+  updatedAt: row.updated_at,
+});
+
 // ============== INITIALIZATION ==============
 
 const isInitialized = () => {
@@ -338,6 +390,8 @@ module.exports = {
   getScenarios, setScenarios,
   // Labels
   getLabels, createLabel, deleteLabel,
+  // Notes
+  getNotesByEmployee, createNote, updateNote, deleteNote, getNoteById,
   // Init
   isInitialized,
 };

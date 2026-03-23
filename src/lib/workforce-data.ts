@@ -204,6 +204,16 @@ export interface Label {
   created_by?: string;
 }
 
+export interface EmployeeNote {
+  id: number;
+  employeeId: number;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Work types for capacity calculation
 export const WORK_TYPES = ['Full-Time', 'Part-Time'] as const;
 export type WorkType = typeof WORK_TYPES[number];

@@ -258,16 +258,41 @@ class ApiClient {
       method: 'DELETE',
     });
   }
+
+  // Employee Notes
+  async getEmployeeNotes(employeeId: number) {
+    return this.request<EmployeeNote[]>(`/employees/${employeeId}/notes`);
+  }
+
+  async createEmployeeNote(employeeId: number, content: string) {
+    return this.request<EmployeeNote>(`/employees/${employeeId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async updateNote(noteId: number, content: string) {
+    return this.request<EmployeeNote>(`/notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  async deleteNote(noteId: number) {
+    return this.request<{ message: string }>(`/notes/${noteId}`, {
+      method: 'DELETE',
+    });
+  }
 }
 
-// Types (re-export from workforce-data for convenience)
 import type { 
   Employee, 
   WorkforceEvent, 
   TeamStructure, 
   Scenario,
   HierarchyStructure,
-  Label
+  Label,
+  EmployeeNote,
 } from './workforce-data';
 
 export interface User {
@@ -282,4 +307,4 @@ export interface User {
 // Export singleton instance
 export const apiClient = new ApiClient();
 
-export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure, Label };
+export type { Employee, WorkforceEvent, TeamStructure, Scenario, HierarchyStructure, Label, EmployeeNote };
