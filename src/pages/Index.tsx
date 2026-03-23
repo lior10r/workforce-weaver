@@ -127,6 +127,22 @@ const Index = () => {
 
 
 
+  // Helper: clear teamLeader references where the leader is no longer on that team
+  const cleanStaleTeamLeaders = useCallback((emps: Employee[], structures: TeamStructure[]) => {
+    let changed = false;
+    const cleaned = structures.map(s => {
+      if (s.teamLeader) {
+        const leaderOnTeam = emps.find(e => e.id === s.teamLeader && e.team === s.teamName && e.status !== 'Departed');
+        if (!leaderOnTeam) {
+          changed = true;
+          return { ...s, teamLeader: undefined };
+        }
+      }
+      return s;
+    });
+    return { cleaned, changed };
+  }, []);
+
 
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
