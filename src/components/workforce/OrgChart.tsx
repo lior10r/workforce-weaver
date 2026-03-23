@@ -431,8 +431,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
                       {dept.directTeams.map(teamName => {
                         const teamMembers = employees.filter(e => e.team === teamName);
                         const structure = teamStructures.find(s => s.teamName === teamName);
-                        const storedLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
-                        const teamLeader = storedLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead') || null;
+                        const teamLeader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
                         const eligibleLeaders = getEligibleManagers(dept.name, undefined, teamName);
 
                         return (
