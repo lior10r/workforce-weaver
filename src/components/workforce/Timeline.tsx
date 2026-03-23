@@ -1091,6 +1091,22 @@ export const Timeline = ({
 
         <div className="w-px h-6 bg-border" />
 
+        {/* Transfer history toggle */}
+        <button
+          onClick={() => setShowTransferHistory(prev => !prev)}
+          className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 ${
+            showTransferHistory
+              ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/30'
+              : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
+          }`}
+          title={showTransferHistory ? 'Showing employees in previous teams — click to hide' : 'Showing current teams only — click to show transfer history'}
+        >
+          <ArrowRightLeft size={12} />
+          {showTransferHistory ? 'History On' : 'History Off'}
+        </button>
+
+        <div className="w-px h-6 bg-border" />
+
         {/* Range configuration */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Range:</span>
