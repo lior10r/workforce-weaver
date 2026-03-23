@@ -617,6 +617,9 @@ const Index = () => {
       const finalEvents = getScenarioEvents(scenario);
       setMasterEmployeesDirect(finalEmployees);
       setMasterEventsDirect(finalEvents);
+      // Clean stale team leaders after merge
+      const { cleaned, changed } = cleanStaleTeamLeaders(finalEmployees, masterTeamStructures);
+      if (changed) setMasterTeamStructuresDirect(cleaned);
       handleDeleteScenario(scenario.id);
       return;
     }
