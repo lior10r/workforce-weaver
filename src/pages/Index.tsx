@@ -1187,13 +1187,6 @@ const Index = () => {
 
           {view === 'timeline' && (
             <div className="space-y-6">
-              <div className="flex flex-wrap gap-3 justify-between items-center">
-                <MissingRolesForecast 
-                  employees={employees}
-                  events={events}
-                  teamStructures={teamStructures}
-                />
-              </div>
               <Timeline
                 employees={filteredTimelineEmployees} 
                 events={events}
