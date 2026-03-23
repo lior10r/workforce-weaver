@@ -50,7 +50,6 @@ export const Sidebar = ({
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
-  const { isAdmin } = useAuth();
   const [expandedDepts, setExpandedDepts] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<string[]>([]);
 
