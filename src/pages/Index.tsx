@@ -1195,10 +1195,10 @@ const Index = () => {
                 />
               </div>
               <Timeline
-                employees={filteredEmployees} 
+                employees={filteredTimelineEmployees} 
                 events={events}
                 openPlannerForUser={openPlannerForUser}
-                allEmployees={employees}
+                allEmployees={rawEmployees}
                 selectedTeam={legacyHierarchy.team}
                 selectedDept={legacyHierarchy.dept}
                 teamStructures={teamStructures}
