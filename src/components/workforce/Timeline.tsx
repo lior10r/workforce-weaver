@@ -898,7 +898,16 @@ export const Timeline = ({
                   <div key={teamName} className="mb-4 ml-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                      <span className="text-xs font-medium text-foreground">{teamName}</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="text-xs font-medium text-foreground cursor-help">{teamName}</span>
+                        </TooltipTrigger>
+                        {renderTeamTooltipContent(teamName) && (
+                          <TooltipContent side="bottom" className="bg-popover border border-border p-3 rounded-xl">
+                            {renderTeamTooltipContent(teamName)}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
                       <span className="text-[10px] text-muted-foreground">({teamMembers.length})</span>
                       {teamLeader && (
                         <span className="text-[10px] text-muted-foreground flex items-center gap-1">
