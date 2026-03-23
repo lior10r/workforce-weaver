@@ -1102,6 +1102,8 @@ const Index = () => {
               hierarchy={legacyHierarchy}
               setHierarchy={() => {}}
               departments={departments}
+              teamStructures={teamStructures}
+              fullHierarchy={hierarchyStructure}
             />
           )}
 
