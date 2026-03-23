@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { FileText, Download, Check, Users, TrendingUp, Calendar, BarChart3, Clock } from 'lucide-react';
+import { FileText, Download, Check, Users, TrendingUp, TrendingDown, Calendar, BarChart3, Clock, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,12 @@ const CHART_COLORS = [
   'hsl(330, 60%, 55%)', 'hsl(90, 50%, 45%)',
 ];
 
-type ReportSection = 'headcount' | 'gaps' | 'events' | 'roles' | 'tenure';
+type ReportSection = 'headcount' | 'gaps' | 'forecast' | 'events' | 'roles' | 'tenure';
 
 const sectionConfig: Record<ReportSection, { label: string; icon: typeof Users }> = {
   headcount: { label: 'Headcount Summary', icon: Users },
   gaps: { label: 'Staffing Gaps', icon: TrendingUp },
+  forecast: { label: 'Staffing Forecast', icon: TrendingDown },
   events: { label: 'Upcoming Events', icon: Calendar },
   roles: { label: 'Role Distribution', icon: BarChart3 },
   tenure: { label: 'Tenure Analysis', icon: Clock },
@@ -37,7 +38,7 @@ const sectionConfig: Record<ReportSection, { label: string; icon: typeof Users }
 
 export const Reports = ({ employees, events, teamStructures, hierarchy }: ReportsProps) => {
   const [sections, setSections] = useState<Record<ReportSection, boolean>>({
-    headcount: true, gaps: true, events: true, roles: true, tenure: true,
+    headcount: true, gaps: true, forecast: true, events: true, roles: true, tenure: true,
   });
   const [isGenerating, setIsGenerating] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
@@ -119,6 +120,139 @@ export const Reports = ({ employees, events, teamStructures, hierarchy }: Report
       ],
     };
   }, [employees]);
+
+  // --- Staffing Forecast: first date each team will have missing roles ---
+  const forecastData = useMemo(() => {
+    const now = new Date();
+    const results: {
+      teamName: string;
+      department: string;
+      firstGapDate: string;
+      isCurrentlyMissing: boolean;
+      missingRoles: { role: string; have: number; need: number }[];
+    }[] = [];
+
+    teamStructures.forEach(structure => {
+      const teamEmps = employees.filter(e => e.team === structure.teamName && !e.isPotential);
+      
+      // Check current state first
+      const currentRoleCounts: Record<string, number> = {};
+      teamEmps.forEach(e => { currentRoleCounts[e.role] = (currentRoleCounts[e.role] || 0) + 1; });
+      
+      const currentMissing: { role: string; have: number; need: number }[] = [];
+      Object.entries(structure.requiredRoles).forEach(([role, need]) => {
+        const have = currentRoleCounts[role] || 0;
+        if (have < need) currentMissing.push({ role, have, need });
+      });
+
+      if (currentMissing.length > 0) {
+        results.push({
+          teamName: structure.teamName,
+          department: structure.department,
+          firstGapDate: now.toISOString().split('T')[0],
+          isCurrentlyMissing: true,
+          missingRoles: currentMissing,
+        });
+        return;
+      }
+
+      // Scan future dates: check each departure/transfer event for this team's members
+      const futureEvents = events
+        .filter(e => {
+          if (new Date(e.date) <= now) return false;
+          if (e.type === 'Departure') {
+            const emp = employees.find(em => em.id === e.empId);
+            return emp?.team === structure.teamName;
+          }
+          if (e.type === 'Team Swap') {
+            const emp = employees.find(em => em.id === e.empId);
+            return emp?.team === structure.teamName;
+          }
+          return false;
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Also check departureDate on employees
+      const futureDepartureDates = teamEmps
+        .filter(e => e.departureDate && new Date(e.departureDate) > now)
+        .map(e => ({ empId: e.id, date: e.departureDate! }));
+
+      // Merge all future change dates
+      const changeDates = new Set<string>();
+      futureEvents.forEach(e => changeDates.add(e.date));
+      futureDepartureDates.forEach(d => changeDates.add(d.date));
+
+      // Also check potential hires joining
+      const potentialHires = employees.filter(e => 
+        e.team === structure.teamName && e.isPotential && new Date(e.joined) > now
+      );
+      potentialHires.forEach(e => changeDates.add(e.joined));
+
+      // Transfers IN to this team
+      const transfersIn = events.filter(e => 
+        e.type === 'Team Swap' && e.targetTeam === structure.teamName && new Date(e.date) > now
+      );
+      transfersIn.forEach(e => changeDates.add(e.date));
+
+      const sortedDates = Array.from(changeDates).sort();
+
+      for (const dateStr of sortedDates) {
+        const targetDate = new Date(dateStr);
+        
+        // Calculate team at this date
+        const departedIds = new Set<number>();
+        
+        // Event-based departures
+        events.filter(e => e.type === 'Departure' && new Date(e.date) <= targetDate)
+          .forEach(e => {
+            const emp = employees.find(em => em.id === e.empId);
+            if (emp?.team === structure.teamName) departedIds.add(e.empId);
+          });
+        
+        // departureDate-based departures
+        teamEmps.filter(e => e.departureDate && new Date(e.departureDate) <= targetDate)
+          .forEach(e => departedIds.add(e.id));
+        
+        // Transfers out
+        events.filter(e => e.type === 'Team Swap' && new Date(e.date) <= targetDate)
+          .forEach(e => {
+            const emp = employees.find(em => em.id === e.empId);
+            if (emp?.team === structure.teamName) departedIds.add(e.empId);
+          });
+
+        // Calculate remaining + arrivals
+        const remaining = teamEmps.filter(e => !departedIds.has(e.id));
+        const arrivals = potentialHires.filter(e => new Date(e.joined) <= targetDate);
+        const transferredIn = transfersIn
+          .filter(e => new Date(e.date) <= targetDate)
+          .map(e => employees.find(em => em.id === e.empId))
+          .filter((e): e is Employee => !!e && e.team !== structure.teamName);
+
+        const allActive = [...remaining, ...arrivals, ...transferredIn];
+        const roleCounts: Record<string, number> = {};
+        allActive.forEach(e => { roleCounts[e.role] = (roleCounts[e.role] || 0) + 1; });
+
+        const missing: { role: string; have: number; need: number }[] = [];
+        Object.entries(structure.requiredRoles).forEach(([role, need]) => {
+          const have = roleCounts[role] || 0;
+          if (have < need) missing.push({ role, have, need });
+        });
+
+        if (missing.length > 0) {
+          results.push({
+            teamName: structure.teamName,
+            department: structure.department,
+            firstGapDate: dateStr,
+            isCurrentlyMissing: false,
+            missingRoles: missing,
+          });
+          return; // Found first gap date for this team
+        }
+      }
+    });
+
+    return results.sort((a, b) => new Date(a.firstGapDate).getTime() - new Date(b.firstGapDate).getTime());
+  }, [employees, events, teamStructures]);
 
   // PDF generation
   const generatePDF = async () => {
@@ -287,6 +421,74 @@ export const Reports = ({ employees, events, teamStructures, hierarchy }: Report
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {sections.forecast && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingDown size={16} className="text-primary" /> Staffing Forecast — First Gap Date
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {forecastData.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-sm text-emerald-500 font-medium">✅ No staffing gaps predicted</p>
+                  <p className="text-xs text-muted-foreground mt-1">All teams will remain fully staffed based on current plans</p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex gap-4 mb-4">
+                    <div className="flex-1 p-3 bg-accent/30 rounded-lg">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Teams at Risk</p>
+                      <p className="text-2xl font-bold text-destructive">{forecastData.length}</p>
+                    </div>
+                    <div className="flex-1 p-3 bg-accent/30 rounded-lg">
+                      <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wide">Currently Missing</p>
+                      <p className="text-2xl font-bold text-amber-500">{forecastData.filter(f => f.isCurrentlyMissing).length}</p>
+                    </div>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Team</TableHead>
+                        <TableHead>Department</TableHead>
+                        <TableHead>First Gap Date</TableHead>
+                        <TableHead>Missing Roles</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {forecastData.map(row => (
+                        <TableRow key={row.teamName}>
+                          <TableCell className="font-medium">{row.teamName}</TableCell>
+                          <TableCell>{row.department}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              {row.isCurrentlyMissing && (
+                                <AlertTriangle size={12} className="text-destructive" />
+                              )}
+                              <span className={row.isCurrentlyMissing ? 'text-destructive font-semibold' : ''}>
+                                {row.isCurrentlyMissing ? 'Now' : formatDate(row.firstGapDate)}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1 flex-wrap">
+                              {row.missingRoles.map(mr => (
+                                <Badge key={mr.role} variant="outline" className="text-[10px]">
+                                  {mr.role} ({mr.have}/{mr.need})
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
               )}
             </CardContent>
           </Card>
