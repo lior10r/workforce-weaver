@@ -647,7 +647,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
     <div className="space-y-6">
       {Object.entries(teamGroups).map(([team, emps]) => {
         const structure = teamStructures.find(s => s.teamName === team);
-        const leader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader) : null;
+        const leader = structure?.teamLeader ? employees.find(e => e.id === structure.teamLeader && e.team === team) || null : null;
         
         return (
           <div key={team} className="glass-card p-6">

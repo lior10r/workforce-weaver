@@ -1215,9 +1215,15 @@ const Index = () => {
                   } else {
                     updatedEmployees = [...s.proposedEmployees, updated];
                   }
+
+                  const updatedTeamStructures = s.baseTeamStructures.map(structure =>
+                    structure.teamName === emp.team && structure.teamLeader === employeeId
+                      ? { ...structure, teamLeader: undefined }
+                      : structure
+                  );
                   
                   return addScenarioChangelogEntry(
-                    { ...s, proposedEmployees: updatedEmployees },
+                    { ...s, proposedEmployees: updatedEmployees, baseTeamStructures: updatedTeamStructures },
                     'employee_modified',
                     employeeId,
                     emp.name,
