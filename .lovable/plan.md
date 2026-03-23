@@ -1,60 +1,43 @@
 
 
-## Skills as User-Defined Labels
+## Fix: Team Leader Showing Wrong Person After Transfer
 
-### Approach
+### Problem
 
-Labels are the better pattern here. They're flexible, visual, and familiar. Any user can create a new label (e.g., "OS", "Python", "Networking") and assign it to employees or team requirements. Only admins can delete labels from the system. Labels are stored in a dedicated SQLite table, not hardcoded.
+The `TeamStructure.teamLeader` field stores a specific employee ID, but when that employee transfers to another team, the stored ID is never cleared. This causes:
 
-### What changes
+1. **Timeline** shows the old leader's name (lines 827, 887) — looks up `structure.teamLeader` from `allEmployees` without checking team membership
+2. **AlertsPanel** checks `structure.teamLeader` against `teamMembers` but silently falls through — should trigger a "No Team Leader" alert when the stored leader isn't on the team anymore
+3. **Roster** works correctly because it uses `autoDetectTeamLeader` which filters by `e.team === teamName`
 
-**1. New `labels` table in SQLite (`server/utils/database.js`)**
-- `id INTEGER PRIMARY KEY`, `name TEXT UNIQUE NOT NULL`, `color TEXT` (optional hex/preset color), `created_by TEXT`
-- CRUD operations: `getLabels`, `createLabel`, `deleteLabel` (admin-only check on the route)
+### Fix
 
-**2. Link labels to employees and team structures**
-- Add `skills TEXT` column to `employees` table — stores JSON array of label IDs/names
-- Add `requiredSkills` field to `TeamStructure` interface — stored in the existing `team_structures` JSON blob
-- Update `rowToEmployee` / `createEmployee` / `updateEmployee` to handle skills
+**Two-pronged approach:**
 
-**3. New API routes (`server/routes/workforce-sqlite.js`)**
-- `GET /api/labels` — list all labels
-- `POST /api/labels` — create a new label (any authenticated user)
-- `DELETE /api/labels/:id` — delete a label (admin only)
+**1. Auto-clear `teamLeader` on team transfer (`src/pages/Index.tsx` or wherever employee updates are handled)**
+- When an employee's team changes, check if they were the `teamLeader` of their old team's structure and clear it
 
-**4. Frontend data model (`src/lib/workforce-data.ts`)**
-- Add `skills?: string[]` to `Employee` interface
-- Add `requiredSkills?: string[]` to `TeamStructure` interface
-- Add `Label` interface: `{ id: number; name: string; color?: string }`
+**2. Validate stored leader in Timeline and AlertsPanel display**
 
-**5. Labels management UI**
-- Add a "Manage Labels" button in the Sidebar or a small settings area
-- Simple list with add input + delete button (delete only visible to admins)
-- Labels shown as colored chips/badges throughout the app
+**`src/components/workforce/Timeline.tsx`** (lines ~827 and ~887):
+- Change leader lookup to verify the person is still on the team:
+```typescript
+const storedLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) : null;
+const teamLeader = storedLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
+```
 
-**6. Employee Modal (`src/components/workforce/EmployeeModal.tsx`)**
-- Add a label picker section — searchable dropdown of existing labels, click to assign, click to create new
-- Display assigned labels as removable chips
+**`src/components/workforce/AlertsPanel.tsx`** (line ~139):
+- Update leader detection to validate team membership and fall back to role-based detection:
+```typescript
+const structLeader = structure?.teamLeader ? teamMembers.find(e => e.id === structure.teamLeader) : null;
+const teamLeader = structLeader || teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
+```
 
-**7. Team Structure Modal (`src/components/workforce/TeamStructureModal.tsx`)**
-- Add "Required Skills" section below Required Roles
-- Same label picker pattern — select from existing labels
-- These define what skills the team needs at least one member to have
-
-**8. Roster alerts (`src/components/workforce/Roster.tsx`)**
-- For teams with `requiredSkills`, check if at least one active member has each label
-- Show amber "Missing: X, Y" badge on team header (same style as understaffed alerts)
-
-**9. API client (`src/lib/api-client.ts`)**
-- Add `getLabels`, `createLabel`, `deleteLabel` methods
+**`src/pages/Index.tsx`** (in the employee update/move handler):
+- When moving an employee to a new team, clear `teamLeader` from the old team's structure if it matches the employee's ID
 
 ### Files to modify
-- `server/utils/database.js` — new labels table + skills column
-- `server/routes/workforce-sqlite.js` — label CRUD endpoints
-- `src/lib/workforce-data.ts` — types
-- `src/lib/api-client.ts` — API methods
-- `src/components/workforce/EmployeeModal.tsx` — label assignment
-- `src/components/workforce/TeamStructureModal.tsx` — required skills
-- `src/components/workforce/Roster.tsx` — missing skills alerts
-- `src/components/workforce/Sidebar.tsx` — labels management UI
+- `src/components/workforce/Timeline.tsx` — validate leader is on team, fallback to role detection
+- `src/components/workforce/AlertsPanel.tsx` — same validation + trigger alert when no valid leader
+- `src/pages/Index.tsx` — clear stale `teamLeader` reference on team transfer
 
