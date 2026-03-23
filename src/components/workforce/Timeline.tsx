@@ -1314,7 +1314,7 @@ export const Timeline = ({
                         {renderTeamAlertBadges(teamName)}
                       </div>
                       <div className="space-y-3 ml-3">
-                        {teamMembers.map(emp => renderEmployeeRow(emp))}
+                        {teamMembers.map(emp => renderEmployeeRow(emp, undefined, false, false, undefined, false, teamName))}
                       </div>
                     </div>
                   );
