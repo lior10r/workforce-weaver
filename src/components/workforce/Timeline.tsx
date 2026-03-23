@@ -683,8 +683,40 @@ export const Timeline = ({
                   </div>
                 )}
                 {isSourceTeam && (
-                  <p className="text-amber-500 text-xs font-medium mt-1">📤 Past team member (transferred out)</p>
+                  <p className="text-amber-500 text-sm font-medium mt-1">📤 Past team member (transferred out)</p>
                 )}
+                {teamNameForContext && (() => {
+                  const ctx = getReplacementContext(emp.id, teamNameForContext, isSourceTeam, isTransfer, transferInfo);
+                  if (!ctx) return null;
+                  if (ctx.type === 'replaced_by' && ctx.person) {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20">
+                        <p className="text-sm text-emerald-500 font-medium">
+                          ✅ Replaced by {ctx.person.name} ({ctx.role})
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'needs_replacement') {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-destructive/10 border border-destructive/20">
+                        <p className="text-sm text-destructive font-bold">
+                          ⚠️ No replacement yet — needs {ctx.role}
+                        </p>
+                      </div>
+                    );
+                  }
+                  if (ctx.type === 'replacing' && ctx.person) {
+                    return (
+                      <div className="mt-1 p-1.5 rounded bg-accent-blue/10 border border-accent-blue/20">
+                        <p className="text-sm text-accent-blue font-medium">
+                          🔄 Replacing {ctx.person.name} ({ctx.role})
+                        </p>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </TooltipContent>
           </Tooltip>
