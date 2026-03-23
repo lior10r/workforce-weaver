@@ -181,7 +181,7 @@ export const OrgChart = forwardRef<HTMLDivElement, OrgChartProps>(({
       }
     }
     if (teamName) {
-      eligible = eligible.filter(e => e.team === teamName);
+      eligible = eligible.filter(e => e.team === teamName && (e.role === 'Team Lead' || e.managerLevel === 'team'));
     }
     return eligible;
   };
