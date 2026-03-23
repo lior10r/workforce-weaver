@@ -21,6 +21,7 @@ import { ExportImport } from '@/components/workforce/ExportImport';
 import { ScenarioManager } from '@/components/workforce/ScenarioManager';
 import { DecisionFlagsPanel } from '@/components/workforce/DecisionFlagsPanel';
 import { MissingRolesForecast } from '@/components/workforce/MissingRolesForecast';
+import { AlertsPanel } from '@/components/workforce/AlertsPanel';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { useLabels } from '@/hooks/use-labels';
 import { toast } from 'sonner';
@@ -1117,6 +1118,12 @@ const Index = () => {
 
           {view === 'timeline' && (
             <div className="space-y-6">
+              <AlertsPanel
+                employees={filteredEmployees}
+                events={events}
+                teamStructures={teamStructures}
+                hierarchy={hierarchy}
+              />
               <div className="flex flex-wrap gap-3 justify-between items-center">
                 <MissingRolesForecast 
                   employees={employees}
