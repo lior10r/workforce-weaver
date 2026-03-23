@@ -385,8 +385,15 @@ const Index = () => {
       
       const changeDetails: Record<string, { before?: string; after?: string }> = {};
       if (isEditing && existingEmployee) {
-        if (existingEmployee.team !== newEmployee.team) {
+      if (existingEmployee.team !== newEmployee.team) {
           changeDetails['Team'] = { before: existingEmployee.team, after: newEmployee.team };
+          // Auto-clear stale teamLeader reference if this employee was the leader of the old team
+          const oldTeamStructure = teamStructures.find(s => s.teamName === existingEmployee.team);
+          if (oldTeamStructure?.teamLeader === existingEmployee.id) {
+            setMasterTeamStructures(prev => prev.map(s => 
+              s.teamName === existingEmployee.team ? { ...s, teamLeader: undefined } : s
+            ));
+          }
         }
         if (existingEmployee.role !== newEmployee.role) {
           changeDetails['Role'] = { before: existingEmployee.role, after: newEmployee.role };
