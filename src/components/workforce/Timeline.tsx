@@ -525,6 +525,9 @@ export const Timeline = ({
                     </div>
                   </div>
                 )}
+                {isSourceTeam && (
+                  <p className="text-amber-500 text-xs font-medium mt-1">📤 Past team member (transferred out)</p>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
