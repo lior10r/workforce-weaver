@@ -150,7 +150,8 @@ const initialEmployees = [
   
   // Mobile Group
   { id: 28, name: 'Zara Ahmed', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Team Lead', status: 'Active', joined: '2021-05-01', managerId: 100, managerLevel: 'team' },
-  { id: 8, name: 'Hannah Moore', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01', managerId: 28 },
+  { id: 29, name: 'Liam O\'Connor', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Team Lead', status: 'Active', joined: '2025-02-01', managerId: 100, managerLevel: 'team' },
+  { id: 8, name: 'Hannah Moore', dept: 'Engineering', group: 'Mobile', team: 'Mobile iOS', role: 'Junior Dev', status: 'Active', joined: '2024-06-01', managerId: 29 },
   { id: 20, name: 'Tina Turner', dept: 'Engineering', group: 'Mobile', team: 'Mobile Android', role: 'Mid-Level Dev', status: 'Active', joined: '2023-01-10', managerId: 100 },
   
   // === PRODUCT & DESIGN DEPARTMENT ===
@@ -175,6 +176,10 @@ const initialEvents = [
   { id: 4, empId: 2, type: 'Team Swap', date: '2025-08-01', details: 'Moving to Infrastructure team', isFlag: false, targetTeam: 'Infrastructure' },
   { id: 5, empId: 8, type: 'Course Start', date: '2025-04-15', details: 'React Advanced Training', isFlag: false },
   { id: 6, empId: 13, type: 'Team Swap', date: '2025-09-15', details: 'Transferring to Backend Core', isFlag: false, targetTeam: 'Backend Core' },
+  // Team leader replacement example: Zara Ahmed (Mobile iOS lead) moved to Frontend Beta 2 months ago
+  { id: 7, empId: 28, type: 'Team Swap', date: '2025-01-15', details: 'Team leader moving to Frontend Beta', isFlag: false, targetTeam: 'Frontend Beta' },
+  // New leader replacing Zara in Mobile iOS
+  { id: 8, empId: 29, type: 'New Joiner', date: '2025-02-01', details: 'Hired as new Mobile iOS team leader, replacing Zara Ahmed', isFlag: false },
   // Departure events (6-year rule)
   { id: 101, empId: 1, type: 'Departure', date: '2029-01-15', details: 'End of rotation cycle', isFlag: false },
   { id: 102, empId: 2, type: 'Departure', date: '2028-05-10', details: 'End of rotation cycle', isFlag: false },
