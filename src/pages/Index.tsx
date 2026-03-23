@@ -127,6 +127,30 @@ const Index = () => {
 
 
 
+  // Helper: clear teamLeader references where the leader is no longer on that team
+  const cleanStaleTeamLeaders = useCallback((emps: Employee[], structures: TeamStructure[]) => {
+    let changed = false;
+    const cleaned = structures.map(s => {
+      if (s.teamLeader) {
+        const leaderOnTeam = emps.find(e => e.id === s.teamLeader && e.team === s.teamName && e.status !== 'Departed');
+        if (!leaderOnTeam) {
+          changed = true;
+          return { ...s, teamLeader: undefined };
+        }
+      }
+      return s;
+    });
+    return { cleaned, changed };
+  }, []);
+
+  // Proactively clean stale team leaders whenever master data changes
+  useEffect(() => {
+    const { cleaned, changed } = cleanStaleTeamLeaders(masterEmployees, masterTeamStructures);
+    if (changed) {
+      setMasterTeamStructuresDirect(cleaned);
+    }
+  }, [masterEmployees, masterTeamStructures, cleanStaleTeamLeaders, setMasterTeamStructuresDirect]);
+
 
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
@@ -541,6 +565,13 @@ const Index = () => {
   };
 
   const handleSaveTeamStructure = (structure: TeamStructure) => {
+    // Validate: if teamLeader is set, ensure they're actually on this team
+    if (structure.teamLeader) {
+      const leaderOnTeam = employees.find(e => e.id === structure.teamLeader && e.team === structure.teamName && e.status !== 'Departed');
+      if (!leaderOnTeam) {
+        structure = { ...structure, teamLeader: undefined };
+      }
+    }
     // Team structures always save to master (structural config, not scenario-specific)
     setMasterTeamStructures(prev => {
       const existing = prev.findIndex(s => s.teamName === structure.teamName);
@@ -601,6 +632,9 @@ const Index = () => {
       const finalEvents = getScenarioEvents(scenario);
       setMasterEmployeesDirect(finalEmployees);
       setMasterEventsDirect(finalEvents);
+      // Clean stale team leaders after merge
+      const { cleaned, changed } = cleanStaleTeamLeaders(finalEmployees, masterTeamStructures);
+      if (changed) setMasterTeamStructuresDirect(cleaned);
       handleDeleteScenario(scenario.id);
       return;
     }
@@ -647,6 +681,9 @@ const Index = () => {
 
     setMasterEmployeesDirect(updatedEmployees);
     setMasterEventsDirect(updatedEvents);
+    // Clean stale team leaders after selective merge
+    const { cleaned, changed } = cleanStaleTeamLeaders(updatedEmployees, masterTeamStructures);
+    if (changed) setMasterTeamStructuresDirect(cleaned);
 
     // Remove merged entries from scenario, or delete scenario if all merged
     const remainingChangelog = scenario.changelog.filter(c => !selectedChangeIds.includes(c.id));
