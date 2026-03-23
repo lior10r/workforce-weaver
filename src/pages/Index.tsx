@@ -1199,6 +1199,7 @@ const Index = () => {
                 events={events}
                 openPlannerForUser={openPlannerForUser}
                 allEmployees={rawEmployees}
+                effectiveEmployees={filteredEmployees}
                 selectedTeam={legacyHierarchy.team}
                 selectedDept={legacyHierarchy.dept}
                 teamStructures={teamStructures}

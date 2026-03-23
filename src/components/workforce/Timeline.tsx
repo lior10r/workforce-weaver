@@ -1049,7 +1049,7 @@ export const Timeline = ({
                   if (teamMembers.length === 0) return null;
 
                   const structure = teamStructures.find(s => s.teamName === teamName);
-                  const teamLeader = structure?.teamLeader ? allEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
+                  const teamLeader = structure?.teamLeader ? effectiveEmployees.find(e => e.id === structure.teamLeader && e.team === teamName) || null : null;
 
                   return (
                     <div key={teamName} className="mb-4 ml-6">
