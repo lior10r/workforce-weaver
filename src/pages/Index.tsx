@@ -50,7 +50,8 @@ import {
   getEmployeeDiffs,
   getEventDiffs,
   addScenarioChangelogEntry,
-  createScenario
+  createScenario,
+  getTeamParent
 } from '@/lib/workforce-data';
 
 interface ScopeFilter {
@@ -127,6 +128,36 @@ const Index = () => {
 
 
 
+  // Helper: apply past Team Swap events so current-state views use the employee's real current team
+  const getEffectiveEmployees = useCallback((emps: Employee[], evts: WorkforceEvent[]) => {
+    const today = new Date();
+    const latestPastSwapByEmployee = new Map<number, WorkforceEvent>();
+
+    evts.forEach(event => {
+      if (event.type !== 'Team Swap' || !event.targetTeam) return;
+      const eventDate = new Date(event.date);
+      if (Number.isNaN(eventDate.getTime()) || eventDate > today) return;
+
+      const existing = latestPastSwapByEmployee.get(event.empId);
+      if (!existing || new Date(existing.date) < eventDate) {
+        latestPastSwapByEmployee.set(event.empId, event);
+      }
+    });
+
+    return emps.map(emp => {
+      const latestSwap = latestPastSwapByEmployee.get(emp.id);
+      if (!latestSwap?.targetTeam || latestSwap.targetTeam === emp.team) return emp;
+
+      const parent = getTeamParent(hierarchy, latestSwap.targetTeam);
+      return {
+        ...emp,
+        team: latestSwap.targetTeam,
+        dept: parent?.dept.name ?? emp.dept,
+        group: parent?.group?.name,
+      };
+    });
+  }, [hierarchy]);
+
   // Helper: clear teamLeader references where the leader is no longer on that team
   const cleanStaleTeamLeaders = useCallback((emps: Employee[], structures: TeamStructure[]) => {
     let changed = false;
@@ -145,18 +176,19 @@ const Index = () => {
 
   // Proactively clean stale team leaders whenever master data changes
   useEffect(() => {
-    const { cleaned, changed } = cleanStaleTeamLeaders(masterEmployees, masterTeamStructures);
+    const effectiveMasterEmployees = getEffectiveEmployees(masterEmployees, masterEvents);
+    const { cleaned, changed } = cleanStaleTeamLeaders(effectiveMasterEmployees, masterTeamStructures);
     if (changed) {
       setMasterTeamStructuresDirect(cleaned);
     }
-  }, [masterEmployees, masterTeamStructures, cleanStaleTeamLeaders, setMasterTeamStructuresDirect]);
+  }, [masterEmployees, masterEvents, masterTeamStructures, cleanStaleTeamLeaders, getEffectiveEmployees, setMasterTeamStructuresDirect]);
 
 
   // Get the active scenario if one is selected
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
 
-  // Computed: Get effective employees/events based on active scenario or master
-  const employees = useMemo(() => {
+  // Computed: get raw scenario/master data, then derive effective current employees from past transfers
+  const rawEmployees = useMemo(() => {
     if (activeScenario) {
       return getScenarioEmployees(activeScenario);
     }
@@ -169,6 +201,8 @@ const Index = () => {
     }
     return masterEvents;
   }, [activeScenario, masterEvents]);
+
+  const employees = useMemo(() => getEffectiveEmployees(rawEmployees, events), [rawEmployees, events, getEffectiveEmployees]);
 
   const teamStructures = useMemo(() => {
     if (activeScenario) {
@@ -284,29 +318,27 @@ const Index = () => {
   // Helper: check if employee has departed
   const isEmployeeDeparted = useCallback((emp: Employee) => {
     const today = new Date();
-    // Check departureDate
     if (emp.departureDate && new Date(emp.departureDate) <= today) return true;
-    // Check departure events
     const hasDepartureEvent = events.some(ev => 
       ev.empId === emp.id && ev.type === 'Departure' && new Date(ev.date) <= today
     );
     return hasDepartureEvent;
   }, [events]);
 
-  const filteredEmployees = useMemo(() => {
-    return employees.filter(e => {
-      const matchSearch = e.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchTeam = scopeFilter.teams.includes(e.team);
-      const isDeptLevel = !allTeamsList.includes(e.team);
-      const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(e.dept);
-      const matchScope = matchTeam || matchDeptLevel;
-      
-      // Filter out departed employees unless toggle is on
-      if (!showDeparted && isEmployeeDeparted(e)) return false;
-      
-      return matchSearch && matchScope;
-    });
-  }, [employees, searchQuery, scopeFilter, allTeamsList, showDeparted, isEmployeeDeparted]);
+  const matchesEmployeeFilters = useCallback((emp: Employee) => {
+    const matchSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchTeam = scopeFilter.teams.includes(emp.team);
+    const isDeptLevel = !allTeamsList.includes(emp.team);
+    const matchDeptLevel = isDeptLevel && scopeFilter.departments.includes(emp.dept);
+    const matchScope = matchTeam || matchDeptLevel;
+
+    if (!showDeparted && isEmployeeDeparted(emp)) return false;
+
+    return matchSearch && matchScope;
+  }, [searchQuery, scopeFilter, allTeamsList, showDeparted, isEmployeeDeparted]);
+
+  const filteredEmployees = useMemo(() => employees.filter(matchesEmployeeFilters), [employees, matchesEmployeeFilters]);
+  const filteredTimelineEmployees = useMemo(() => rawEmployees.filter(matchesEmployeeFilters), [rawEmployees, matchesEmployeeFilters]);
 
   // Stats
   const stats = useMemo(() => ({
@@ -1163,10 +1195,10 @@ const Index = () => {
                 />
               </div>
               <Timeline
-                employees={filteredEmployees} 
+                employees={filteredTimelineEmployees} 
                 events={events}
                 openPlannerForUser={openPlannerForUser}
-                allEmployees={employees}
+                allEmployees={rawEmployees}
                 selectedTeam={legacyHierarchy.team}
                 selectedDept={legacyHierarchy.dept}
                 teamStructures={teamStructures}
