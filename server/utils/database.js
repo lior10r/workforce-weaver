@@ -77,6 +77,18 @@ db.exec(`
     color TEXT,
     created_by TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS employee_notes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    employee_id INTEGER NOT NULL,
+    author_id TEXT NOT NULL,
+    author_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 `);
 
 // Add skills column to employees if not exists
