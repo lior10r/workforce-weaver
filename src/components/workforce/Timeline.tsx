@@ -426,6 +426,18 @@ export const Timeline = ({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">{emp.team} • {emp.dept}</p>
+                {emp.skills && emp.skills.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-primary uppercase tracking-wide mb-1">Skills</p>
+                    <div className="flex flex-wrap gap-1">
+                      {emp.skills.map(skill => (
+                        <span key={skill} className="px-1.5 py-0.5 rounded-full text-[10px] bg-primary/10 text-primary font-medium">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>
