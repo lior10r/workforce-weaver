@@ -145,28 +145,10 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Input
-              type="number"
-              value={yearsRangeStart}
-              onChange={(e) => setYearsRangeStart(parseInt(e.target.value) || yearsRangeStart)}
-              className="w-20 h-7 text-xs"
-            />
-            <span>—</span>
-            <Input
-              type="number"
-              value={yearsRangeEnd}
-              onChange={(e) => setYearsRangeEnd(parseInt(e.target.value) || yearsRangeEnd)}
-              className="w-20 h-7 text-xs"
-            />
-          </div>
-          <button onClick={() => { setYearsRangeStart(yearsRangeStart + 1); setYearsRangeEnd(yearsRangeEnd - 1); }} className="p-1 rounded hover:bg-secondary transition-colors">
-            <ZoomIn size={14} className="text-muted-foreground" />
-          </button>
-          <button onClick={() => { setYearsRangeStart(yearsRangeStart - 1); setYearsRangeEnd(yearsRangeEnd + 1); }} className="p-1 rounded hover:bg-secondary transition-colors">
-            <ZoomOut size={14} className="text-muted-foreground" />
-          </button>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-mono">{formatDate(rangeStart.toISOString().split('T')[0])}</span>
+          <span>—</span>
+          <span className="font-mono">{formatDate(rangeEnd.toISOString().split('T')[0])}</span>
         </div>
       </div>
 
