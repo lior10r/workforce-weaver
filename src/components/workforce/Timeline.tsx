@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Flag, Clock, ArrowRightLeft, ArrowRight, UserPlus, BookOpen, AlertTriangle, HelpCircle, Plus, Minus, Edit3, Building2, Users, FolderTree, Crown, Check, X, MessageSquare, Trash2, Pencil, Calendar, ZoomIn, ZoomOut } from 'lucide-react';
 import { Shield, Tag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,7 @@ export const Timeline = ({
   onEditEmployee,
   
 }: TimelineProps) => {
+  const navigate = useNavigate();
   // effectiveEmployees: used for alerts, leader checks, team membership counts
   // Falls back to `employees` if not provided
   const effectiveEmployees = effectiveEmployeesProp || employees;
@@ -574,7 +576,7 @@ export const Timeline = ({
               <div className="cursor-help">
                 <div className="flex items-center gap-2">
                   {isPotential && <HelpCircle size={12} className="text-potential" />}
-                  <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
+                  <p className="font-semibold text-sm text-foreground truncate hover:text-primary cursor-pointer transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/employee/${emp.id}`); }}>{emp.name}</p>
                   {managerLevel && (
                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${managerBadgeColors[managerLevel]}`}>
                       {managerLevel === 'dept' ? 'Dept Mgr' : 'Group Mgr'}
@@ -916,6 +918,8 @@ export const Timeline = ({
           {!isPotential && empEvents.map(ev => {
             const evPos = pos(ev.date);
             if (ev.type === 'Departure') return null;
+            // Hide resolved flags from timeline — they remain on the Employee Profile page
+            if (ev.isFlag && ev.isResolved) return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;

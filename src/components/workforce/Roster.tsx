@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Flag, Edit2, Settings, Users, ChevronDown, ChevronRight, AlertTriangle, Plus, Minus, Edit3, Crown, Building2, FolderTree, Trash2, GripVertical, UserPlus, Clock, GraduationCap, Tag } from 'lucide-react';
 import { Employee, TeamStructure, getRoleColor, formatDate, DiffStatus, HierarchyStructure, getAllDeptTeams, WorkforceEvent, getCapacityWeight, Label } from '@/lib/workforce-data';
 
@@ -172,6 +173,7 @@ export const Roster = ({
   onDeleteLabel,
   isAdmin = false,
 }: RosterProps) => {
+  const navigate = useNavigate();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
@@ -453,7 +455,7 @@ export const Roster = ({
           {/* Info */}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-semibold text-foreground">{emp.name}</h4>
+              <h4 className="font-semibold text-foreground hover:text-primary cursor-pointer transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/employee/${emp.id}`); }}>{emp.name}</h4>
               {isLeader && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-500 uppercase">
                   Team Lead

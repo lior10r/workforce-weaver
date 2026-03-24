@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, Clock, Users, UserX, Shield, Tag, Bell, CalendarClock, Filter, X } from 'lucide-react';
 import { Employee, WorkforceEvent, TeamStructure, HierarchyStructure, getAllDeptTeams, formatDate } from '@/lib/workforce-data';
 
