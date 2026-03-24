@@ -132,6 +132,7 @@ export const Timeline = ({
   onEditEmployee,
   
 }: TimelineProps) => {
+  const navigate = useNavigate();
   // effectiveEmployees: used for alerts, leader checks, team membership counts
   // Falls back to `employees` if not provided
   const effectiveEmployees = effectiveEmployeesProp || employees;
