@@ -16,6 +16,7 @@ interface PersonalTimelineProps {
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
   onAddTimelineNote?: (empId: number, date: string, note: string) => void;
+  onUpdateEventDate?: (eventId: number, newDate: string) => void;
 }
 
 const generateYearLabels = (start: Date, end: Date): string[] => {
@@ -38,7 +39,7 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate }: PersonalTimelineProps) => {
   const navigate = useNavigate();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
@@ -46,6 +47,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
   const [clickNoteText, setClickNoteText] = useState('');
   const [clickNotePos, setClickNotePos] = useState<number>(0);
+  const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
+  const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
+  const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
@@ -116,6 +120,43 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   }, [timelineScale, rangeStart, rangeEnd]);
 
   const pos = useCallback((dateStr: string) => getTimelinePositionInRange(dateStr, rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+
+  const pctToDate = useCallback((pct: number): string => {
+    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+    const d = new Date(rangeStart.getTime() + (pct / 100) * rangeMs);
+    return d.toISOString().split('T')[0];
+  }, [rangeStart, rangeEnd]);
+
+  const handleNoteDragStart = useCallback((eventId: number, e: React.MouseEvent) => {
+    if (!onUpdateEventDate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingEventId(eventId);
+
+    const barEl = (e.currentTarget as HTMLElement).closest('.timeline-gantt-bar') as HTMLElement;
+    if (!barEl) return;
+
+    const onMouseMove = (me: MouseEvent) => {
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      setDragPreviewPos(pct);
+      setDragPreviewDate(pctToDate(pct));
+    };
+
+    const onMouseUp = (me: MouseEvent) => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      const newDate = pctToDate(pct);
+      onUpdateEventDate(eventId, newDate);
+      setDraggingEventId(null);
+      setDragPreviewDate(null);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [onUpdateEventDate, pctToDate]);
 
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
@@ -250,7 +291,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                   </p>
                 </div>
                 <div
-                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair"
+                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar"
                   onClick={(e) => {
                     if (!onAddTimelineNote) return;
                     // Don't trigger if clicking on an event marker or popover
@@ -328,21 +369,29 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                   {/* Event markers */}
                   {phaseEvents.map(ev => {
                     if (ev.type === 'Departure') return null;
-                    const evPos = pos(ev.date);
+                    const evPos = draggingEventId === ev.id ? dragPreviewPos : pos(ev.date);
                     const isSwap = ev.type === 'Team Swap';
                     const isNote = ev.type === 'Timeline Note';
+                    const isDragging = draggingEventId === ev.id;
                     return (
                       <Popover key={ev.id}>
                         <PopoverTrigger asChild>
                           <div
                             style={{ left: `${evPos}%` }}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
+                            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 ${isDragging ? 'z-30' : ''} ${isNote && onUpdateEventDate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                            data-event-marker
+                            onMouseDown={isNote && onUpdateEventDate ? (e) => handleNoteDragStart(ev.id, e) : undefined}
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
                               isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
-                            }`}>
+                            } ${isDragging ? 'scale-125 ring-2 ring-amber-300 shadow-2xl' : ''}`}>
                               {isNote ? <StickyNote size={10} className="text-white" /> : isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
                             </div>
+                            {isDragging && dragPreviewDate && (
+                              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover border border-border rounded px-2 py-0.5 text-[10px] font-mono text-foreground shadow-lg">
+                                {formatDate(dragPreviewDate)}
+                              </div>
+                            )}
                           </div>
                         </PopoverTrigger>
                         <PopoverContent side="top" align="center" className="w-56 p-3 text-xs" sideOffset={8}>
@@ -352,6 +401,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                             <p className="text-primary flex items-center gap-1 mt-1"><ArrowRight size={12} /> {ev.targetTeam}</p>
                           )}
                           <p className="text-muted-foreground mt-1.5 font-mono text-[10px]">{formatDate(ev.date)}</p>
+                          {isNote && onUpdateEventDate && (
+                            <p className="text-muted-foreground mt-1 text-[10px] italic">Drag to reposition</p>
+                          )}
                           {onDeleteEvent && (
                             <button onClick={() => onDeleteEvent(ev.id)} className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
                               <Trash2 size={10} /> Remove

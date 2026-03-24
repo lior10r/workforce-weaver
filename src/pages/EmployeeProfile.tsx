@@ -281,6 +281,22 @@ const EmployeeProfile = () => {
                     isFlag: false,
                   });
                 }}
+                onUpdateEventDate={(eventId, newDate) => {
+                  const scenarioId = ensureWorkingScenario();
+                  setScenarios(prev => prev.map(s => {
+                    if (s.id !== scenarioId) return s;
+                    const inProposed = s.proposedEvents.find(e => e.id === eventId);
+                    if (inProposed) {
+                      return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? { ...e, date: newDate } : e) };
+                    }
+                    // Event is in master — copy to proposed with new date
+                    const masterEvent = events.find(e => e.id === eventId);
+                    if (masterEvent) {
+                      return { ...s, proposedEvents: [...s.proposedEvents, { ...masterEvent, date: newDate }] };
+                    }
+                    return s;
+                  }));
+                }}
               />
             </CardContent>
           </Card>
