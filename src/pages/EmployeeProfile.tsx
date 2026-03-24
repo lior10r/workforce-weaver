@@ -179,9 +179,9 @@ const EmployeeProfile = () => {
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-6 py-8">
           {/* Back button */}
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
             <ArrowLeft size={18} />
-            <span className="text-sm font-medium">Back</span>
+            <span className="text-sm font-medium">Back to Operations Center</span>
           </button>
 
           {/* Header */}
