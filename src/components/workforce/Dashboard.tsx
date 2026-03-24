@@ -42,6 +42,15 @@ export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHiera
         onNavigateToTeam={onNavigateToTeam}
       />
 
+      {/* Replacement Tracker */}
+      <ReplacementTracker
+        employees={allEmployees}
+        events={events}
+        teamStructures={teamStructures}
+        hierarchy={fullHierarchy}
+        onHireForTeam={onHireForTeam}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Team Distribution */}
         <div className="lg:col-span-2 space-y-8">
