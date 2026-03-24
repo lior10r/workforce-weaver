@@ -273,7 +273,6 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             const endPos = phase.endDate ? pos(phase.endDate) : 100;
             const width = Math.max(0, endPos - startPos);
             const phaseEvents = empEvents.filter(e => {
-              if (e.isFlag) return false; // flags shown separately
               const evDate = new Date(e.date);
               const phaseStart = new Date(phase.startDate);
               const phaseEnd = phase.endDate ? new Date(phase.endDate) : new Date('2099-12-31');
@@ -372,6 +371,8 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     const evPos = draggingEventId === ev.id ? dragPreviewPos : pos(ev.date);
                     const isSwap = ev.type === 'Team Swap';
                     const isNote = ev.type === 'Timeline Note';
+                    const isFlag = ev.isFlag;
+                    const isResolved = ev.isResolved;
                     const isDragging = draggingEventId === ev.id;
                     return (
                       <Popover key={ev.id}>
@@ -383,9 +384,17 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                             onMouseDown={isNote && onUpdateEventDate ? (e) => handleNoteDragStart(ev.id, e) : undefined}
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
-                              isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
+                              isFlag
+                                ? (isResolved ? 'bg-emerald-500' : 'bg-flag')
+                                : isNote ? 'bg-amber-500'
+                                : isSwap ? 'bg-primary'
+                                : 'bg-foreground'
                             } ${isDragging ? 'scale-125 ring-2 ring-amber-300 shadow-2xl' : ''}`}>
-                              {isNote ? <StickyNote size={10} className="text-white" /> : isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
+                              {isFlag
+                                ? (isResolved ? <Check size={10} className="text-white" /> : <Flag size={10} className="text-foreground" />)
+                                : isNote ? <StickyNote size={10} className="text-white" />
+                                : isSwap ? <ArrowRight size={10} className="text-primary-foreground" />
+                                : <Clock size={10} className="text-background" />}
                             </div>
                             {isDragging && dragPreviewDate && (
                               <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover border border-border rounded px-2 py-0.5 text-[10px] font-mono text-foreground shadow-lg">
@@ -395,20 +404,45 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                           </div>
                         </PopoverTrigger>
                         <PopoverContent side="top" align="center" className="w-56 p-3 text-xs" sideOffset={8}>
-                          <p className="font-bold uppercase mb-1 text-primary">{ev.type}</p>
+                          <p className={`font-bold uppercase mb-1 ${isFlag ? (isResolved ? 'text-emerald-500' : 'text-flag') : 'text-primary'}`}>
+                            {ev.type} {isResolved && '✓ Resolved'}
+                          </p>
                           <p className="text-foreground font-medium">{ev.details}</p>
                           {isSwap && ev.targetTeam && (
                             <p className="text-primary flex items-center gap-1 mt-1"><ArrowRight size={12} /> {ev.targetTeam}</p>
+                          )}
+                          {isResolved && ev.resolutionNote && (
+                            <div className="mt-2 p-2 bg-emerald-500/10 rounded-lg">
+                              <p className="text-emerald-600 text-[10px] font-medium flex items-center gap-1">
+                                <MessageSquare size={10} /> Resolution:
+                              </p>
+                              <p className="text-foreground text-[10px] mt-0.5">{ev.resolutionNote}</p>
+                            </div>
                           )}
                           <p className="text-muted-foreground mt-1.5 font-mono text-[10px]">{formatDate(ev.date)}</p>
                           {isNote && onUpdateEventDate && (
                             <p className="text-muted-foreground mt-1 text-[10px] italic">Drag to reposition</p>
                           )}
-                          {onDeleteEvent && (
-                            <button onClick={() => onDeleteEvent(ev.id)} className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
-                              <Trash2 size={10} /> Remove
-                            </button>
-                          )}
+                          <div className="flex gap-1 mt-2 pt-2 border-t border-border/50">
+                            {isFlag && onResolveFlag && (
+                              <button
+                                onClick={() => onResolveFlag(ev.id, '')}
+                                className={`flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                                  isResolved
+                                    ? 'bg-emerald-500/20 text-emerald-500 hover:bg-emerald-500/30'
+                                    : 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20'
+                                }`}
+                              >
+                                {isResolved ? <MessageSquare size={10} /> : <Check size={10} />}
+                                {isResolved ? 'Edit' : 'Resolve'}
+                              </button>
+                            )}
+                            {onDeleteEvent && (
+                              <button onClick={() => onDeleteEvent(ev.id)} className="flex items-center justify-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
+                                <Trash2 size={10} /> Remove
+                              </button>
+                            )}
+                          </div>
                         </PopoverContent>
                       </Popover>
                     );
