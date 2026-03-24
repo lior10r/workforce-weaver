@@ -167,14 +167,7 @@ export const ReplacementTracker = ({ employees, events, teamStructures, hierarch
     });
   };
 
-  if (gaps.length === 0) {
-    return (
-      <div className="glass-card p-8 text-center">
-        <CheckCircle2 size={40} className="mx-auto mb-3 text-primary/30" />
-        <p className="text-muted-foreground text-sm">No replacement needs detected in the next {timeWindow} days</p>
-      </div>
-    );
-  }
+  const isEmpty = gaps.length === 0;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -349,8 +342,9 @@ export const ReplacementTracker = ({ employees, events, teamStructures, hierarch
         })}
 
         {filteredGaps.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No gaps matching current filters
+          <div className="text-center py-8 text-muted-foreground">
+            <CheckCircle2 size={32} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">{isEmpty ? `No replacement needs detected in the next ${timeWindow} days` : 'No gaps matching current filters'}</p>
           </div>
         )}
       </div>
