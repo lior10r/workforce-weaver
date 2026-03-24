@@ -348,6 +348,55 @@ const Index = () => {
     upcomingChanges: events.filter(e => new Date(e.date) > new Date()).length
   }), [filteredEmployees, events]);
 
+  // Compute uncovered replacement count for sidebar badge
+  const uncoveredReplacementCount = useMemo(() => {
+    const today = new Date();
+    const windowEnd = new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000);
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    let uncovered = 0;
+
+    // Collect departing employees
+    const departing = new Map<number, { team: string; role: string; date: number }>();
+    employees.forEach(emp => {
+      if (emp.departureDate) {
+        const d = new Date(emp.departureDate);
+        if (d >= today && d <= windowEnd) departing.set(emp.id, { team: emp.team, role: emp.role, date: d.getTime() });
+      }
+    });
+    events.forEach(evt => {
+      if (evt.type === 'Departure' && !departing.has(evt.empId)) {
+        const d = new Date(evt.date);
+        if (d >= today && d <= windowEnd) {
+          const emp = employees.find(e => e.id === evt.empId);
+          if (emp) departing.set(emp.id, { team: emp.team, role: emp.role, date: d.getTime() });
+        }
+      }
+      if (evt.type === 'Team Swap' && evt.targetTeam) {
+        const d = new Date(evt.date);
+        if (d >= today && d <= windowEnd && !departing.has(evt.empId)) {
+          const emp = employees.find(e => e.id === evt.empId);
+          if (emp && evt.targetTeam !== emp.team) departing.set(emp.id, { team: emp.team, role: emp.role, date: d.getTime() });
+        }
+      }
+    });
+
+    departing.forEach(({ team, role, date }, empId) => {
+      const hasPotentialHire = employees.some(e =>
+        e.isPotential && e.id !== empId && e.team === team &&
+        Math.abs(new Date(e.joined).getTime() - date) <= THIRTY_DAYS
+      );
+      if (hasPotentialHire) return;
+      const hasIncomingSwap = events.some(evt =>
+        evt.type === 'Team Swap' && evt.targetTeam === team &&
+        new Date(evt.date) >= today &&
+        Math.abs(new Date(evt.date).getTime() - date) <= THIRTY_DAYS
+      );
+      if (!hasIncomingSwap) uncovered++;
+    });
+
+    return uncovered;
+  }, [employees, events]);
+
   // Handlers
   const handleAddDepartment = (name: string) => {
     if (!departments[name]) {
@@ -1018,6 +1067,7 @@ const Index = () => {
         hierarchy={hierarchy}
         showDeparted={showDeparted}
         setShowDeparted={setShowDeparted}
+        uncoveredReplacementCount={uncoveredReplacementCount}
       />
 
       {/* Main Content */}
@@ -1198,6 +1248,11 @@ const Index = () => {
                 }
                 setView('timeline');
               }}
+              onHireForTeam={(isAdmin || user?.role === 'manager') ? (prefill) => {
+                setEmployeePrefill(prefill);
+                setEditingEmployee(null);
+                setIsEmployeeModalOpen(true);
+              } : undefined}
             />
           )}
 

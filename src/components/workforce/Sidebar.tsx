@@ -11,15 +11,21 @@ interface SidebarItemProps {
   label: string;
   active: boolean;
   onClick: () => void;
+  badge?: number;
 }
 
-const SidebarItem = ({ icon: Icon, label, active, onClick }: SidebarItemProps) => (
+const SidebarItem = ({ icon: Icon, label, active, onClick, badge }: SidebarItemProps) => (
   <button
     onClick={onClick}
     className={`sidebar-item ${active ? 'sidebar-item-active' : 'sidebar-item-inactive'}`}
   >
     <Icon size={20} />
     <span className="font-medium text-sm">{label}</span>
+    {badge != null && badge > 0 && (
+      <span className="ml-auto bg-destructive text-destructive-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+        {badge}
+      </span>
+    )}
   </button>
 );
 
@@ -37,6 +43,7 @@ interface SidebarProps {
   hierarchy: HierarchyStructure;
   showDeparted: boolean;
   setShowDeparted: (show: boolean) => void;
+  uncoveredReplacementCount?: number;
 }
 
 export const Sidebar = ({ 
@@ -47,6 +54,7 @@ export const Sidebar = ({
   hierarchy,
   showDeparted,
   setShowDeparted,
+  uncoveredReplacementCount = 0,
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
@@ -182,7 +190,8 @@ export const Sidebar = ({
           icon={Users} 
           label="Operations Center" 
           active={view === 'dashboard'} 
-          onClick={() => setView('dashboard')} 
+          onClick={() => setView('dashboard')}
+          badge={uncoveredReplacementCount}
         />
         <SidebarItem 
           icon={Calendar} 

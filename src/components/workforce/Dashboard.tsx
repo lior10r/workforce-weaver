@@ -1,6 +1,7 @@
 import { Flag, Users, AlertCircle } from 'lucide-react';
 import { Employee, WorkforceEvent, Hierarchy, TeamStructure, HierarchyStructure, formatDate } from '@/lib/workforce-data';
 import { AlertsPanel } from './AlertsPanel';
+import { ReplacementTracker } from './ReplacementTracker';
 
 interface DashboardProps {
   employees: Employee[];
@@ -12,9 +13,10 @@ interface DashboardProps {
   teamStructures: TeamStructure[];
   fullHierarchy: HierarchyStructure;
   onNavigateToTeam?: (teamName: string) => void;
+  onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
 }
 
-export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy, onNavigateToTeam }: DashboardProps) => {
+export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy, onNavigateToTeam, onHireForTeam }: DashboardProps) => {
   const today = new Date();
   const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   
@@ -38,6 +40,15 @@ export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHiera
         teamStructures={teamStructures}
         hierarchy={fullHierarchy}
         onNavigateToTeam={onNavigateToTeam}
+      />
+
+      {/* Replacement Tracker */}
+      <ReplacementTracker
+        employees={allEmployees}
+        events={events}
+        teamStructures={teamStructures}
+        hierarchy={fullHierarchy}
+        onHireForTeam={onHireForTeam}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
