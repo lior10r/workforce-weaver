@@ -37,6 +37,7 @@ interface SidebarProps {
   hierarchy: HierarchyStructure;
   showDeparted: boolean;
   setShowDeparted: (show: boolean) => void;
+  uncoveredReplacementCount?: number;
 }
 
 export const Sidebar = ({ 
