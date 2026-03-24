@@ -1176,6 +1176,7 @@ const Index = () => {
           {view === 'dashboard' && (
             <Dashboard 
               employees={filteredEmployees} 
+              allEmployees={employees}
               events={events} 
               hierarchy={legacyHierarchy}
               setHierarchy={() => {}}
