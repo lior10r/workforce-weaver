@@ -48,6 +48,7 @@ export const Sidebar = ({
   hierarchy,
   showDeparted,
   setShowDeparted,
+  uncoveredReplacementCount = 0,
 }: SidebarProps) => {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
