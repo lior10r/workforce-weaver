@@ -180,6 +180,43 @@ export const Timeline = ({
 
   const pos = useCallback((dateStr: string) => getTimelinePositionInRange(dateStr, rangeStart, rangeEnd), [rangeStart, rangeEnd]);
 
+  const pctToDate = useCallback((pct: number): string => {
+    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+    const d = new Date(rangeStart.getTime() + (pct / 100) * rangeMs);
+    return d.toISOString().split('T')[0];
+  }, [rangeStart, rangeEnd]);
+
+  const handleFlagDragStart = useCallback((eventId: number, e: React.MouseEvent) => {
+    if (!onUpdateEventDate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingEventId(eventId);
+
+    const barEl = (e.currentTarget as HTMLElement).closest('.timeline-gantt-bar') as HTMLElement;
+    if (!barEl) return;
+
+    const onMouseMove = (me: MouseEvent) => {
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      setDragPreviewPos(pct);
+      setDragPreviewDate(pctToDate(pct));
+    };
+
+    const onMouseUp = (me: MouseEvent) => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      const newDate = pctToDate(pct);
+      onUpdateEventDate(eventId, newDate);
+      setDraggingEventId(null);
+      setDragPreviewDate(null);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [onUpdateEventDate, pctToDate]);
+
   const minWidth = useMemo(() => Math.max(1200, columnLabels.length * 160), [columnLabels]);
 
   // Get all unique teams from employees for grouping
