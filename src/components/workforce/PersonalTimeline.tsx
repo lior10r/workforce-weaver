@@ -1,8 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar, ZoomIn, ZoomOut } from 'lucide-react';
+import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Employee, WorkforceEvent, getRoleColor, getTimelinePositionInRange, formatDate } from '@/lib/workforce-data';
@@ -79,26 +78,29 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
     return result;
   }, [employee, empEvents]);
 
-  // Default range: from hire date (minus some padding) to today + 1 year (or departure + padding)
-  const defaultRange = useMemo(() => {
+  const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
+
+  // Auto-compute range based on career span
+  const { rangeStart, rangeEnd } = useMemo(() => {
     const hireDate = new Date(employee.joined);
     const today = new Date();
     const departure = employee.departureDate ? new Date(employee.departureDate) : null;
-    const latestEvent = empEvents.length > 0 ? new Date(Math.max(...empEvents.map(e => new Date(e.endDate || e.date).getTime()))) : today;
-    const endRef = departure && departure > today ? departure : latestEvent > today ? latestEvent : today;
+    const endRef = departure && departure > today ? departure : today;
 
-    return {
-      start: new Date(hireDate.getFullYear() - 1, 0, 1),
-      end: new Date(endRef.getFullYear() + 2, 11, 31),
-    };
-  }, [employee, empEvents]);
-
-  const [timelineScale, setTimelineScale] = useState<TimelineScale>('years');
-  const [yearsRangeStart, setYearsRangeStart] = useState(defaultRange.start.getFullYear());
-  const [yearsRangeEnd, setYearsRangeEnd] = useState(defaultRange.end.getFullYear());
-
-  const rangeStart = useMemo(() => new Date(yearsRangeStart, 0, 1), [yearsRangeStart]);
-  const rangeEnd = useMemo(() => new Date(yearsRangeEnd, 11, 31), [yearsRangeEnd]);
+    if (timelineScale === 'years') {
+      return {
+        rangeStart: new Date(hireDate.getFullYear(), 0, 1),
+        rangeEnd: new Date(endRef.getFullYear(), 11, 31),
+      };
+    } else {
+      const startQ = Math.floor(hireDate.getMonth() / 3);
+      const endQ = Math.floor(endRef.getMonth() / 3);
+      return {
+        rangeStart: new Date(hireDate.getFullYear(), startQ * 3, 1),
+        rangeEnd: new Date(endRef.getFullYear(), endQ * 3 + 3, 0),
+      };
+    }
+  }, [employee, timelineScale]);
 
   const columnLabels = useMemo(() => {
     if (timelineScale === 'years') return generateYearLabels(rangeStart, rangeEnd);
@@ -142,28 +144,10 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Input
-              type="number"
-              value={yearsRangeStart}
-              onChange={(e) => setYearsRangeStart(parseInt(e.target.value) || yearsRangeStart)}
-              className="w-20 h-7 text-xs"
-            />
-            <span>—</span>
-            <Input
-              type="number"
-              value={yearsRangeEnd}
-              onChange={(e) => setYearsRangeEnd(parseInt(e.target.value) || yearsRangeEnd)}
-              className="w-20 h-7 text-xs"
-            />
-          </div>
-          <button onClick={() => { setYearsRangeStart(yearsRangeStart + 1); setYearsRangeEnd(yearsRangeEnd - 1); }} className="p-1 rounded hover:bg-secondary transition-colors">
-            <ZoomIn size={14} className="text-muted-foreground" />
-          </button>
-          <button onClick={() => { setYearsRangeStart(yearsRangeStart - 1); setYearsRangeEnd(yearsRangeEnd + 1); }} className="p-1 rounded hover:bg-secondary transition-colors">
-            <ZoomOut size={14} className="text-muted-foreground" />
-          </button>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="font-mono">{formatDate(rangeStart.toISOString().split('T')[0])}</span>
+          <span>—</span>
+          <span className="font-mono">{formatDate(rangeEnd.toISOString().split('T')[0])}</span>
         </div>
       </div>
 
