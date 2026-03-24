@@ -40,6 +40,9 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
 
 export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote }: PersonalTimelineProps) => {
   const navigate = useNavigate();
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteDate, setNoteDate] = useState('');
+  const [noteText, setNoteText] = useState('');
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
