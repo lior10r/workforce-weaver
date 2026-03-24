@@ -44,7 +44,7 @@ const EmployeeProfile = () => {
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
 
-  const employees = useMemo(() => {
+  const rawEmployees = useMemo(() => {
     if (activeScenario) return getScenarioEmployees(activeScenario);
     return masterEmployees;
   }, [activeScenario, masterEmployees]);
@@ -54,8 +54,38 @@ const EmployeeProfile = () => {
     return masterEvents;
   }, [activeScenario, masterEvents]);
 
+  // Derive effective employees by applying past Team Swap events
+  const employees = useMemo(() => {
+    const today = new Date();
+    const latestPastSwapByEmployee = new Map<number, WorkforceEvent>();
+
+    events.forEach(event => {
+      if (event.type !== 'Team Swap' || !event.targetTeam) return;
+      const eventDate = new Date(event.date);
+      if (Number.isNaN(eventDate.getTime()) || eventDate > today) return;
+      const existing = latestPastSwapByEmployee.get(event.empId);
+      if (!existing || new Date(existing.date) < eventDate) {
+        latestPastSwapByEmployee.set(event.empId, event);
+      }
+    });
+
+    return rawEmployees.map(emp => {
+      const latestSwap = latestPastSwapByEmployee.get(emp.id);
+      if (!latestSwap?.targetTeam || latestSwap.targetTeam === emp.team) return emp;
+      const parent = getTeamParent(hierarchy, latestSwap.targetTeam);
+      return {
+        ...emp,
+        team: latestSwap.targetTeam,
+        dept: parent?.dept.name ?? emp.dept,
+        group: parent?.group?.name,
+      };
+    });
+  }, [rawEmployees, events, hierarchy]);
+
   const empId = id ? parseInt(id, 10) : null;
   const employee = empId ? employees.find(e => e.id === empId) : null;
+  // Keep raw employee for timeline (shows original team history)
+  const rawEmployee = empId ? rawEmployees.find(e => e.id === empId) : null;
 
   const empEvents = useMemo(() => {
     if (!empId) return [];
