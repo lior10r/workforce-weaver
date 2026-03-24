@@ -1,10 +1,10 @@
-import { useMemo } from 'react';
-import { AlertTriangle, Clock, Users, UserX, Shield, Tag, Bell, CalendarClock } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { AlertTriangle, Clock, Users, UserX, Shield, Tag, Bell, CalendarClock, Filter, X } from 'lucide-react';
 import { Employee, WorkforceEvent, TeamStructure, HierarchyStructure, getAllDeptTeams, formatDate } from '@/lib/workforce-data';
 
 interface Alert {
   id: string;
-  type: 'departure' | 'understaffed' | 'overstaffed' | 'missing_skill' | 'no_leader' | 'upcoming_event';
+  type: 'departure' | 'understaffed' | 'overstaffed' | 'missing_role' | 'missing_skill' | 'no_leader' | 'upcoming_event';
   severity: 'critical' | 'warning' | 'info';
   title: string;
   description: string;
@@ -29,6 +29,7 @@ const ALERT_ICONS: Record<Alert['type'], typeof AlertTriangle> = {
   departure: CalendarClock,
   understaffed: Users,
   overstaffed: Users,
+  missing_role: AlertTriangle,
   missing_skill: Tag,
   no_leader: Shield,
   upcoming_event: Clock,
@@ -118,7 +119,29 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         }
       }
 
-      // 4. Missing required skills
+      // 4. Missing required roles
+      if (structure?.requiredRoles && Object.keys(structure.requiredRoles).length > 0) {
+        const roleCounts: Record<string, number> = {};
+        teamMembers.forEach(e => { roleCounts[e.role] = (roleCounts[e.role] || 0) + 1; });
+        const missingRoles: { role: string; have: number; need: number }[] = [];
+        for (const [role, needed] of Object.entries(structure.requiredRoles)) {
+          const have = roleCounts[role] || 0;
+          if (have < needed) missingRoles.push({ role, have, need: needed });
+        }
+        if (missingRoles.length > 0) {
+          const totalMissing = missingRoles.reduce((sum, r) => sum + (r.need - r.have), 0);
+          result.push({
+            id: `role-${teamName}`,
+            type: 'missing_role',
+            severity: totalMissing >= 3 ? 'critical' : 'warning',
+            title: `${teamName} missing roles`,
+            description: missingRoles.map(r => `${r.role}: ${r.have}/${r.need}`).join(', '),
+            team: teamName,
+          });
+        }
+      }
+
+      // 5. Missing required skills
       if (structure?.requiredSkills && Object.keys(structure.requiredSkills).length > 0) {
         for (const [skill, needed] of Object.entries(structure.requiredSkills)) {
           const have = teamMembers.filter(e => (e.skills || []).includes(skill)).length;
@@ -135,7 +158,7 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         }
       }
 
-      // 5. No team leader — stored leader, role-based leader, or group/dept manager all count
+      // 6. No team leader — stored leader, role-based leader, or group/dept manager all count
       const structLeader = structure?.teamLeader ? teamMembers.find(e => e.id === structure.teamLeader) : null;
       const roleLeader = teamMembers.find(e => e.managerLevel === 'team' || e.role === 'Team Lead');
       const hasManagerLeader = teamMembers.some(e => e.managerLevel === 'group' || e.managerLevel === 'department');
@@ -151,7 +174,7 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
       }
     });
 
-    // 6. Upcoming events (training end, courses ending within 60 days)
+    // 7. Upcoming events (training end, courses ending within 60 days)
     const upcomingEvents = events.filter(e =>
       (e.type === 'Training' || e.type === 'Course') && e.endDate
     );
@@ -188,6 +211,30 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
 
   const criticalCount = alerts.filter(a => a.severity === 'critical').length;
   const warningCount = alerts.filter(a => a.severity === 'warning').length;
+  const infoCount = alerts.filter(a => a.severity === 'info').length;
+
+  const [severityFilter, setSeverityFilter] = useState<Alert['severity'] | 'all'>('all');
+  const [typeFilter, setTypeFilter] = useState<Alert['type'] | 'all'>('all');
+
+  const filteredAlerts = useMemo(() => {
+    return alerts.filter(a => {
+      if (severityFilter !== 'all' && a.severity !== severityFilter) return false;
+      if (typeFilter !== 'all' && a.type !== typeFilter) return false;
+      return true;
+    });
+  }, [alerts, severityFilter, typeFilter]);
+
+  const hasActiveFilter = severityFilter !== 'all' || typeFilter !== 'all';
+
+  const TYPE_LABELS: Record<Alert['type'], string> = {
+    departure: 'Departures',
+    understaffed: 'Understaffed',
+    overstaffed: 'Overstaffed',
+    missing_role: 'Missing Roles',
+    missing_skill: 'Missing Skills',
+    no_leader: 'No Leader',
+    upcoming_event: 'Events',
+  };
 
   return (
     <div className="glass-card p-6">
@@ -195,6 +242,11 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         <h3 className="text-lg font-bold flex items-center gap-2 text-foreground">
           <Bell size={18} className="text-primary" />
           Alerts & Notifications
+          {hasActiveFilter && (
+            <span className="text-xs font-normal text-muted-foreground ml-1">
+              ({filteredAlerts.length}/{alerts.length})
+            </span>
+          )}
         </h3>
         <div className="flex gap-2">
           {criticalCount > 0 && (
@@ -210,14 +262,61 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
         </div>
       </div>
 
-      {alerts.length === 0 ? (
+      {/* Filter Controls */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3">
+        <Filter size={12} className="text-muted-foreground mr-0.5" />
+        {([['all', 'All'], ['critical', 'Critical'], ['warning', 'Warning'], ['info', 'Info']] as const).map(([sev, label]) => (
+          <button
+            key={sev}
+            onClick={() => setSeverityFilter(sev)}
+            className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+              severityFilter === sev
+                ? sev === 'critical' ? 'bg-destructive/20 text-destructive ring-1 ring-destructive/40'
+                : sev === 'warning' ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 ring-1 ring-amber-500/40'
+                : sev === 'info' ? 'bg-primary/20 text-primary ring-1 ring-primary/40'
+                : 'bg-accent text-foreground ring-1 ring-border'
+                : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+            }`}
+          >
+            {label} {sev !== 'all' && `(${sev === 'critical' ? criticalCount : sev === 'warning' ? warningCount : infoCount})`}
+          </button>
+        ))}
+        <span className="text-border mx-0.5">|</span>
+        {(Object.keys(TYPE_LABELS) as Array<Alert['type']>).map(t => {
+          const count = alerts.filter(a => a.type === t).length;
+          if (count === 0) return null;
+          return (
+            <button
+              key={t}
+              onClick={() => setTypeFilter(typeFilter === t ? 'all' : t)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                typeFilter === t
+                  ? 'bg-accent text-foreground ring-1 ring-border'
+                  : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+              }`}
+            >
+              {TYPE_LABELS[t]} ({count})
+            </button>
+          );
+        })}
+        {hasActiveFilter && (
+          <button
+            onClick={() => { setSeverityFilter('all'); setTypeFilter('all'); }}
+            className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-destructive/10 text-destructive hover:bg-destructive/20 transition-all flex items-center gap-1"
+          >
+            <X size={10} /> Clear
+          </button>
+        )}
+      </div>
+
+      {filteredAlerts.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           <Bell size={32} className="mx-auto mb-3 opacity-30" />
-          <p className="text-sm">All clear — no alerts</p>
+          <p className="text-sm">{hasActiveFilter ? 'No alerts match the current filter' : 'All clear — no alerts'}</p>
         </div>
       ) : (
         <div className="space-y-2 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
-          {alerts.map(alert => {
+          {filteredAlerts.map(alert => {
             const styles = SEVERITY_STYLES[alert.severity];
             const Icon = ALERT_ICONS[alert.type];
 
