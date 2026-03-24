@@ -133,7 +133,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   return (
     <div className="space-y-3">
       {/* Controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg overflow-hidden border border-border">
             {(['years', 'quarters'] as const).map(scale => (
@@ -148,6 +148,17 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
               </button>
             ))}
           </div>
+          {onAddTimelineNote && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => setShowNoteForm(!showNoteForm)}
+            >
+              <StickyNote size={12} className="mr-1" />
+              {showNoteForm ? 'Cancel' : 'Add Note'}
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="font-mono">{formatDate(rangeStart.toISOString().split('T')[0])}</span>
@@ -155,6 +166,45 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
           <span className="font-mono">{formatDate(rangeEnd.toISOString().split('T')[0])}</span>
         </div>
       </div>
+
+      {/* Add Note Form */}
+      {showNoteForm && onAddTimelineNote && (
+        <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-accent/30">
+          <Input
+            type="date"
+            value={noteDate}
+            onChange={e => setNoteDate(e.target.value)}
+            className="w-[150px] h-8 text-xs"
+          />
+          <Input
+            placeholder="Note text..."
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            className="flex-1 h-8 text-xs"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && noteDate && noteText.trim()) {
+                onAddTimelineNote(employee.id, noteDate, noteText.trim());
+                setNoteText('');
+                setNoteDate('');
+                setShowNoteForm(false);
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            disabled={!noteDate || !noteText.trim()}
+            onClick={() => {
+              onAddTimelineNote(employee.id, noteDate, noteText.trim());
+              setNoteText('');
+              setNoteDate('');
+              setShowNoteForm(false);
+            }}
+          >
+            Add
+          </Button>
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="overflow-x-auto scrollbar-thin">
