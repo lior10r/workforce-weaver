@@ -190,7 +190,8 @@ export const Sidebar = ({
           icon={Users} 
           label="Operations Center" 
           active={view === 'dashboard'} 
-          onClick={() => setView('dashboard')} 
+          onClick={() => setView('dashboard')}
+          badge={uncoveredReplacementCount}
         />
         <SidebarItem 
           icon={Calendar} 
