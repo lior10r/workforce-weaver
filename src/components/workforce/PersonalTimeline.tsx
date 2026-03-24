@@ -251,7 +251,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
       )}
 
       {/* Timeline */}
-      <div className="overflow-x-auto scrollbar-thin">
+      <div className="overflow-x-auto overflow-y-visible scrollbar-thin">
         <div style={{ minWidth: `${minWidth}px` }}>
           {/* Header */}
           <div className="flex items-center border-b border-border">
@@ -280,7 +280,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             });
 
             return (
-              <div key={idx} className="flex items-center py-2 group">
+              <div key={idx} className={`flex items-center py-2 group ${clickNoteDate ? 'mb-12' : ''}`}>
                 <div className="w-48 shrink-0 px-3">
                   <p className={`text-sm font-semibold truncate ${phase.isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {phase.team}
@@ -290,7 +290,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                   </p>
                 </div>
                 <div
-                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar"
+                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar overflow-visible"
                   onClick={(e) => {
                     if (!onAddTimelineNote) return;
                     // Don't trigger if clicking on an event marker or popover

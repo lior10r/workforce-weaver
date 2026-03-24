@@ -29,7 +29,7 @@ interface TimelineProps {
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
   onEditEmployee?: (employee: Employee) => void;
-  
+  onUpdateEventDate?: (eventId: number, newDate: string) => void;
 }
 
 interface TrainingPeriod {
@@ -130,7 +130,7 @@ export const Timeline = ({
   onResolveFlag,
   onDeleteEvent,
   onEditEmployee,
-  
+  onUpdateEventDate,
 }: TimelineProps) => {
   const navigate = useNavigate();
   // effectiveEmployees: used for alerts, leader checks, team membership counts
@@ -144,6 +144,11 @@ export const Timeline = ({
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  
+  // Drag state for flags
+  const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
+  const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
+  const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
 
   // Range state
   const defaultYears = useMemo(() => getDefaultYearsRange(), []);
@@ -174,6 +179,43 @@ export const Timeline = ({
   const currentDatePos = getTimelinePositionInRange(currentDate.toISOString().split('T')[0], rangeStart, rangeEnd);
 
   const pos = useCallback((dateStr: string) => getTimelinePositionInRange(dateStr, rangeStart, rangeEnd), [rangeStart, rangeEnd]);
+
+  const pctToDate = useCallback((pct: number): string => {
+    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+    const d = new Date(rangeStart.getTime() + (pct / 100) * rangeMs);
+    return d.toISOString().split('T')[0];
+  }, [rangeStart, rangeEnd]);
+
+  const handleFlagDragStart = useCallback((eventId: number, e: React.MouseEvent) => {
+    if (!onUpdateEventDate) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setDraggingEventId(eventId);
+
+    const barEl = (e.currentTarget as HTMLElement).closest('.timeline-gantt-bar') as HTMLElement;
+    if (!barEl) return;
+
+    const onMouseMove = (me: MouseEvent) => {
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      setDragPreviewPos(pct);
+      setDragPreviewDate(pctToDate(pct));
+    };
+
+    const onMouseUp = (me: MouseEvent) => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      const rect = barEl.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(100, ((me.clientX - rect.left) / rect.width) * 100));
+      const newDate = pctToDate(pct);
+      onUpdateEventDate(eventId, newDate);
+      setDraggingEventId(null);
+      setDragPreviewDate(null);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [onUpdateEventDate, pctToDate]);
 
   const minWidth = useMemo(() => Math.max(1200, columnLabels.length * 160), [columnLabels]);
 
@@ -762,7 +804,7 @@ export const Timeline = ({
 
         {/* Gantt Area */}
         <div
-          className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 ${!isPotential ? 'cursor-crosshair' : ''}`}
+          className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 timeline-gantt-bar ${!isPotential ? 'cursor-crosshair' : ''}`}
           onClick={(e) => {
             if (isPotential) return;
             if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
@@ -929,7 +971,7 @@ export const Timeline = ({
 
           {/* Event Markers */}
           {!isPotential && empEvents.map(ev => {
-            const evPos = pos(ev.date);
+            const evPos = draggingEventId === ev.id ? dragPreviewPos : pos(ev.date);
             if (ev.type === 'Departure') return null;
             // Hide timeline notes from strategic timeline — they're personal only
             if (ev.type === 'Timeline Note') return null;
@@ -937,8 +979,10 @@ export const Timeline = ({
             if (ev.isFlag && ev.isResolved) return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
+            const isFlag = ev.isFlag;
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
             const isResolved = ev.isResolved;
+            const isDragging = draggingEventId === ev.id;
 
             const scrollToTransferred = isTeamSwap ? () => {
               const targetEl = document.querySelector(`[data-timeline-emp-id="transfer-${ev.empId}"]`);
@@ -954,7 +998,9 @@ export const Timeline = ({
                 <PopoverTrigger asChild>
                   <div 
                     style={{ left: `${evPos}%` }}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
+                    className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 ${isDragging ? 'z-30' : ''} ${isFlag && onUpdateEventDate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                    data-event-marker
+                    onMouseDown={isFlag && onUpdateEventDate ? (e) => handleFlagDragStart(ev.id, e) : undefined}
                     onClick={isTeamSwap ? (e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -967,6 +1013,7 @@ export const Timeline = ({
                         : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
                       ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
                       ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
+                      ${isDragging ? 'scale-125 ring-2 ring-flag/50 shadow-2xl' : ''}
                     `}
                     >
                       {ev.isFlag 
@@ -978,6 +1025,11 @@ export const Timeline = ({
                         : <Clock size={10} className="text-background" />
                       }
                     </div>
+                    {isDragging && dragPreviewDate && (
+                      <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover border border-border rounded px-2 py-0.5 text-[10px] font-mono text-foreground shadow-lg z-40">
+                        {formatDate(dragPreviewDate)}
+                      </div>
+                    )}
                   </div>
                 </PopoverTrigger>
                 <PopoverContent 
