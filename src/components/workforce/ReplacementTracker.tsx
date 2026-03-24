@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, UserPlus, Clock, Filter, ChevronDown, Arro
 import { Employee, WorkforceEvent, TeamStructure, HierarchyStructure, formatDate, getTeamParent } from '@/lib/workforce-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ReplacementGap {
@@ -200,18 +201,21 @@ export const ReplacementTracker = ({ employees, events, teamStructures, hierarch
 
         {/* Filters */}
         <div className="flex items-center gap-2">
-          <Select value={String(timeWindow)} onValueChange={v => setTimeWindow(Number(v))}>
-            <SelectTrigger className="w-[120px] h-8 text-xs">
-              <Clock size={12} className="mr-1" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30">30 days</SelectItem>
-              <SelectItem value="60">60 days</SelectItem>
-              <SelectItem value="90">90 days</SelectItem>
-              <SelectItem value="180">180 days</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-1">
+            <Clock size={12} className="text-muted-foreground" />
+            <Input
+              type="number"
+              min={1}
+              max={730}
+              value={timeWindow}
+              onChange={e => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v) && v > 0) setTimeWindow(v);
+              }}
+              className="w-[70px] h-8 text-xs text-center"
+            />
+            <span className="text-xs text-muted-foreground">days</span>
+          </div>
 
           <Select value={deptFilter} onValueChange={setDeptFilter}>
             <SelectTrigger className="w-[140px] h-8 text-xs">
