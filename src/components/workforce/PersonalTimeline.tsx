@@ -291,7 +291,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                   </p>
                 </div>
                 <div
-                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair"
+                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar"
                   onClick={(e) => {
                     if (!onAddTimelineNote) return;
                     // Don't trigger if clicking on an event marker or popover
