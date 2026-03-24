@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar } from 'lucide-react';
+import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
