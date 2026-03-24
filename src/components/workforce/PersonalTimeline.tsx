@@ -251,7 +251,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
       )}
 
       {/* Timeline */}
-      <div className="overflow-x-auto scrollbar-thin">
+      <div className="overflow-x-auto overflow-y-visible scrollbar-thin">
         <div style={{ minWidth: `${minWidth}px` }}>
           {/* Header */}
           <div className="flex items-center border-b border-border">
