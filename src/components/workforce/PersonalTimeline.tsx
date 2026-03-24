@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar, ZoomIn, ZoomOut } from 'lucide-react';
+import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
