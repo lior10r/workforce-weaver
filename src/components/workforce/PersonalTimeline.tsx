@@ -40,14 +40,11 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate, openPlannerForUser }: PersonalTimelineProps) => {
   const navigate = useNavigate();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
   const [noteText, setNoteText] = useState('');
-  const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
-  const [clickNoteText, setClickNoteText] = useState('');
-  const [clickNotePos, setClickNotePos] = useState<number>(0);
   const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
   const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
   const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
