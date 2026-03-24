@@ -454,7 +454,7 @@ export const Roster = ({
           {/* Info */}
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h4 className="font-semibold text-foreground">{emp.name}</h4>
+              <h4 className="font-semibold text-foreground hover:text-primary cursor-pointer transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/employee/${emp.id}`); }}>{emp.name}</h4>
               {isLeader && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-500/20 text-green-500 uppercase">
                   Team Lead
