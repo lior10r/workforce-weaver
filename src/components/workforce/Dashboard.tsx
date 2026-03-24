@@ -4,6 +4,7 @@ import { AlertsPanel } from './AlertsPanel';
 
 interface DashboardProps {
   employees: Employee[];
+  allEmployees: Employee[];
   events: WorkforceEvent[];
   hierarchy: Hierarchy;
   setHierarchy: (hierarchy: Hierarchy) => void;
@@ -12,7 +13,7 @@ interface DashboardProps {
   fullHierarchy: HierarchyStructure;
 }
 
-export const Dashboard = ({ employees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy }: DashboardProps) => {
+export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy }: DashboardProps) => {
   const today = new Date();
   const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   
@@ -31,7 +32,7 @@ export const Dashboard = ({ employees, events, hierarchy, setHierarchy, departme
     <div className="space-y-8 animate-fade-in">
       {/* Alerts Panel */}
       <AlertsPanel
-        employees={employees}
+        employees={allEmployees}
         events={events}
         teamStructures={teamStructures}
         hierarchy={fullHierarchy}
