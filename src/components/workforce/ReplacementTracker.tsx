@@ -342,8 +342,9 @@ export const ReplacementTracker = ({ employees, events, teamStructures, hierarch
         })}
 
         {filteredGaps.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            No gaps matching current filters
+          <div className="text-center py-8 text-muted-foreground">
+            <CheckCircle2 size={32} className="mx-auto mb-3 opacity-30" />
+            <p className="text-sm">{isEmpty ? `No replacement needs detected in the next ${timeWindow} days` : 'No gaps matching current filters'}</p>
           </div>
         )}
       </div>
