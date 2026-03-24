@@ -369,21 +369,29 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                   {/* Event markers */}
                   {phaseEvents.map(ev => {
                     if (ev.type === 'Departure') return null;
-                    const evPos = pos(ev.date);
+                    const evPos = draggingEventId === ev.id ? dragPreviewPos : pos(ev.date);
                     const isSwap = ev.type === 'Team Swap';
                     const isNote = ev.type === 'Timeline Note';
+                    const isDragging = draggingEventId === ev.id;
                     return (
                       <Popover key={ev.id}>
                         <PopoverTrigger asChild>
                           <div
                             style={{ left: `${evPos}%` }}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
+                            className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 ${isDragging ? 'z-30' : ''} ${isNote && onUpdateEventDate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                            data-event-marker
+                            onMouseDown={isNote && onUpdateEventDate ? (e) => handleNoteDragStart(ev.id, e) : undefined}
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
                               isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
-                            }`}>
+                            } ${isDragging ? 'scale-125 ring-2 ring-amber-300 shadow-2xl' : ''}`}>
                               {isNote ? <StickyNote size={10} className="text-white" /> : isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
                             </div>
+                            {isDragging && dragPreviewDate && (
+                              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover border border-border rounded px-2 py-0.5 text-[10px] font-mono text-foreground shadow-lg">
+                                {formatDate(dragPreviewDate)}
+                              </div>
+                            )}
                           </div>
                         </PopoverTrigger>
                         <PopoverContent side="top" align="center" className="w-56 p-3 text-xs" sideOffset={8}>
@@ -393,6 +401,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                             <p className="text-primary flex items-center gap-1 mt-1"><ArrowRight size={12} /> {ev.targetTeam}</p>
                           )}
                           <p className="text-muted-foreground mt-1.5 font-mono text-[10px]">{formatDate(ev.date)}</p>
+                          {isNote && onUpdateEventDate && (
+                            <p className="text-muted-foreground mt-1 text-[10px] italic">Drag to reposition</p>
+                          )}
                           {onDeleteEvent && (
                             <button onClick={() => onDeleteEvent(ev.id)} className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
                               <Trash2 size={10} /> Remove
