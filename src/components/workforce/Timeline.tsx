@@ -576,7 +576,7 @@ export const Timeline = ({
               <div className="cursor-help">
                 <div className="flex items-center gap-2">
                   {isPotential && <HelpCircle size={12} className="text-potential" />}
-                  <p className="font-semibold text-sm text-foreground truncate">{emp.name}</p>
+                  <p className="font-semibold text-sm text-foreground truncate hover:text-primary cursor-pointer transition-colors" onClick={(e) => { e.stopPropagation(); navigate(`/employee/${emp.id}`); }}>{emp.name}</p>
                   {managerLevel && (
                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${managerBadgeColors[managerLevel]}`}>
                       {managerLevel === 'dept' ? 'Dept Mgr' : 'Group Mgr'}
