@@ -173,6 +173,7 @@ export const Roster = ({
   onDeleteLabel,
   isAdmin = false,
 }: RosterProps) => {
+  const navigate = useNavigate();
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set(hierarchy.map(d => d.name)));
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedTeams, setExpandedTeams] = useState<Set<string>>(new Set());
