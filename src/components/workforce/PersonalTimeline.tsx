@@ -17,6 +17,7 @@ interface PersonalTimelineProps {
   onDeleteEvent?: (eventId: number) => void;
   onAddTimelineNote?: (empId: number, date: string, note: string) => void;
   onUpdateEventDate?: (eventId: number, newDate: string) => void;
+  openPlannerForUser?: (empId: number, asFlag?: boolean, date?: string) => void;
 }
 
 const generateYearLabels = (start: Date, end: Date): string[] => {
@@ -39,14 +40,11 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate, openPlannerForUser }: PersonalTimelineProps) => {
   const navigate = useNavigate();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
   const [noteText, setNoteText] = useState('');
-  const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
-  const [clickNoteText, setClickNoteText] = useState('');
-  const [clickNotePos, setClickNotePos] = useState<number>(0);
   const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
   const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
   const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
@@ -280,7 +278,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             });
 
             return (
-              <div key={idx} className={`flex items-center py-2 group ${clickNoteDate ? 'mb-12' : ''}`}>
+              <div key={idx} className="flex items-center py-2 group">
                 <div className="w-48 shrink-0 px-3">
                   <p className={`text-sm font-semibold truncate ${phase.isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {phase.team}
@@ -292,8 +290,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                 <div
                   className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar overflow-visible"
                   onClick={(e) => {
-                    if (!onAddTimelineNote) return;
-                    // Don't trigger if clicking on an event marker or popover
+                    if (!openPlannerForUser) return;
                     if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
@@ -301,9 +298,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
                     const clickDate = new Date(rangeStart.getTime() + pct * rangeMs);
                     const dateStr = clickDate.toISOString().split('T')[0];
-                    setClickNoteDate(dateStr);
-                    setClickNotePos(pct * 100);
-                    setClickNoteText('');
+                    openPlannerForUser(employee.id, true, dateStr);
                   }}
                 >
                   {/* Grid lines */}
@@ -447,46 +442,6 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                       </Popover>
                     );
                   })}
-
-                  {/* Click-to-add-note inline input */}
-                  {clickNoteDate && onAddTimelineNote && (
-                    <div
-                      style={{ left: `${clickNotePos}%` }}
-                      className="absolute top-full mt-1 -translate-x-1/2 z-40 flex items-center gap-1 bg-popover border border-border rounded-lg p-2 shadow-xl"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{formatDate(clickNoteDate)}</span>
-                      <Input
-                        autoFocus
-                        placeholder="Add note..."
-                        value={clickNoteText}
-                        onChange={e => setClickNoteText(e.target.value)}
-                        className="w-[160px] h-7 text-xs"
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && clickNoteText.trim()) {
-                            onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
-                            setClickNoteDate(null);
-                            setClickNoteText('');
-                          }
-                          if (e.key === 'Escape') {
-                            setClickNoteDate(null);
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs px-2"
-                        disabled={!clickNoteText.trim()}
-                        onClick={() => {
-                          onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
-                          setClickNoteDate(null);
-                          setClickNoteText('');
-                        }}
-                      >
-                        <Check size={12} />
-                      </Button>
-                    </div>
-                  )}
 
                   {/* End marker for departure */}
                   {phase.endDate && idx === phases.length - 1 && (empEvents.some(e => e.type === 'Departure') || employee.departureDate) && (
