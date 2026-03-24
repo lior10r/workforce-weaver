@@ -17,6 +17,7 @@ interface AlertsPanelProps {
   events: WorkforceEvent[];
   teamStructures: TeamStructure[];
   hierarchy: HierarchyStructure;
+  onNavigateToTeam?: (teamName: string) => void;
 }
 
 const SEVERITY_STYLES: Record<Alert['severity'], { bg: string; border: string; text: string; icon: string }> = {
@@ -35,7 +36,7 @@ const ALERT_ICONS: Record<Alert['type'], typeof AlertTriangle> = {
   upcoming_event: Clock,
 };
 
-export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: AlertsPanelProps) => {
+export const AlertsPanel = ({ employees, events, teamStructures, hierarchy, onNavigateToTeam }: AlertsPanelProps) => {
   const alerts = useMemo(() => {
     const result: Alert[] = [];
     const today = new Date();
@@ -323,7 +324,8 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy }: Al
             return (
               <div
                 key={alert.id}
-                className={`p-3 rounded-xl border ${styles.bg} ${styles.border} transition-all hover:shadow-sm`}
+                className={`p-3 rounded-xl border ${styles.bg} ${styles.border} transition-all hover:shadow-sm ${alert.team && onNavigateToTeam ? 'cursor-pointer hover:ring-1 hover:ring-primary/30' : ''}`}
+                onClick={() => alert.team && onNavigateToTeam?.(alert.team)}
               >
                 <div className="flex items-start gap-2.5">
                   <div className={`mt-0.5 ${styles.icon}`}>
