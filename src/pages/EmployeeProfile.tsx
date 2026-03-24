@@ -289,13 +289,16 @@ const EmployeeProfile = () => {
                     if (inProposed) {
                       return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? { ...e, date: newDate } : e) };
                     }
-                    // Event is in master — copy to proposed with new date
                     const masterEvent = events.find(e => e.id === eventId);
                     if (masterEvent) {
                       return { ...s, proposedEvents: [...s.proposedEvents, { ...masterEvent, date: newDate }] };
                     }
                     return s;
                   }));
+                }}
+                openPlannerForUser={(empId, asFlag = false, date) => {
+                  setEventPrefill({ empId, isFlag: asFlag, date });
+                  setIsEventModalOpen(true);
                 }}
               />
             </CardContent>
