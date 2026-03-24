@@ -918,6 +918,8 @@ export const Timeline = ({
           {!isPotential && empEvents.map(ev => {
             const evPos = pos(ev.date);
             if (ev.type === 'Departure') return null;
+            // Hide resolved flags from timeline — they remain on the Employee Profile page
+            if (ev.isFlag && ev.isResolved) return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
