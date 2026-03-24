@@ -462,11 +462,12 @@ const EmployeeProfile = () => {
           <EmployeeModal
             isOpen={isEmployeeModalOpen}
             onClose={() => setIsEmployeeModalOpen(false)}
-            onSave={handleEditEmployee}
-            employee={employee}
+            onSubmit={handleEditEmployee}
+            editingEmployee={employee}
             employees={employees}
             departments={{}}
             hierarchy={hierarchy}
+            teamStructures={masterTeamStructures}
           />
         )}
 
@@ -475,9 +476,10 @@ const EmployeeProfile = () => {
           <EventModal
             isOpen={isEventModalOpen}
             onClose={() => setIsEventModalOpen(false)}
-            onSave={handleAddEvent}
+            onSubmit={handleAddEvent}
             employees={employees}
             prefill={eventPrefill}
+            departments={{}}
           />
         )}
       </div>
