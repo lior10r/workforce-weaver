@@ -13,6 +13,7 @@ interface DashboardProps {
   teamStructures: TeamStructure[];
   fullHierarchy: HierarchyStructure;
   onNavigateToTeam?: (teamName: string) => void;
+  onHireForTeam?: (prefill: { dept: string; team: string; group?: string | null }) => void;
 }
 
 export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy, onNavigateToTeam }: DashboardProps) => {
