@@ -17,6 +17,7 @@ interface PersonalTimelineProps {
   onDeleteEvent?: (eventId: number) => void;
   onAddTimelineNote?: (empId: number, date: string, note: string) => void;
   onUpdateEventDate?: (eventId: number, newDate: string) => void;
+  openPlannerForUser?: (empId: number, asFlag?: boolean, date?: string) => void;
 }
 
 const generateYearLabels = (start: Date, end: Date): string[] => {
