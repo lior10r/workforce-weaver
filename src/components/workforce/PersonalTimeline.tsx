@@ -14,6 +14,7 @@ interface PersonalTimelineProps {
   events: WorkforceEvent[];
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
+  onAddTimelineNote?: (empId: number, date: string, note: string) => void;
 }
 
 const generateYearLabels = (start: Date, end: Date): string[] => {
