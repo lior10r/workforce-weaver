@@ -35,7 +35,7 @@ import { BulkActions } from './BulkActions';
 interface RosterProps {
   employees: Employee[];
   events: WorkforceEvent[];
-  openPlannerForUser: (empId: number, asFlag?: boolean) => void;
+  openPlannerForUser: (empId: number, asFlag?: boolean, date?: string) => void;
   onEditEmployee: (employee: Employee) => void;
   teamStructures: TeamStructure[];
   onConfigureTeam: (teamName: string, department: string) => void;
