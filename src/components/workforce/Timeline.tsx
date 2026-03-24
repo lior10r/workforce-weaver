@@ -130,7 +130,7 @@ export const Timeline = ({
   onResolveFlag,
   onDeleteEvent,
   onEditEmployee,
-  
+  onUpdateEventDate,
 }: TimelineProps) => {
   const navigate = useNavigate();
   // effectiveEmployees: used for alerts, leader checks, team membership counts
