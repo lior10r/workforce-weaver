@@ -17,7 +17,7 @@ type TimelineScale = 'years' | 'quarters';
 interface TimelineProps {
   employees: Employee[];
   events: WorkforceEvent[];
-  openPlannerForUser: (empId: number, asFlag?: boolean) => void;
+  openPlannerForUser: (empId: number, asFlag?: boolean, date?: string) => void;
   allEmployees?: Employee[];
   effectiveEmployees?: Employee[]; // employees with past Team Swap applied — used for alerts/leader checks
   selectedTeam?: string;
