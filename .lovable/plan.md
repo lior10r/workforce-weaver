@@ -1,47 +1,57 @@
 
 
-## Employee Profile Page — Enhanced with Flags, Notes, and Events
+## Replacement Tracker — Clearer Gap Visibility and Planned Replacements
 
-Building on the previously approved plan, this extends the Employee Profile page to serve as the central hub for managing an individual employee, with decision flags, general notes, and employee-specific events. The Timeline view will surface only critical flags at team scope.
+### Problem
 
-### Page Sections
+Replacement information is currently scattered: the Timeline shows small "needs replacement" badges, AlertsPanel lists departures without linking to replacements, and MissingRolesForecast shows future gaps but doesn't clearly connect planned hires to the roles they fill. There is no single view that answers "who is leaving, what role gap does that create, and who (if anyone) is planned to fill it."
 
-1. **Header** — Name, role, department/group/team breadcrumb, status, work type, hire date, departure date
-2. **Personal & Role Info** — Manager, manager level, skills/labels, capacity
-3. **Decision Flags** — Filtered view of all flags for this employee, with ability to add new flags (reuses the existing `openPlannerForUser(empId, asFlag=true)` pattern), resolve, or delete them
-4. **General Notes** — Reuses existing `EmployeeNotes` component for manager observations
-5. **Event History** — All events for this employee (promotions, swaps, trainings, departures, flags) displayed chronologically, with ability to add new events via the Planner
-6. **Team Context** — Current teammates and team structure info
+### Solution
 
-### Timeline Critical Flags
+A new **Replacement Tracker** panel (accessible from the Dashboard/Sidebar) that provides a focused, actionable view of all replacement needs — current and upcoming — with clear visual pairing of departing employees and their planned replacements.
 
-In the Timeline view, flag indicators on employee bars will be filtered to show only **unresolved** flags. Resolved flags will be hidden from the timeline to reduce noise — they remain visible on the Employee Profile page.
+### Design
+
+Each entry is a "replacement card" showing:
+
+```text
+┌─────────────────────────────────────────────────┐
+│  🔴 Senior Dev — Frontend Alpha (Engineering)   │
+│                                                  │
+│  LEAVING: Jane Smith — departs 15/04/2025        │
+│  REPLACEMENT: Mike Chen (potential) joins 01/04  │  ← green if covered
+│  ─── or ───                                      │
+│  REPLACEMENT: ⚠ None planned                     │  ← red if uncovered
+└─────────────────────────────────────────────────┘
+```
+
+### Features
+
+1. **Grouped by status**: "Uncovered" (no replacement) at top, "Covered" (has planned hire/transfer) below
+2. **Sources of gaps**: Departures (via departureDate or Departure events), Team Swaps out — all within a configurable future window (30/60/90/180 days)
+3. **Matching logic**: A replacement is detected when a potential hire or incoming Team Swap targets the same team within a ±30-day window of the departure, with matching or compatible role
+4. **Filters**: By department, by time window, by coverage status (uncovered only)
+5. **Actions**: "Hire for this role" button on uncovered gaps that opens EmployeeModal pre-filled with team/dept/role
+6. **Click-through**: Employee names link to their profile page
 
 ### Technical Plan
 
-**Create `src/pages/EmployeeProfile.tsx`**:
-- Reads `:id` from URL params
-- Uses `useWorkforceData` to get employees, events, hierarchy
-- Renders all sections above
-- "Add Flag" button calls `openPlannerForUser` with `asFlag=true`
-- "Add Event" button calls `openPlannerForUser` without flag
-- Back button via `useNavigate(-1)`
-- Inline flag resolution (resolve/delete) using existing handlers
+**Create `src/components/workforce/ReplacementTracker.tsx`**:
+- Props: employees, events, teamStructures, hierarchy, onHireForTeam
+- Scans all employees with upcoming departures (departureDate or Departure events) and team swaps out
+- For each gap, searches for potential hires (isPotential) or incoming swaps to the same team within ±30 days
+- Renders grouped cards with clear visual status (covered vs uncovered)
+- Time window filter (dropdown: 30/60/90/180 days, default 90)
+- Department filter
+- "Hire" action button on uncovered items
 
-**Modify `src/App.tsx`**:
-- Add route `/employee/:id` wrapped in `ProtectedRoute`
+**Modify `src/components/workforce/Dashboard.tsx`**:
+- Add the ReplacementTracker as a new section/tab in the dashboard, alongside existing AlertsPanel
 
-**Modify `src/components/workforce/Roster.tsx`**:
-- Make employee names clickable links to `/employee/:id`
-
-**Modify `src/components/workforce/Timeline.tsx`**:
-- Make employee names clickable links to `/employee/:id`
-- Filter flag markers to show only unresolved flags on bars
-
-**Modify `src/components/workforce/AlertsPanel.tsx`**:
-- Make employee name references clickable links to `/employee/:id`
+**Modify `src/components/workforce/Sidebar.tsx`**:
+- Add a sidebar entry/badge for uncovered replacements count to draw attention
 
 ### Files
-- **Create**: `src/pages/EmployeeProfile.tsx`
-- **Modify**: `src/App.tsx`, `src/components/workforce/Roster.tsx`, `src/components/workforce/Timeline.tsx`, `src/components/workforce/AlertsPanel.tsx`
+- **Create**: `src/components/workforce/ReplacementTracker.tsx`
+- **Modify**: `src/components/workforce/Dashboard.tsx`, `src/components/workforce/Sidebar.tsx`
 
