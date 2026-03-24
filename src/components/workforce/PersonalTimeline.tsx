@@ -256,6 +256,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     if (ev.type === 'Departure') return null;
                     const evPos = pos(ev.date);
                     const isSwap = ev.type === 'Team Swap';
+                    const isNote = ev.type === 'Timeline Note';
                     return (
                       <Popover key={ev.id}>
                         <PopoverTrigger asChild>
@@ -264,9 +265,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
-                              isSwap ? 'bg-primary' : 'bg-foreground'
+                              isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
                             }`}>
-                              {isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
+                              {isNote ? <StickyNote size={10} className="text-white" /> : isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
                             </div>
                           </div>
                         </PopoverTrigger>

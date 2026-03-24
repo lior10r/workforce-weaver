@@ -918,6 +918,8 @@ export const Timeline = ({
           {!isPotential && empEvents.map(ev => {
             const evPos = pos(ev.date);
             if (ev.type === 'Departure') return null;
+            // Hide timeline notes from strategic timeline — they're personal only
+            if (ev.type === 'Timeline Note') return null;
             // Hide resolved flags from timeline — they remain on the Employee Profile page
             if (ev.isFlag && ev.isResolved) return null;
 
