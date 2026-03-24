@@ -804,7 +804,7 @@ export const Timeline = ({
 
         {/* Gantt Area */}
         <div
-          className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 ${!isPotential ? 'cursor-crosshair' : ''}`}
+          className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 timeline-gantt-bar ${!isPotential ? 'cursor-crosshair' : ''}`}
           onClick={(e) => {
             if (isPotential) return;
             if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
