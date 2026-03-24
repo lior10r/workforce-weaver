@@ -39,7 +39,7 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote, onUpdateEventDate }: PersonalTimelineProps) => {
   const navigate = useNavigate();
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
@@ -47,6 +47,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
   const [clickNoteText, setClickNoteText] = useState('');
   const [clickNotePos, setClickNotePos] = useState<number>(0);
+  const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
+  const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
+  const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
