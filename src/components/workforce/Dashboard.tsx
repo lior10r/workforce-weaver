@@ -1,6 +1,7 @@
 import { Flag, Users, AlertCircle } from 'lucide-react';
 import { Employee, WorkforceEvent, Hierarchy, TeamStructure, HierarchyStructure, formatDate } from '@/lib/workforce-data';
 import { AlertsPanel } from './AlertsPanel';
+import { ReplacementTracker } from './ReplacementTracker';
 
 interface DashboardProps {
   employees: Employee[];
