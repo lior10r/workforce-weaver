@@ -336,7 +336,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                         <PopoverTrigger asChild>
                           <div
                             style={{ left: `${evPos}%` }}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
                               isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
