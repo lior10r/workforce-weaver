@@ -278,7 +278,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             });
 
             return (
-              <div key={idx} className={`flex items-center py-2 group ${clickNoteDate ? 'mb-12' : ''}`}>
+              <div key={idx} className="flex items-center py-2 group">
                 <div className="w-48 shrink-0 px-3">
                   <p className={`text-sm font-semibold truncate ${phase.isCurrent ? 'text-foreground' : 'text-muted-foreground'}`}>
                     {phase.team}
