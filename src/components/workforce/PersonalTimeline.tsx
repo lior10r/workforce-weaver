@@ -290,8 +290,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                 <div
                   className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair timeline-gantt-bar overflow-visible"
                   onClick={(e) => {
-                    if (!onAddTimelineNote) return;
-                    // Don't trigger if clicking on an event marker or popover
+                    if (!openPlannerForUser) return;
                     if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
                     const rect = e.currentTarget.getBoundingClientRect();
                     const clickX = e.clientX - rect.left;
@@ -299,9 +298,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
                     const clickDate = new Date(rangeStart.getTime() + pct * rangeMs);
                     const dateStr = clickDate.toISOString().split('T')[0];
-                    setClickNoteDate(dateStr);
-                    setClickNotePos(pct * 100);
-                    setClickNoteText('');
+                    openPlannerForUser(employee.id, true, dateStr);
                   }}
                 >
                   {/* Grid lines */}
