@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar } from 'lucide-react';
+import { Flag, Clock, ArrowRight, BookOpen, Check, MessageSquare, Trash2, Calendar, StickyNote } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Employee, WorkforceEvent, getRoleColor, getTimelinePositionInRange, formatDate } from '@/lib/workforce-data';
@@ -14,6 +15,7 @@ interface PersonalTimelineProps {
   events: WorkforceEvent[];
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
+  onAddTimelineNote?: (empId: number, date: string, note: string) => void;
 }
 
 const generateYearLabels = (start: Date, end: Date): string[] => {
@@ -36,8 +38,11 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote }: PersonalTimelineProps) => {
   const navigate = useNavigate();
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteDate, setNoteDate] = useState('');
+  const [noteText, setNoteText] = useState('');
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
@@ -128,7 +133,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   return (
     <div className="space-y-3">
       {/* Controls */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <div className="flex rounded-lg overflow-hidden border border-border">
             {(['years', 'quarters'] as const).map(scale => (
@@ -143,6 +148,17 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
               </button>
             ))}
           </div>
+          {onAddTimelineNote && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs h-7"
+              onClick={() => setShowNoteForm(!showNoteForm)}
+            >
+              <StickyNote size={12} className="mr-1" />
+              {showNoteForm ? 'Cancel' : 'Add Note'}
+            </Button>
+          )}
         </div>
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <span className="font-mono">{formatDate(rangeStart.toISOString().split('T')[0])}</span>
@@ -150,6 +166,45 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
           <span className="font-mono">{formatDate(rangeEnd.toISOString().split('T')[0])}</span>
         </div>
       </div>
+
+      {/* Add Note Form */}
+      {showNoteForm && onAddTimelineNote && (
+        <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-accent/30">
+          <Input
+            type="date"
+            value={noteDate}
+            onChange={e => setNoteDate(e.target.value)}
+            className="w-[150px] h-8 text-xs"
+          />
+          <Input
+            placeholder="Note text..."
+            value={noteText}
+            onChange={e => setNoteText(e.target.value)}
+            className="flex-1 h-8 text-xs"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && noteDate && noteText.trim()) {
+                onAddTimelineNote(employee.id, noteDate, noteText.trim());
+                setNoteText('');
+                setNoteDate('');
+                setShowNoteForm(false);
+              }
+            }}
+          />
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            disabled={!noteDate || !noteText.trim()}
+            onClick={() => {
+              onAddTimelineNote(employee.id, noteDate, noteText.trim());
+              setNoteText('');
+              setNoteDate('');
+              setShowNoteForm(false);
+            }}
+          >
+            Add
+          </Button>
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="overflow-x-auto scrollbar-thin">
@@ -256,6 +311,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     if (ev.type === 'Departure') return null;
                     const evPos = pos(ev.date);
                     const isSwap = ev.type === 'Team Swap';
+                    const isNote = ev.type === 'Timeline Note';
                     return (
                       <Popover key={ev.id}>
                         <PopoverTrigger asChild>
@@ -264,9 +320,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
-                              isSwap ? 'bg-primary' : 'bg-foreground'
+                              isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
                             }`}>
-                              {isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
+                              {isNote ? <StickyNote size={10} className="text-white" /> : isSwap ? <ArrowRight size={10} className="text-primary-foreground" /> : <Clock size={10} className="text-background" />}
                             </div>
                           </div>
                         </PopoverTrigger>

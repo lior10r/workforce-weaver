@@ -272,6 +272,15 @@ const EmployeeProfile = () => {
                 events={events}
                 onResolveFlag={(eventId, note) => handleResolveFlag(eventId, note)}
                 onDeleteEvent={handleDeleteEvent}
+                onAddTimelineNote={(empId, date, note) => {
+                  handleAddEvent({
+                    empId,
+                    type: 'Timeline Note',
+                    date,
+                    details: note,
+                    isFlag: false,
+                  });
+                }}
               />
             </CardContent>
           </Card>
