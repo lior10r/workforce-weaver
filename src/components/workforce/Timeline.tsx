@@ -954,7 +954,7 @@ export const Timeline = ({
                 <PopoverTrigger asChild>
                   <div 
                     style={{ left: `${evPos}%` }}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
                     onClick={isTeamSwap ? (e) => {
                       e.preventDefault();
                       e.stopPropagation();
