@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit2, Flag, Plus, Calendar, Users, ChevronRight, Check, Trash2, MessageSquare, Clock, Crown, GraduationCap, Tag, Briefcase, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
-import { Employee, WorkforceEvent, getRoleColor, formatDate, getTeamParent, getCapacityWeight } from '@/lib/workforce-data';
+import { Employee, WorkforceEvent, getRoleColor, formatDate, getTeamParent, getCapacityWeight, getScenarioEmployees, getScenarioEvents } from '@/lib/workforce-data';
 import { PersonalTimeline } from '@/components/workforce/PersonalTimeline';
 import { EmployeeNotes } from '@/components/workforce/EmployeeNotes';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createScenario, addScenarioChangelogEntry, getScenarioEmployees, getScenarioEvents } from '@/lib/workforce-data';
+import { createScenario, addScenarioChangelogEntry } from '@/lib/workforce-data';
 
 const EmployeeProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -44,7 +44,7 @@ const EmployeeProfile = () => {
 
   const activeScenario = scenarios.find(s => s.id === activeScenarioId);
 
-  const employees = useMemo(() => {
+  const rawEmployees = useMemo(() => {
     if (activeScenario) return getScenarioEmployees(activeScenario);
     return masterEmployees;
   }, [activeScenario, masterEmployees]);
@@ -54,8 +54,38 @@ const EmployeeProfile = () => {
     return masterEvents;
   }, [activeScenario, masterEvents]);
 
+  // Derive effective employees by applying past Team Swap events
+  const employees = useMemo(() => {
+    const today = new Date();
+    const latestPastSwapByEmployee = new Map<number, WorkforceEvent>();
+
+    events.forEach(event => {
+      if (event.type !== 'Team Swap' || !event.targetTeam) return;
+      const eventDate = new Date(event.date);
+      if (Number.isNaN(eventDate.getTime()) || eventDate > today) return;
+      const existing = latestPastSwapByEmployee.get(event.empId);
+      if (!existing || new Date(existing.date) < eventDate) {
+        latestPastSwapByEmployee.set(event.empId, event);
+      }
+    });
+
+    return rawEmployees.map(emp => {
+      const latestSwap = latestPastSwapByEmployee.get(emp.id);
+      if (!latestSwap?.targetTeam || latestSwap.targetTeam === emp.team) return emp;
+      const parent = getTeamParent(hierarchy, latestSwap.targetTeam);
+      return {
+        ...emp,
+        team: latestSwap.targetTeam,
+        dept: parent?.dept.name ?? emp.dept,
+        group: parent?.group?.name,
+      };
+    });
+  }, [rawEmployees, events, hierarchy]);
+
   const empId = id ? parseInt(id, 10) : null;
   const employee = empId ? employees.find(e => e.id === empId) : null;
+  // Keep raw employee for timeline (shows original team history)
+  const rawEmployee = empId ? rawEmployees.find(e => e.id === empId) : null;
 
   const empEvents = useMemo(() => {
     if (!empId) return [];
@@ -237,7 +267,7 @@ const EmployeeProfile = () => {
             </CardHeader>
             <CardContent>
               <PersonalTimeline
-                employee={employee}
+                employee={rawEmployee || employee}
                 allEmployees={employees}
                 events={events}
                 onResolveFlag={(eventId, note) => handleResolveFlag(eventId, note)}
