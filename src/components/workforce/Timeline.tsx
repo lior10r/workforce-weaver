@@ -971,7 +971,7 @@ export const Timeline = ({
 
           {/* Event Markers */}
           {!isPotential && empEvents.map(ev => {
-            const evPos = pos(ev.date);
+            const evPos = draggingEventId === ev.id ? dragPreviewPos : pos(ev.date);
             if (ev.type === 'Departure') return null;
             // Hide timeline notes from strategic timeline — they're personal only
             if (ev.type === 'Timeline Note') return null;
@@ -979,8 +979,10 @@ export const Timeline = ({
             if (ev.isFlag && ev.isResolved) return null;
 
             const isTeamSwap = ev.type === 'Team Swap';
+            const isFlag = ev.isFlag;
             const evDiffStatus = eventDiffMap?.get(ev.id)?.status;
             const isResolved = ev.isResolved;
+            const isDragging = draggingEventId === ev.id;
 
             const scrollToTransferred = isTeamSwap ? () => {
               const targetEl = document.querySelector(`[data-timeline-emp-id="transfer-${ev.empId}"]`);
@@ -996,7 +998,9 @@ export const Timeline = ({
                 <PopoverTrigger asChild>
                   <div 
                     style={{ left: `${evPos}%` }}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
+                    className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 ${isDragging ? 'z-30' : ''} ${isFlag && onUpdateEventDate ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
+                    data-event-marker
+                    onMouseDown={isFlag && onUpdateEventDate ? (e) => handleFlagDragStart(ev.id, e) : undefined}
                     onClick={isTeamSwap ? (e) => {
                       e.preventDefault();
                       e.stopPropagation();
@@ -1009,6 +1013,7 @@ export const Timeline = ({
                         : isTeamSwap ? 'bg-accent-blue' : 'bg-foreground'}
                       ${evDiffStatus === 'added' ? 'ring-2 ring-emerald-500' : ''}
                       ${evDiffStatus === 'modified' ? 'ring-2 ring-amber-500' : ''}
+                      ${isDragging ? 'scale-125 ring-2 ring-flag/50 shadow-2xl' : ''}
                     `}
                     >
                       {ev.isFlag 
