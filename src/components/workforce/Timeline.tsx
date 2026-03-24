@@ -233,95 +233,69 @@ export const Timeline = ({
     const emp = allEmployees.find(e => e.id === empId);
     if (!emp) return null;
 
-    // Employee transferred out or is in source team — find who replaced them
-    if (isSourceTeam) {
-      const teamSwapEvent = events.find(e => e.empId === empId && e.type === 'Team Swap');
-      if (teamSwapEvent) {
-        const swapDate = new Date(teamSwapEvent.date).getTime();
-        // Look for someone who joined this team around the same time
-        const replacementEvent = events
-          .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || (e.type === 'New Joiner'))
-          .filter(e => e.empId !== empId)
-          .find(e => {
-            const eDate = new Date(e.date).getTime();
-            if (e.type === 'New Joiner') {
-              const joinerEmp = allEmployees.find(em => em.id === e.empId);
-              return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
-            }
-            return Math.abs(eDate - swapDate) <= replacementWindow;
-          });
-        if (replacementEvent) {
-          const replacementEmp = allEmployees.find(e => e.id === replacementEvent.empId);
-          return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
-        }
-        return { type: 'needs_replacement' as const, person: null, role: emp.role };
-      }
-    }
+    const getClosestEvent = (candidateEvents: WorkforceEvent[], referenceTime: number) => {
+      return candidateEvents
+        .map(event => ({ event, distance: Math.abs(new Date(event.date).getTime() - referenceTime) }))
+        .filter(({ distance }) => distance <= replacementWindow)
+        .sort((a, b) => a.distance - b.distance)[0]?.event || null;
+    };
 
-    // Employee transferred in — find who they replaced
-    if (isTransfer && transferInfo) {
-      const transferDate = new Date(transferInfo.transferDate).getTime();
-      const replacedEvent = events
-        .filter(e => (e.type === 'Team Swap' || e.type === 'Departure') && e.empId !== empId)
-        .filter(e => {
-          const srcEmp = allEmployees.find(em => em.id === e.empId);
-          if (e.type === 'Team Swap') return srcEmp?.team === teamName;
-          if (e.type === 'Departure') return srcEmp?.team === teamName;
-          return false;
-        })
-        .find(e => Math.abs(new Date(e.date).getTime() - transferDate) <= replacementWindow);
-      if (replacedEvent) {
-        const replacedEmp = allEmployees.find(e => e.id === replacedEvent.empId);
-        return { type: 'replacing' as const, person: replacedEmp || null, role: replacedEmp?.role };
-      }
-    }
-
-    // Check departed employees who have no replacement (past or future)
-    const departureEvent = events.find(e => e.empId === empId && e.type === 'Departure');
-    if (departureEvent) {
-      const depDate = new Date(departureEvent.date).getTime();
-      const replacementEvent = events
-        .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
-        .filter(e => e.empId !== empId)
-        .find(e => {
-          const eDate = new Date(e.date).getTime();
-          if (e.type === 'New Joiner') {
-            const joinerEmp = allEmployees.find(em => em.id === e.empId);
-            return joinerEmp?.team === teamName && Math.abs(eDate - depDate) <= replacementWindow;
+    const findIncomingReplacement = (referenceTime: number) => {
+      const replacementEvent = getClosestEvent(
+        events.filter(event => {
+          if (event.empId === empId) return false;
+          if (event.type === 'Team Swap') return event.targetTeam === teamName;
+          if (event.type === 'New Joiner') {
+            const joinerEmp = allEmployees.find(candidate => candidate.id === event.empId);
+            return joinerEmp?.team === teamName;
           }
-          return Math.abs(eDate - depDate) <= replacementWindow;
-        });
-      if (!replacementEvent) {
-        return { type: 'needs_replacement' as const, person: null, role: emp.role };
-      }
-      if (replacementEvent) {
-        const replacementEmp = allEmployees.find(e => e.id === replacementEvent.empId);
-        return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
-      }
+          return false;
+        }),
+        referenceTime
+      );
+
+      if (!replacementEvent) return null;
+
+      const replacementEmp = allEmployees.find(candidate => candidate.id === replacementEvent.empId);
+      return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
+    };
+
+    const findOutgoingReplacement = (referenceTime: number) => {
+      const replacedEvent = getClosestEvent(
+        events.filter(event => {
+          if (event.empId === empId) return false;
+          if (event.type !== 'Team Swap' && event.type !== 'Departure') return false;
+          const sourceEmp = allEmployees.find(candidate => candidate.id === event.empId);
+          return sourceEmp?.team === teamName;
+        }),
+        referenceTime
+      );
+
+      if (!replacedEvent) return null;
+
+      const replacedEmp = allEmployees.find(candidate => candidate.id === replacedEvent.empId);
+      return { type: 'replacing' as const, person: replacedEmp || null, role: replacedEmp?.role };
+    };
+
+    const departureEvent = events.find(event => event.empId === empId && event.type === 'Departure');
+    if (departureEvent) {
+      const replacement = findIncomingReplacement(new Date(departureEvent.date).getTime());
+      return replacement || { type: 'needs_replacement' as const, person: null, role: emp.role };
     }
 
-    // Check future team swap out (not isSourceTeam — this is for non-history mode)
-    if (!isSourceTeam && !isTransfer) {
-      const futureSwap = events.find(e => e.empId === empId && e.type === 'Team Swap');
-      if (futureSwap) {
-        const swapDate = new Date(futureSwap.date).getTime();
-        const replacementEvent = events
-          .filter(e => (e.type === 'Team Swap' && e.targetTeam === teamName) || e.type === 'New Joiner')
-          .filter(e => e.empId !== empId)
-          .find(e => {
-            const eDate = new Date(e.date).getTime();
-            if (e.type === 'New Joiner') {
-              const joinerEmp = allEmployees.find(em => em.id === e.empId);
-              return joinerEmp?.team === teamName && Math.abs(eDate - swapDate) <= replacementWindow;
-            }
-            return Math.abs(eDate - swapDate) <= replacementWindow;
-          });
-        if (replacementEvent) {
-          const replacementEmp = allEmployees.find(e => e.id === replacementEvent.empId);
-          return { type: 'replaced_by' as const, person: replacementEmp || null, role: replacementEmp?.role };
-        }
-        return { type: 'needs_replacement' as const, person: null, role: emp.role };
-      }
+    const teamSwapEvent = events.find(event => event.empId === empId && event.type === 'Team Swap');
+    if ((isSourceTeam || !isTransfer) && teamSwapEvent && emp.team === teamName) {
+      const replacement = findIncomingReplacement(new Date(teamSwapEvent.date).getTime());
+      return replacement || { type: 'needs_replacement' as const, person: null, role: emp.role };
+    }
+
+    if (isTransfer && transferInfo) {
+      return findOutgoingReplacement(new Date(transferInfo.transferDate).getTime());
+    }
+
+    const newJoinerEvent = events.find(event => event.empId === empId && event.type === 'New Joiner');
+    if (newJoinerEvent && emp.team === teamName && new Date(newJoinerEvent.date).getTime() >= currentDate.getTime()) {
+      return findOutgoingReplacement(new Date(newJoinerEvent.date).getTime());
     }
 
     return null;
