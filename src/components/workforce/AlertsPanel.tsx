@@ -167,7 +167,7 @@ export const AlertsPanel = ({ employees, events, teamStructures, hierarchy, onNa
         result.push({
           id: `leader-${teamName}`,
           type: 'no_leader',
-          severity: 'warning',
+          severity: 'critical',
           title: `${teamName} has no leader`,
           description: `${teamMembers.length} members without a designated team leader`,
           team: teamName,
