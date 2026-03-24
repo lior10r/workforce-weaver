@@ -249,7 +249,23 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     {formatDate(phase.startDate)} — {phase.endDate ? formatDate(phase.endDate) : 'Present'}
                   </p>
                 </div>
-                <div className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50">
+                <div
+                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair"
+                  onClick={(e) => {
+                    if (!onAddTimelineNote) return;
+                    // Don't trigger if clicking on an event marker or popover
+                    if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const pct = clickX / rect.width;
+                    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+                    const clickDate = new Date(rangeStart.getTime() + pct * rangeMs);
+                    const dateStr = clickDate.toISOString().split('T')[0];
+                    setClickNoteDate(dateStr);
+                    setClickNotePos(pct * 100);
+                    setClickNoteText('');
+                  }}
+                >
                   {/* Grid lines */}
                   <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${columnLabels.length}, 1fr)` }}>
                     {columnLabels.map((_, i) => <div key={i} className="border-l first:border-l-0 border-border/30" />)}
