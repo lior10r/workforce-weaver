@@ -4,6 +4,7 @@ import { ArrowLeft, Edit2, Flag, Plus, Calendar, Users, ChevronRight, Check, Tra
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { Employee, WorkforceEvent, getRoleColor, formatDate, getTeamParent, getCapacityWeight } from '@/lib/workforce-data';
+import { PersonalTimeline } from '@/components/workforce/PersonalTimeline';
 import { EmployeeNotes } from '@/components/workforce/EmployeeNotes';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
@@ -178,9 +179,9 @@ const EmployeeProfile = () => {
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto px-6 py-8">
           {/* Back button */}
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
+          <button onClick={() => navigate('/')} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-6">
             <ArrowLeft size={18} />
-            <span className="text-sm font-medium">Back</span>
+            <span className="text-sm font-medium">Back to Operations Center</span>
           </button>
 
           {/* Header */}
@@ -226,6 +227,24 @@ const EmployeeProfile = () => {
               </Button>
             </div>
           </div>
+
+          {/* Personal Timeline */}
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar size={16} className="text-primary" /> Career Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PersonalTimeline
+                employee={employee}
+                allEmployees={employees}
+                events={events}
+                onResolveFlag={(eventId, note) => handleResolveFlag(eventId, note)}
+                onDeleteEvent={handleDeleteEvent}
+              />
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left column */}
