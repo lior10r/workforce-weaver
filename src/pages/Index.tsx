@@ -1292,7 +1292,19 @@ const Index = () => {
                 }}
                 onDeleteEvent={handleDeleteEvent}
                 onEditEmployee={handleEditEmployee}
-                
+                onUpdateEventDate={(eventId, newDate) => {
+                  const event = events.find(e => e.id === eventId);
+                  if (!event) return;
+                  const scenarioId = ensureWorkingScenario();
+                  setScenarios(prev => prev.map(s => {
+                    if (s.id !== scenarioId) return s;
+                    const inProposed = s.proposedEvents.find(e => e.id === eventId);
+                    if (inProposed) {
+                      return { ...s, proposedEvents: s.proposedEvents.map(e => e.id === eventId ? { ...e, date: newDate } : e) };
+                    }
+                    return { ...s, proposedEvents: [...s.proposedEvents, { ...event, date: newDate }] };
+                  }));
+                }}
               />
             </div>
           )}
