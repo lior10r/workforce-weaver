@@ -11,9 +11,10 @@ interface DashboardProps {
   departments: Record<string, string[]>;
   teamStructures: TeamStructure[];
   fullHierarchy: HierarchyStructure;
+  onNavigateToTeam?: (teamName: string) => void;
 }
 
-export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy }: DashboardProps) => {
+export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHierarchy, departments, teamStructures, fullHierarchy, onNavigateToTeam }: DashboardProps) => {
   const today = new Date();
   const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
   
@@ -36,6 +37,7 @@ export const Dashboard = ({ employees, allEmployees, events, hierarchy, setHiera
         events={events}
         teamStructures={teamStructures}
         hierarchy={fullHierarchy}
+        onNavigateToTeam={onNavigateToTeam}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
