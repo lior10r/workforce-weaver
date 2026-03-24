@@ -273,7 +273,6 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
             const endPos = phase.endDate ? pos(phase.endDate) : 100;
             const width = Math.max(0, endPos - startPos);
             const phaseEvents = empEvents.filter(e => {
-              if (e.isFlag) return false; // flags shown separately
               const evDate = new Date(e.date);
               const phaseStart = new Date(phase.startDate);
               const phaseEnd = phase.endDate ? new Date(phase.endDate) : new Date('2099-12-31');
