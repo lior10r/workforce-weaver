@@ -1183,6 +1183,21 @@ const Index = () => {
               departments={departments}
               teamStructures={teamStructures}
               fullHierarchy={hierarchy}
+              onNavigateToTeam={(teamName) => {
+                const dept = hierarchy.find(d => {
+                  const allTeams = [...(d.directTeams || [])];
+                  d.groups.forEach(g => allTeams.push(...g.teams));
+                  return allTeams.includes(teamName);
+                });
+                if (dept) {
+                  setScopeFilter(prev => ({
+                    ...prev,
+                    departments: [dept.name],
+                    teams: [teamName],
+                  }));
+                }
+                setView('timeline');
+              }}
             />
           )}
 
