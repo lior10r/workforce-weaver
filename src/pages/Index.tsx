@@ -1198,6 +1198,11 @@ const Index = () => {
                 }
                 setView('timeline');
               }}
+              onHireForTeam={(isAdmin || user?.role === 'manager') ? (prefill) => {
+                setEmployeePrefill(prefill);
+                setEditingEmployee(null);
+                setIsEmployeeModalOpen(true);
+              } : undefined}
             />
           )}
 
