@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, UserPlus, Clock, Filter, ChevronDown, Arro
 import { Employee, WorkforceEvent, TeamStructure, HierarchyStructure, formatDate, getTeamParent } from '@/lib/workforce-data';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface ReplacementGap {
