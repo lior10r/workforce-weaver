@@ -1025,6 +1025,11 @@ export const Timeline = ({
                         : <Clock size={10} className="text-background" />
                       }
                     </div>
+                    {isDragging && dragPreviewDate && (
+                      <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap bg-popover border border-border rounded px-2 py-0.5 text-[10px] font-mono text-foreground shadow-lg z-40">
+                        {formatDate(dragPreviewDate)}
+                      </div>
+                    )}
                   </div>
                 </PopoverTrigger>
                 <PopoverContent 
