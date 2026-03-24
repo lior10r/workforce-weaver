@@ -1067,6 +1067,7 @@ const Index = () => {
         hierarchy={hierarchy}
         showDeparted={showDeparted}
         setShowDeparted={setShowDeparted}
+        uncoveredReplacementCount={uncoveredReplacementCount}
       />
 
       {/* Main Content */}
