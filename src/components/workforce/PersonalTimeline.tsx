@@ -443,46 +443,6 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     );
                   })}
 
-                  {/* Click-to-add-note inline input */}
-                  {clickNoteDate && onAddTimelineNote && (
-                    <div
-                      style={{ left: `${clickNotePos}%` }}
-                      className="absolute top-full mt-1 -translate-x-1/2 z-40 flex items-center gap-1 bg-popover border border-border rounded-lg p-2 shadow-xl"
-                      onClick={e => e.stopPropagation()}
-                    >
-                      <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{formatDate(clickNoteDate)}</span>
-                      <Input
-                        autoFocus
-                        placeholder="Add note..."
-                        value={clickNoteText}
-                        onChange={e => setClickNoteText(e.target.value)}
-                        className="w-[160px] h-7 text-xs"
-                        onKeyDown={e => {
-                          if (e.key === 'Enter' && clickNoteText.trim()) {
-                            onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
-                            setClickNoteDate(null);
-                            setClickNoteText('');
-                          }
-                          if (e.key === 'Escape') {
-                            setClickNoteDate(null);
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        className="h-7 text-xs px-2"
-                        disabled={!clickNoteText.trim()}
-                        onClick={() => {
-                          onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
-                          setClickNoteDate(null);
-                          setClickNoteText('');
-                        }}
-                      >
-                        <Check size={12} />
-                      </Button>
-                    </div>
-                  )}
-
                   {/* End marker for departure */}
                   {phase.endDate && idx === phases.length - 1 && (empEvents.some(e => e.type === 'Departure') || employee.departureDate) && (
                     <Tooltip>
