@@ -29,10 +29,10 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
     setSelectedType(prefill.isFlag ? 'Decision Flag' : 'Promotion');
     setSelectedEmpId(prefill.empId);
     setSelectedNewRole('');
-    setStartDate(undefined);
+    setStartDate(prefill.date ? new Date(prefill.date + 'T00:00:00') : undefined);
     setEndDate(undefined);
     setSelectedDept(Object.keys(departments)[0] || '');
-  }, [isOpen, prefill.empId, prefill.isFlag, departments]);
+  }, [isOpen, prefill.empId, prefill.isFlag, prefill.date, departments]);
 
   // Get selected employee's current role for promotion options
   const selectedEmployee = useMemo(() => {

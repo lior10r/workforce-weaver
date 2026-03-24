@@ -630,8 +630,8 @@ const Index = () => {
     }));
   };
 
-  const openPlannerForUser = (empId: number, asFlag = false) => {
-    setEventPrefill({ empId, isFlag: asFlag });
+  const openPlannerForUser = (empId: number, asFlag = false, date?: string) => {
+    setEventPrefill({ empId, isFlag: asFlag, date });
     setIsEventModalOpen(true);
   };
 
