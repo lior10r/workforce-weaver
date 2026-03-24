@@ -228,6 +228,24 @@ const EmployeeProfile = () => {
             </div>
           </div>
 
+          {/* Personal Timeline */}
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar size={16} className="text-primary" /> Career Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <PersonalTimeline
+                employee={employee}
+                allEmployees={employees}
+                events={events}
+                onResolveFlag={(eventId, note) => handleResolveFlag(eventId, note)}
+                onDeleteEvent={handleDeleteEvent}
+              />
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left column */}
             <div className="lg:col-span-2 space-y-6">
