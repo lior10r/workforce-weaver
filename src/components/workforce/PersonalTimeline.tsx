@@ -43,6 +43,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
+  const [clickNoteText, setClickNoteText] = useState('');
+  const [clickNotePos, setClickNotePos] = useState<number>(0);
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
