@@ -43,6 +43,9 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteDate, setNoteDate] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [clickNoteDate, setClickNoteDate] = useState<string | null>(null);
+  const [clickNoteText, setClickNoteText] = useState('');
+  const [clickNotePos, setClickNotePos] = useState<number>(0);
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
   // Compute all "phases" — periods in different teams
@@ -246,7 +249,23 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                     {formatDate(phase.startDate)} — {phase.endDate ? formatDate(phase.endDate) : 'Present'}
                   </p>
                 </div>
-                <div className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50">
+                <div
+                  className="flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 cursor-crosshair"
+                  onClick={(e) => {
+                    if (!onAddTimelineNote) return;
+                    // Don't trigger if clicking on an event marker or popover
+                    if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const clickX = e.clientX - rect.left;
+                    const pct = clickX / rect.width;
+                    const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+                    const clickDate = new Date(rangeStart.getTime() + pct * rangeMs);
+                    const dateStr = clickDate.toISOString().split('T')[0];
+                    setClickNoteDate(dateStr);
+                    setClickNotePos(pct * 100);
+                    setClickNoteText('');
+                  }}
+                >
                   {/* Grid lines */}
                   <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${columnLabels.length}, 1fr)` }}>
                     {columnLabels.map((_, i) => <div key={i} className="border-l first:border-l-0 border-border/30" />)}
@@ -317,7 +336,7 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                         <PopoverTrigger asChild>
                           <div
                             style={{ left: `${evPos}%` }}
-                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
                           >
                             <div className={`p-1.5 rounded-full shadow-lg transition-transform hover:scale-110 ${
                               isNote ? 'bg-amber-500' : isSwap ? 'bg-primary' : 'bg-foreground'
@@ -342,6 +361,46 @@ export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag
                       </Popover>
                     );
                   })}
+
+                  {/* Click-to-add-note inline input */}
+                  {clickNoteDate && onAddTimelineNote && (
+                    <div
+                      style={{ left: `${clickNotePos}%` }}
+                      className="absolute top-full mt-1 -translate-x-1/2 z-40 flex items-center gap-1 bg-popover border border-border rounded-lg p-2 shadow-xl"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <span className="text-[10px] font-mono text-muted-foreground whitespace-nowrap">{formatDate(clickNoteDate)}</span>
+                      <Input
+                        autoFocus
+                        placeholder="Add note..."
+                        value={clickNoteText}
+                        onChange={e => setClickNoteText(e.target.value)}
+                        className="w-[160px] h-7 text-xs"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && clickNoteText.trim()) {
+                            onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
+                            setClickNoteDate(null);
+                            setClickNoteText('');
+                          }
+                          if (e.key === 'Escape') {
+                            setClickNoteDate(null);
+                          }
+                        }}
+                      />
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs px-2"
+                        disabled={!clickNoteText.trim()}
+                        onClick={() => {
+                          onAddTimelineNote(employee.id, clickNoteDate, clickNoteText.trim());
+                          setClickNoteDate(null);
+                          setClickNoteText('');
+                        }}
+                      >
+                        <Check size={12} />
+                      </Button>
+                    </div>
+                  )}
 
                   {/* End marker for departure */}
                   {phase.endDate && idx === phases.length - 1 && (empEvents.some(e => e.type === 'Departure') || employee.departureDate) && (
