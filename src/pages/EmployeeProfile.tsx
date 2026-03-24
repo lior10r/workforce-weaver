@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createScenario, addScenarioChangelogEntry, getScenarioEmployees, getScenarioEvents } from '@/lib/workforce-data';
+import { createScenario, addScenarioChangelogEntry } from '@/lib/workforce-data';
 
 const EmployeeProfile = () => {
   const { id } = useParams<{ id: string }>();
