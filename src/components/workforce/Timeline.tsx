@@ -144,6 +144,11 @@ export const Timeline = ({
   // Resolution dialog state
   const [resolvingEventId, setResolvingEventId] = useState<number | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
+  
+  // Drag state for flags
+  const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
+  const [dragPreviewPos, setDragPreviewPos] = useState<number>(0);
+  const [dragPreviewDate, setDragPreviewDate] = useState<string | null>(null);
 
   // Range state
   const defaultYears = useMemo(() => getDefaultYearsRange(), []);
