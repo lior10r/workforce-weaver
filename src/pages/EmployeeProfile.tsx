@@ -267,7 +267,7 @@ const EmployeeProfile = () => {
             </CardHeader>
             <CardContent>
               <PersonalTimeline
-                employee={employee}
+                employee={rawEmployee || employee}
                 allEmployees={employees}
                 events={events}
                 onResolveFlag={(eventId, note) => handleResolveFlag(eventId, note)}
