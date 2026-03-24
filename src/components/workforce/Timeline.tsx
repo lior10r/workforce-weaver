@@ -17,7 +17,7 @@ type TimelineScale = 'years' | 'quarters';
 interface TimelineProps {
   employees: Employee[];
   events: WorkforceEvent[];
-  openPlannerForUser: (empId: number, asFlag?: boolean) => void;
+  openPlannerForUser: (empId: number, asFlag?: boolean, date?: string) => void;
   allEmployees?: Employee[];
   effectiveEmployees?: Employee[]; // employees with past Team Swap applied — used for alerts/leader checks
   selectedTeam?: string;
@@ -761,7 +761,20 @@ export const Timeline = ({
         </div>
 
         {/* Gantt Area */}
-        <div className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50`}>
+        <div
+          className={`flex-1 h-10 relative bg-secondary/30 rounded-lg border border-border/50 ${!isPotential ? 'cursor-crosshair' : ''}`}
+          onClick={(e) => {
+            if (isPotential) return;
+            if ((e.target as HTMLElement).closest('[data-event-marker]')) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const pct = clickX / rect.width;
+            const rangeMs = rangeEnd.getTime() - rangeStart.getTime();
+            const clickDate = new Date(rangeStart.getTime() + pct * rangeMs);
+            const dateStr = clickDate.toISOString().split('T')[0];
+            openPlannerForUser(emp.id, true, dateStr);
+          }}
+        >
           {/* Grid lines */}
           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${columnLabels.length}, 1fr)` }}>
             {columnLabels.map((label, i) => (
@@ -941,7 +954,7 @@ export const Timeline = ({
                 <PopoverTrigger asChild>
                   <div 
                     style={{ left: `${evPos}%` }}
-                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer"
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-20 cursor-pointer" data-event-marker
                     onClick={isTeamSwap ? (e) => {
                       e.preventDefault();
                       e.stopPropagation();

@@ -256,7 +256,7 @@ const Index = () => {
   const [isTeamStructureModalOpen, setIsTeamStructureModalOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [editingTeamStructure, setEditingTeamStructure] = useState<{ teamName: string; department: string } | null>(null);
-  const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean }>({ empId: '', isFlag: false });
+  const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean; date?: string }>({ empId: '', isFlag: false });
   const [employeePrefill, setEmployeePrefill] = useState<{ dept: string; team: string; group?: string | null } | undefined>(undefined);
 
   // Update scope filter when hierarchy changes
@@ -630,8 +630,8 @@ const Index = () => {
     }));
   };
 
-  const openPlannerForUser = (empId: number, asFlag = false) => {
-    setEventPrefill({ empId, isFlag: asFlag });
+  const openPlannerForUser = (empId: number, asFlag = false, date?: string) => {
+    setEventPrefill({ empId, isFlag: asFlag, date });
     setIsEventModalOpen(true);
   };
 
