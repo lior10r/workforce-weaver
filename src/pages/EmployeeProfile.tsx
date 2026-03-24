@@ -38,7 +38,7 @@ const EmployeeProfile = () => {
   const [activeScenarioId, setActiveScenarioId] = useState<string | null>(null);
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false);
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-  const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean; date?: string }>({ empId: '', isFlag: false });
+  const [eventPrefill, setEventPrefill] = useState<{ empId: number | string; isFlag: boolean; date?: string; defaultType?: string }>({ empId: '', isFlag: false });
   const [resolvingFlagId, setResolvingFlagId] = useState<number | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
 
@@ -297,7 +297,7 @@ const EmployeeProfile = () => {
                   }));
                 }}
                 openPlannerForUser={(empId, asFlag = false, date) => {
-                  setEventPrefill({ empId, isFlag: asFlag, date });
+                  setEventPrefill({ empId, isFlag: asFlag, date, defaultType: 'Timeline Note' });
                   setIsEventModalOpen(true);
                 }}
               />

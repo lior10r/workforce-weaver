@@ -11,7 +11,7 @@ interface EventModalProps {
   onClose: () => void;
   onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string; newRole?: string }) => void;
   employees: Employee[];
-  prefill: { empId: number | string; isFlag: boolean; date?: string };
+  prefill: { empId: number | string; isFlag: boolean; date?: string; defaultType?: string };
   departments: Record<string, string[]>;
 }
 
@@ -26,7 +26,7 @@ export const EventModal = ({ isOpen, onClose, onSubmit, employees, prefill, depa
   // Sync modal defaults each time it opens (important for Decision Flag vs Movement)
   useEffect(() => {
     if (!isOpen) return;
-    setSelectedType(prefill.isFlag ? 'Decision Flag' : 'Promotion');
+    setSelectedType(prefill.defaultType || (prefill.isFlag ? 'Decision Flag' : 'Promotion'));
     setSelectedEmpId(prefill.empId);
     setSelectedNewRole('');
     setStartDate(prefill.date ? new Date(prefill.date + 'T00:00:00') : undefined);
