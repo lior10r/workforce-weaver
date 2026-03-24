@@ -37,7 +37,7 @@ const generateQuarterLabels = (start: Date, end: Date): string[] => {
   return labels;
 };
 
-export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent }: PersonalTimelineProps) => {
+export const PersonalTimeline = ({ employee, allEmployees, events, onResolveFlag, onDeleteEvent, onAddTimelineNote }: PersonalTimelineProps) => {
   const navigate = useNavigate();
   const empEvents = useMemo(() => events.filter(e => e.empId === employee.id), [events, employee.id]);
 
