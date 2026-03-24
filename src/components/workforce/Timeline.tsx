@@ -29,7 +29,7 @@ interface TimelineProps {
   onResolveFlag?: (eventId: number, resolutionNote: string) => void;
   onDeleteEvent?: (eventId: number) => void;
   onEditEmployee?: (employee: Employee) => void;
-  
+  onUpdateEventDate?: (eventId: number, newDate: string) => void;
 }
 
 interface TrainingPeriod {
