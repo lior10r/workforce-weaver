@@ -4,6 +4,7 @@ import { ArrowLeft, Edit2, Flag, Plus, Calendar, Users, ChevronRight, Check, Tra
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkforceData } from '@/hooks/use-workforce-data';
 import { Employee, WorkforceEvent, getRoleColor, formatDate, getTeamParent, getCapacityWeight } from '@/lib/workforce-data';
+import { PersonalTimeline } from '@/components/workforce/PersonalTimeline';
 import { EmployeeNotes } from '@/components/workforce/EmployeeNotes';
 import { EmployeeModal } from '@/components/workforce/EmployeeModal';
 import { EventModal } from '@/components/workforce/EventModal';
