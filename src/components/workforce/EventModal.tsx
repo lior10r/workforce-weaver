@@ -11,7 +11,7 @@ interface EventModalProps {
   onClose: () => void;
   onSubmit: (event: { empId: number; type: string; date: string; details: string; isFlag: boolean; targetTeam?: string; endDate?: string; newRole?: string }) => void;
   employees: Employee[];
-  prefill: { empId: number | string; isFlag: boolean };
+  prefill: { empId: number | string; isFlag: boolean; date?: string };
   departments: Record<string, string[]>;
 }
 
